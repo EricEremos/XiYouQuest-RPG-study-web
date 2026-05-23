@@ -28,7 +28,7 @@ export function IFLYTEK_API_SECRET() {
   return requireEnv("IFLYTEK_API_SECRET");
 }
 
-// --- OpenRouter (DeepSeek) ---
+// --- OpenRouter (DeepSeek V4 Flash primary, Gemini 2.5 Flash fallback, Gemini 2.5 Flash Image for scene art) ---
 export function OPENROUTER_API_KEY() {
   return requireEnv("OPENROUTER_API_KEY");
 }

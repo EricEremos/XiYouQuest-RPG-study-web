@@ -1,7 +1,7 @@
 import { OPENROUTER_API_KEY } from "@/lib/env";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL = "google/gemini-2.5-flash";
+const MODEL = "deepseek/deepseek-v4-flash";
 
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
@@ -77,7 +77,7 @@ async function chatCompletion(
 
 // ---------- Quick Completion (lightweight, no retries) ----------
 
-const FALLBACK_MODEL = "minimax/minimax-m2.5";
+const FALLBACK_MODEL = "google/gemini-2.5-flash";
 
 async function fetchCompletion(model: string, systemPrompt: string, userPrompt: string, timeoutMs: number, maxTokens = 400): Promise<string> {
   const start = Date.now();

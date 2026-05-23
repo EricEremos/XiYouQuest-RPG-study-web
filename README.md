@@ -21,8 +21,8 @@
   <img src="https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?logo=supabase" alt="Supabase" />
   <img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss" alt="Tailwind" />
   <img src="https://img.shields.io/badge/iFlytek-ISE_+_ASR_+_TTS-FF6B35" alt="iFlytek" />
-  <img src="https://img.shields.io/badge/Gemini-2.5_Flash-4285F4?logo=google" alt="Gemini 2.5 Flash" />
-  <img src="https://img.shields.io/badge/MiniMax-M2.5_(fallback)-8B5CF6" alt="MiniMax M2.5" />
+  <img src="https://img.shields.io/badge/DeepSeek-V4_Flash-5B5BD6" alt="DeepSeek V4 Flash" />
+  <img src="https://img.shields.io/badge/Gemini-2.5_Flash_(fallback)-4285F4?logo=google" alt="Gemini 2.5 Flash fallback" />
   <img src="https://img.shields.io/badge/Vercel-Deployed-000?logo=vercel" alt="Vercel" />
 </p>
 
@@ -91,8 +91,8 @@ Record -> WAV Encode -> iFlytek ISE -> XML Parse -> Gemini Feedback -> XP Award 
 | **Personalized Learning Path** | AI-generated adaptive curriculum with multi-phase study plans, checkpoint assessments, and predicted PSC grade tracking |
 | **Real-time Speech Scoring** | Phone-level accuracy, tone analysis, fluency metrics via iFlytek Intelligent Speech Evaluation |
 | **AI Companions** | 4 Journey to the West characters with unique personalities, expressions, voice lines, and conversation styles |
-| **AI Feedback** | Character-personalized, context-aware study tips powered by Gemini 2.5 Flash via OpenRouter |
-| **AI Image Generation** | Context-aware pixel-art scene images auto-generated every 3 chat turns via Gemini 2.5 Flash |
+| **AI Feedback** | Character-personalized, context-aware study tips powered by DeepSeek V4 Flash via OpenRouter |
+| **AI Image Generation** | Context-aware pixel-art scene images auto-generated every 3 chat turns via Gemini 2.5 Flash Image |
 | **Full Mock Exam** | Timed 5-component simulation with official PSC grade mapping (一级甲等 to 三级乙等) and AI feedback reports |
 | **TTS Playback** | Native Putonghua model audio for every word, sentence, and passage via iFlytek TTS |
 | **Practice History** | Detailed session history with score trends, radar charts, component breakdowns, and AI-generated insights |
@@ -133,7 +133,7 @@ Record -> WAV Encode -> iFlytek ISE -> XML Parse -> Gemini Feedback -> XP Award 
           |              |               |                 |
    +-----------+  +----------+   +------------+   +-------------+
    +-----------+  +---------------+   +------------+
-   |  Supabase |  | Gemini 2.5    |   | iFlytek    |
+   |  Supabase |  | DeepSeek V4   |   | iFlytek    |
    | PostgreSQL|  | Flash         |   | ISE+ASR+TTS|
    |  + RLS    |  | (OpenRouter)  |   | (wss://)   |
    |  + Storage|  | Chat+Feedback |   |            |
@@ -325,7 +325,7 @@ A 7-stage story campaign themed after Journey to the West (西游记), where pla
 
 ## Companion Chat
 
-An interactive voice-driven conversation system where users practice Mandarin with Journey to the West character companions in themed scenarios. Powered by **Gemini 2.5 Flash** (via OpenRouter) with **MiniMax M2.5** as fallback.
+An interactive voice-driven conversation system where users practice Mandarin with Journey to the West character companions in themed scenarios. Powered by **DeepSeek V4 Flash** (via OpenRouter) with **Gemini 2.5 Flash** as fallback.
 
 ### Flow
 
@@ -337,12 +337,12 @@ Select Companion -> Select Scenario -> Chat (voice input + AI reply) -> Summary
 
 1. **Scenario selection** — scenarios tied to quest stage progression across 3 categories: JTTW (Journey to the West lore), modern daily life, and PSC exam practice
 2. **Voice input** — user speaks -> iFlytek ASR transcription -> ISE pronunciation/tone/fluency scoring
-3. **AI response** — conversation history + user transcript fed to Gemini 2.5 Flash -> character-personalized reply with TTS voice. Falls back to MiniMax M2.5 after 3 retries with exponential backoff.
+3. **AI response** — conversation history + user transcript fed to DeepSeek V4 Flash -> character-personalized reply with TTS voice. Falls back to Gemini 2.5 Flash after 3 retries with exponential backoff.
 4. **Off-topic detection** — prompt-enforced via mandatory JSON response schema. The LLM must respond with either `{"type": "reply", "content": "..."}` for on-topic exchanges or `{"type": "redirect", "content": "..."}` for off-topic ones. Detection rules vary by scenario category:
    - **JTTW**: off-topic = unrelated to the scenario, Journey to the West world/lore, Mandarin practice, Chinese culture, or Tang Dynasty life
    - **Modern/PSC**: off-topic = violence, illegal activities, explicit content, character-breaking, or extended non-Chinese passages
    - Redirect responses stay in-character (companion expresses confusion and steers back). Off-topic exchanges are **not saved to the database** and award **0 XP / 0 affection**.
-5. **Automatic scene images** — every 3 on-topic turns, the client non-blockingly triggers `/api/chat/generate-image`. It builds a conversation summary from the last 8 messages, sends it to **Gemini 2.5 Flash** (image mode), and the resulting pixel-art scene is uploaded to Supabase Storage and displayed as a context-aware background behind the chat.
+5. **Automatic scene images** — every 3 on-topic turns, the client non-blockingly triggers `/api/chat/generate-image`. It builds a conversation summary from the last 8 messages, sends it to **Gemini 2.5 Flash Image**, and the resulting pixel-art scene is uploaded to Supabase Storage and displayed as a context-aware background behind the chat.
 6. **Session end** — summary with average scores, XP earned, affection gained, and all generated scene images
 
 ### Rewards
@@ -372,7 +372,7 @@ Initial Assessment (C1-C5 quick quizzes)
 
 ### Key Features
 
-- **AI-generated curriculum** — Gemini 2.5 Flash analyzes initial scores and creates a personalized multi-phase plan
+- **AI-generated curriculum** — DeepSeek V4 Flash analyzes initial scores and creates a personalized multi-phase plan
 - **Learning nodes** — drill and mock_exam type nodes targeting specific components and focus areas
 - **Checkpoint assessments** — mid-plan quizzes with score delta tracking and AI-written progress feedback
 - **Predicted grade trajectory** — shows expected PSC grade at each checkpoint
@@ -480,7 +480,7 @@ All TTS uses **iFlytek's WebSocket API** (`wss://tts-api-sg.xf-yun.com/v2/tts`) 
 
 ## AI Feedback Pipeline
 
-**Gemini 2.5 Flash** (via OpenRouter, fallback: MiniMax M2.5) generates contextual, personality-driven feedback across multiple systems:
+**DeepSeek V4 Flash** (via OpenRouter, fallback: Gemini 2.5 Flash) generates contextual, personality-driven feedback across multiple systems:
 
 ### Practice Feedback
 
@@ -520,7 +520,7 @@ For prompted speaking, Gemini returns structured JSON with `vocabularyLevel` (1-
 
 ## AI Image Generation
 
-**Gemini 2.5 Flash** (via OpenRouter, `google/gemini-2.5-flash-image:nitro`) generates context-aware pixel-art scene images during companion chats.
+**Gemini 2.5 Flash Image** (via OpenRouter, `google/gemini-2.5-flash-image:nitro`) generates context-aware pixel-art scene images during companion chats. Image generation stays on Gemini — DeepSeek does not currently offer an image-gen variant.
 
 - **Trigger**: automatically fires every **3 on-topic user turns** (turn 3, 6, 9, ...) — non-blocking, runs in the background while the conversation continues
 - **Context building**: summarizes the last 8 messages into a scene description, combined with companion name and scenario title
@@ -677,15 +677,15 @@ Request -> Layer 1: Middleware (src/proxy.ts)
 
 | Vercel Route | Edge Function | External APIs |
 |---|---|---|
-| `/api/ai/feedback` | `ai-feedback` | Gemini 2.5 Flash |
-| `/api/ai/insights` | `ai-insights` | Gemini 2.5 Flash |
-| `/api/ai/mock-exam-feedback` | `ai-mock-exam-feedback` | Gemini 2.5 Flash |
+| `/api/ai/feedback` | `ai-feedback` | DeepSeek V4 Flash |
+| `/api/ai/insights` | `ai-insights` | DeepSeek V4 Flash |
+| `/api/ai/mock-exam-feedback` | `ai-mock-exam-feedback` | DeepSeek V4 Flash |
 | `/api/chat/generate-image` | `chat-generate-image` | Gemini 2.5 Flash Image + Supabase Storage |
-| `/api/chat/start` | `chat-start` | Gemini 2.5 Flash + iFlytek TTS |
-| `/api/chat/respond` | `chat-respond` | iFlytek ASR + ISE + Gemini 2.5 Flash |
-| `/api/learning/generate-plan` | `learning-generate-plan` | Gemini 2.5 Flash + DB |
+| `/api/chat/start` | `chat-start` | DeepSeek V4 Flash + iFlytek TTS |
+| `/api/chat/respond` | `chat-respond` | iFlytek ASR + ISE + DeepSeek V4 Flash |
+| `/api/learning/generate-plan` | `learning-generate-plan` | DeepSeek V4 Flash + DB |
 | `/api/speech/assess` | `speech-assess` | iFlytek ISE |
-| `/api/speech/c5-assess` | `speech-c5-assess` | iFlytek ASR + ISE + Gemini 2.5 Flash |
+| `/api/speech/c5-assess` | `speech-c5-assess` | iFlytek ASR + ISE + DeepSeek V4 Flash |
 | `/api/tts/speak` | `tts-speak` | iFlytek TTS |
 | `/api/tts/companion` | `tts-companion` | iFlytek TTS |
 
@@ -731,7 +731,7 @@ All 24+ internal API fetch calls across all practice components, companion chat,
 | **Database** | Supabase (PostgreSQL + RLS + Storage) | Data persistence, auth, file storage |
 | **Edge Runtime** | Supabase Edge Functions (Deno) | Long-running AI/speech routes (150s timeout) |
 | **Auth** | Supabase Auth | Email, Google OAuth, Discord OAuth |
-| **AI (All)** | Gemini 2.5 Flash (via OpenRouter) | Feedback, chat, insights, curriculum, C5 analysis (fallback: MiniMax M2.5) |
+| **AI (All)** | DeepSeek V4 Flash (via OpenRouter) | Feedback, chat, insights, curriculum, C5 analysis (fallback: Gemini 2.5 Flash) |
 | **AI Image Generation** | Gemini 2.5 Flash Image (via OpenRouter) | Context-aware pixel-art scene images every 3 chat turns |
 | **Speech Assessment** | iFlytek ISE (WebSocket) | Pronunciation scoring (zh-CN) |
 | **Speech Recognition** | iFlytek IST (WebSocket) | Speech-to-text for C5 and companion chat |
@@ -777,7 +777,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
-# OpenRouter (Gemini 2.5 Flash + MiniMax M2.5 fallback)
+# OpenRouter (DeepSeek V4 Flash primary + Gemini 2.5 Flash fallback + Gemini 2.5 Flash Image for scene art)
 OPENROUTER_API_KEY=your_openrouter_api_key
 
 # iFlytek (shared by ISE, TTS, and IST)
@@ -904,8 +904,8 @@ src/
 |   +-- supabase/                         # Browser + server Supabase clients
 |   +-- iflytek-speech/                   # ISE + IST WebSocket clients
 |   +-- voice/                            # TTS WebSocket client + pinyin lookup data
-|   +-- gemini/                           # Gemini 2.5 Flash AI client (via OpenRouter) with retry logic
-|   +-- image-gen/                        # Gemini 2.5 Flash image generation client
+|   +-- gemini/                           # OpenRouter LLM client (DeepSeek V4 Flash primary, Gemini 2.5 Flash fallback) — folder name historical
+|   +-- image-gen/                        # Gemini 2.5 Flash Image generation client
 |   +-- quest/                            # Battle logic, stage config, story text
 |   +-- chat/                             # Companion chat prompt building, helpers
 |   +-- achievements/                     # 44 achievement definitions + event-driven checks

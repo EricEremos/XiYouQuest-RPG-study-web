@@ -33,9 +33,9 @@ All clients live in `src/lib/`. Env vars in `.env.local`:
 |---------|------------|----------|
 | Supabase | `supabase/client.ts`, `supabase/server.ts` | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` |
 | iFlytek (ISE + ASR + TTS) | `iflytek-speech/client.ts`, `iflytek-speech/asr-client.ts`, `voice/client.ts` | `IFLYTEK_APP_ID`, `IFLYTEK_API_KEY`, `IFLYTEK_API_SECRET` |
-| DeepSeek v3.2 (via OpenRouter) | `gemini/client.ts` | `OPENROUTER_API_KEY` |
+| DeepSeek V4 Flash (via OpenRouter) | `gemini/client.ts` | `OPENROUTER_API_KEY` |
 
-**Note:** The AI client file is still named `gemini/client.ts` (historical) but uses OpenRouter/DeepSeek. Exports: `generateFeedback()`, `analyzeC5Speaking()`, `chatConversation()`.
+**Note:** The AI client file is still named `gemini/client.ts` (historical) but uses OpenRouter. Primary model: `deepseek/deepseek-v4-flash`. Fallback: `google/gemini-2.5-flash`. Exports: `generateFeedback()`, `analyzeC5Speaking()`, `chatConversation()`.
 
 | Gemini 3.1 Flash (via OpenRouter) | `image-gen/client.ts` | `OPENROUTER_API_KEY` |
 
