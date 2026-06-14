@@ -96,7 +96,7 @@ Record -> WAV Encode -> iFlytek ISE -> XML Parse -> Gemini Feedback -> XP Award 
 | **Full Mock Exam** | Timed 5-component simulation with official PSC grade mapping (一级甲等 to 三级乙等) and AI feedback reports |
 | **TTS Playback** | Native Putonghua model audio for every word, sentence, and passage via iFlytek TTS |
 | **Practice History** | Detailed session history with score trends, radar charts, component breakdowns, and AI-generated insights |
-| **44 Achievements** | 4-tier achievement system (Common/Uncommon/Rare/Epic) with toast notifications and friend activity feed |
+| **40 Achievements** | 4-tier achievement system (Common/Uncommon/Rare/Epic) with toast notifications and friend activity feed |
 | **XP & Levels** | 10-tier progression from Beginner to PSC God with streak multipliers and daily bonuses |
 | **Character Affection** | Build bonds with companions across 5 affection levels by practicing and chatting together |
 | **Social System** | Friends, friend codes (PSC-XXXX), leaderboards, Discord friend suggestions |
@@ -199,7 +199,7 @@ Multiple-choice quiz testing vocabulary accuracy and grammatical judgment — no
 Read a full Chinese passage aloud with sentence-by-sentence scoring.
 
 ```
-Phase 1 - SELECT: Choose passage from grid (30 passages with images)
+Phase 1 - SELECT: Choose passage from grid (passages fetched from question_banks, with images)
 Phase 2 - READY: Interactive passage with per-sentence TTS playback
 Phase 3 - RECORD: Full passage recording via AudioRecorder
 Phase 4 - ASSESS: ISE read_chapter -> sentence-level scores + word detail
@@ -391,15 +391,15 @@ Initial Assessment (C1-C5 quick quizzes)
 
 ## Achievements
 
-44 achievements across 4 tiers, tracked via event-driven checks at 8 trigger points.
+40 achievements across 4 tiers, tracked via event-driven checks at 8 trigger points.
 
 ### Tiers
 
 | Tier | Color | Count | Examples |
 |------|-------|-------|---------|
 | Common | Bronze | 6 | First Steps, Honorable Defeat, Fellow Traveler, Trial by Fire, First Words, First Step |
-| Uncommon | Silver | 12 | Stage 1-7 Cleared, Character Apprentice x4, Chatterbox |
-| Rare | Gold | 12 | Stage 1-7 Flawless, Character Adept x4, Polyglot |
+| Uncommon | Silver | 13 | Stage 1-7 Cleared, Character Apprentice x4, Chatterbox, On Track |
+| Rare | Gold | 13 | Stage 1-7 Flawless, Character Adept x4, Polyglot, Adapting |
 | Epic | Purple | 8 | Journey Complete, Character Master x4, Last Stand, Storyteller, Exam Ready |
 
 ### Trigger Points
@@ -417,7 +417,7 @@ Initial Assessment (C1-C5 quick quizzes)
 
 ### Achievement Page
 
-- Completion summary bar: `X / 44 (Y%)`
+- Completion summary bar: `X / 40 (Y%)`
 - Per-tier breakdown with colored badges
 - Filterable grid (All / Common / Uncommon / Rare / Epic)
 - Locked achievements shown dimmed with descriptions still visible
@@ -802,7 +802,7 @@ Apply migrations to your Supabase project. The schema creates tables with RLS po
 | `practice_details` | Per-question results within sessions |
 | `question_banks` | Questions for all 7 components |
 | `friendships` | Friend requests and relationships |
-| `achievements` | Static achievement catalog (44 achievements) |
+| `achievements` | Static achievement catalog (40 achievements) |
 | `user_achievements` | Per-user unlock records with timestamps |
 | `quest_progress` | Quest stage progress, attempts, best scores |
 | `chat_sessions` | Companion chat session metadata |
@@ -879,7 +879,7 @@ src/
 |   |   +-- characters/                   # Gallery, quest unlocks, affection
 |   |   +-- profile/                      # Stats, history, danger zone
 |   |   +-- social/                       # Friends, requests, search
-|   +-- api/                              # 39 API routes
+|   +-- api/                              # 40 API routes
 |       +-- ai/                           # feedback, insights, mock-exam-feedback
 |       +-- auth/                         # callback, delete-account
 |       +-- chat/                         # start, respond, end, resume, history, delete, generate-image
@@ -899,7 +899,7 @@ src/
 |   |                                       AudioSettings, BGMProvider, SettingsDialog
 |   +-- character/                        # CharacterDisplay, DialogueBox
 |   +-- practice/                         # AudioRecorder (WAV PCM encoder)
-|   +-- quest/                            # 12 battle/story RPG components
+|   +-- quest/                            # 15 battle/story RPG components
 +-- lib/
 |   +-- supabase/                         # Browser + server Supabase clients
 |   +-- iflytek-speech/                   # ISE + IST WebSocket clients
@@ -908,7 +908,7 @@ src/
 |   +-- image-gen/                        # Gemini 2.5 Flash Image generation client
 |   +-- quest/                            # Battle logic, stage config, story text
 |   +-- chat/                             # Companion chat prompt building, helpers
-|   +-- achievements/                     # 44 achievement definitions + event-driven checks
+|   +-- achievements/                     # 40 achievement definitions + event-driven checks
 |   +-- gamification/                     # XP, levels, streaks, affection calculations
 |   +-- scoring/                          # C5 official PSC scoring rubric
 |   +-- edge-routing.ts                   # Dynamic edge function URL resolution
