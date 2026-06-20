@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { calculateXP } from "@/lib/gamification/xp";
 import { randomizeAnswerPositions } from "@/lib/utils";
+import { getSpeakingGuide } from "@/lib/speaking-guides";
 import { encodeWAV } from "@/lib/audio-utils";
 import { matchWordScores } from "@/lib/scoring/word-scores";
 import { AudioRecorder, type AudioRecorderHandle } from "@/components/practice/audio-recorder";
@@ -78,6 +79,7 @@ interface ComponentConfig {
   points: number;
 }
 
+// Full 5-section exam (official PSC weighting: 10/20/10/30/30)
 const COMPONENTS: ComponentConfig[] = [
   { number: 1, name: "Monosyllabic Characters", chineseName: "读单音节字词", timeLimitSeconds: 210, weight: 0.10, points: 10 },
   { number: 2, name: "Multisyllabic Words", chineseName: "读多音节词语", timeLimitSeconds: 150, weight: 0.20, points: 20 },
@@ -85,6 +87,22 @@ const COMPONENTS: ComponentConfig[] = [
   { number: 4, name: "Passage Reading", chineseName: "朗读短文", timeLimitSeconds: 240, weight: 0.30, points: 30 },
   { number: 5, name: "Prompted Speaking", chineseName: "命题说话", timeLimitSeconds: 180, weight: 0.30, points: 30 },
 ];
+
+// Section-3-omitted exam (common computer-based PSC: 10/20/30/40 — speaking weighted 40%)
+const NO_S3_COMPONENTS: ComponentConfig[] = [
+  { number: 1, name: "Monosyllabic Characters", chineseName: "读单音节字词", timeLimitSeconds: 210, weight: 0.10, points: 10 },
+  { number: 2, name: "Multisyllabic Words", chineseName: "读多音节词语", timeLimitSeconds: 150, weight: 0.20, points: 20 },
+  { number: 4, name: "Passage Reading", chineseName: "朗读短文", timeLimitSeconds: 240, weight: 0.30, points: 30 },
+  { number: 5, name: "Prompted Speaking", chineseName: "命题说话", timeLimitSeconds: 180, weight: 0.40, points: 40 },
+];
+
+type ExamMode = "full" | "no-s3";
+
+// 15 minutes of preparation before the exam (real PSC gives 15 min)
+const PREP_TIME_SECONDS = 15 * 60;
+
+// Number of prompted-speaking topic choices offered (real CBT PSC offers 2)
+const EXAM_TOPIC_CHOICES = 2;
 
 // ============================================================
 // PSC Grade mapping
@@ -104,7 +122,7 @@ function getPSCGrade(score: number): { grade: string; description: string } {
 // Main ExamRunner
 // ============================================================
 
-type ExamPhase = "start" | "component" | "transition" | "assessing" | "results";
+type ExamPhase = "start" | "prep" | "component" | "transition" | "assessing" | "results";
 
 // Raw data collected during exam (no scoring)
 interface ComponentRawData {
@@ -192,11 +210,23 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
   const activePassage = passage ?? EXAM_PASSAGE;
   const activeTopics = topics ?? EXAM_TOPICS;
   const [examPhase, setExamPhase] = useState<ExamPhase>("start");
+  const [examMode, setExamMode] = useState<ExamMode>("full");
+  // Components for the selected mode — drives sequencing, weighting and display
+  const activeComponents = examMode === "no-s3" ? NO_S3_COMPONENTS : COMPONENTS;
+  // Lift the speaking topic choices so the prep screen shows the exact future choices
+  const examTopicChoices = useMemo(
+    () => [...activeTopics].sort(() => Math.random() - 0.5).slice(0, EXAM_TOPIC_CHOICES),
+    [activeTopics]
+  );
   const [currentComponentIndex, setCurrentComponentIndex] = useState(0);
   const [rawDataList, setRawDataList] = useState<ComponentRawData[]>([]);
   const [componentResults, setComponentResults] = useState<ComponentResult[]>([]);
   const [assessmentProgress, setAssessmentProgress] = useState(0);
-  const [examStartTime] = useState<number>(Date.now());
+  // Prep notes are intentionally kept in local state only and NEVER threaded into
+  // ComponentRawData / the save payload, so they cannot carry into the scored exam.
+  const [prepNotes, setPrepNotes] = useState("");
+  // Captured at the prep→exam cutover so the 15-min prep is excluded from exam duration
+  const [examStartTime, setExamStartTime] = useState<number>(Date.now());
   const [mockExamAchChecked, setMockExamAchChecked] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [aiFeedbackLoading, setAiFeedbackLoading] = useState(false);
@@ -204,6 +234,28 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
   const [historyLoading, setHistoryLoading] = useState(true);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const hasSavedRef = useRef(false);
+
+  // ---- 15-minute preparation phase ----
+  // When prep time runs out, the exam starts automatically.
+  const handlePrepTimeUp = useCallback(() => {
+    setExamStartTime(Date.now());
+    setCurrentComponentIndex(0);
+    setExamPhase("component");
+  }, []);
+
+  const prepTimer = useExamTimer(PREP_TIME_SECONDS, handlePrepTimeUp, false);
+
+  // Enter the prep phase from the start screen
+  const beginPreparation = useCallback(() => {
+    setExamPhase("prep");
+    prepTimer.start();
+  }, [prepTimer]);
+
+  // Cutover prep → exam (manual "Start Exam Now"). Notes stop being rendered here.
+  const beginExam = useCallback(() => {
+    prepTimer.stop();
+    handlePrepTimeUp();
+  }, [prepTimer, handlePrepTimeUp]);
 
   // ---- Fetch mock exam history on mount ----
   useEffect(() => {
@@ -444,7 +496,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
     const newRawList = [...rawDataList, rawData];
     setRawDataList(newRawList);
 
-    if (currentComponentIndex + 1 >= COMPONENTS.length) {
+    if (currentComponentIndex + 1 >= activeComponents.length) {
       // All components done — start assessment
       setExamPhase("assessing");
       setAssessmentProgress(0);
@@ -453,7 +505,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
       setCurrentComponentIndex(currentComponentIndex + 1);
       setExamPhase("transition");
     }
-  }, [rawDataList, currentComponentIndex, runAllAssessments]);
+  }, [rawDataList, currentComponentIndex, runAllAssessments, activeComponents.length]);
 
   // ---- Check mock exam achievements, save result & fetch AI feedback ----
   const savedExamIdRef = useRef<string | null>(null);
@@ -471,14 +523,14 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
         .catch(() => {});
 
       const weightedTotal = componentResults.reduce((sum, cr) => {
-        const config = COMPONENTS.find((c) => c.number === cr.componentNumber);
+        const config = activeComponents.find((c) => c.number === cr.componentNumber);
         return sum + cr.score * (config?.weight ?? 0);
       }, 0);
       const grade = getPSCGrade(weightedTotal).grade;
       const totalXP = componentResults.reduce((sum, cr) => sum + cr.xpEarned, 0);
       const totalDuration = Math.round((Date.now() - examStartTime) / 1000);
       const componentScores = componentResults.map((cr) => {
-        const config = COMPONENTS.find((c) => c.number === cr.componentNumber);
+        const config = activeComponents.find((c) => c.number === cr.componentNumber);
         return { componentNumber: cr.componentNumber, score: cr.score, points: Math.round((cr.score * (config?.weight ?? 0)) * 10) / 10 };
       });
 
@@ -546,7 +598,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
 
   // ---- Start Screen ----
   if (examPhase === "start") {
-    const totalTime = COMPONENTS.reduce((sum, c) => sum + c.timeLimitSeconds, 0);
+    const totalTime = activeComponents.reduce((sum, c) => sum + c.timeLimitSeconds, 0);
     const totalMinutes = Math.ceil(totalTime / 60);
 
     return (
@@ -556,15 +608,40 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           <div className="text-center space-y-2">
             <h2 className="font-pixel text-sm">Mock PSC Examination</h2>
             <p className="text-muted-foreground">
-              Complete all 5 components to receive your estimated PSC grade.
+              Complete all {activeComponents.length} components to receive your estimated PSC grade.
             </p>
             <p className="text-sm text-muted-foreground">
-              Estimated total time: ~{totalMinutes} minutes
+              15 min preparation + ~{totalMinutes} minutes exam
             </p>
           </div>
 
+          {/* Exam mode selector */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase">Exam Format</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setExamMode("full")}
+                className={`rounded-lg border-2 p-3 text-left transition-colors cursor-pointer ${
+                  examMode === "full" ? "border-primary bg-accent" : "border-border hover:border-primary/50"
+                }`}
+              >
+                <p className="font-medium text-sm">Full (5 sections)</p>
+                <p className="text-xs text-muted-foreground">Includes 选择判断. Speaking = 30%.</p>
+              </button>
+              <button
+                onClick={() => setExamMode("no-s3")}
+                className={`rounded-lg border-2 p-3 text-left transition-colors cursor-pointer ${
+                  examMode === "no-s3" ? "border-primary bg-accent" : "border-border hover:border-primary/50"
+                }`}
+              >
+                <p className="font-medium text-sm">No Section 3 (4 sections)</p>
+                <p className="text-xs text-muted-foreground">Common CBT format. Speaking = 40%.</p>
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-3">
-            {COMPONENTS.map((comp) => (
+            {activeComponents.map((comp) => (
               <div key={comp.number} className="flex items-center justify-between rounded-lg border p-3">
                 <div>
                   <p className="font-medium">
@@ -585,14 +662,8 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           </div>
 
           <div className="flex justify-center">
-            <Button
-              size="lg"
-              onClick={() => {
-                setExamPhase("component");
-                setCurrentComponentIndex(0);
-              }}
-            >
-              Start Mock Exam
+            <Button size="lg" onClick={beginPreparation}>
+              Begin 15-min Preparation
             </Button>
           </div>
         </CardContent>
@@ -669,11 +740,140 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
     );
   }
 
+  // ---- Preparation Screen (15 min, shows all questions + notes) ----
+  if (examPhase === "prep") {
+    const showQuiz = examMode === "full";
+    return (
+      <div className="space-y-4">
+        {/* Sticky prep header with countdown */}
+        <Card>
+          <CardContent className="pt-4 sm:pt-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-pixel text-sm">Preparation</h2>
+                <p className="text-sm text-muted-foreground">
+                  Review all questions and jot notes. Notes will NOT be available once the exam starts.
+                </p>
+              </div>
+              <Badge variant={prepTimer.timeRemaining <= 60 ? "destructive" : "outline"} className="text-base px-3 py-1">
+                {prepTimer.formatTime}
+              </Badge>
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">Answer conventions</p>
+              <p>• Chinese has no singular/plural — always choose the <span className="font-medium">singular</span> form.</p>
+              <p>• For measure words, pick the standard single-unit measure word for the noun.</p>
+            </div>
+            <div className="flex justify-end">
+              <Button size="lg" onClick={beginExam}>
+                Start Exam Now
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Notes scratchpad (prep only) */}
+        <Card>
+          <CardContent className="pt-4 space-y-2">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase">Your Notes (preparation only)</h3>
+            <textarea
+              value={prepNotes}
+              onChange={(e) => setPrepNotes(e.target.value)}
+              placeholder="Jot down ideas for the speaking topic, tricky pronunciations, etc. These disappear when the exam starts."
+              className="w-full min-h-[120px] rounded-lg border bg-background p-3 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </CardContent>
+        </Card>
+
+        {/* C1: Monosyllabic characters */}
+        <Card>
+          <CardContent className="pt-4 space-y-2">
+            <h3 className="text-sm font-medium">读单音节字词 · Monosyllabic ({characters.length})</h3>
+            <div className="max-h-[220px] overflow-y-auto rounded-lg border bg-muted/30 p-3">
+              <div className="grid grid-cols-6 sm:grid-cols-10 gap-1.5">
+                {characters.map((ch, idx) => (
+                  <div key={idx} className="flex items-center justify-center rounded border border-muted p-1.5">
+                    <p className="text-lg font-bold font-chinese">{ch}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* C2: Multisyllabic words */}
+        <Card>
+          <CardContent className="pt-4 space-y-2">
+            <h3 className="text-sm font-medium">读多音节词语 · Multisyllabic ({words.length})</h3>
+            <div className="max-h-[220px] overflow-y-auto rounded-lg border bg-muted/30 p-3">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                {words.map((w, idx) => (
+                  <div key={idx} className="flex items-center justify-center rounded border border-muted p-1.5">
+                    <p className="text-base font-bold font-chinese">{w}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* C3: Quiz questions (full mode only) */}
+        {showQuiz && (
+          <Card>
+            <CardContent className="pt-4 space-y-2">
+              <h3 className="text-sm font-medium">选择判断 · Vocabulary &amp; Grammar ({activeQuizQuestions.length})</h3>
+              <div className="max-h-[260px] overflow-y-auto rounded-lg border bg-muted/30 p-3 space-y-2">
+                {activeQuizQuestions.map((q, idx) => (
+                  <div key={q.id} className="text-sm">
+                    <p className="font-medium">{idx + 1}. {q.prompt}</p>
+                    <p className="text-muted-foreground font-chinese">
+                      {q.options.map((o, i) => `${String.fromCharCode(65 + i)}. ${o}`).join("   ")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* C4: Passage */}
+        <Card>
+          <CardContent className="pt-4 space-y-2">
+            <h3 className="text-sm font-medium">朗读短文 · Passage — {activePassage.title}</h3>
+            <div className="max-h-[260px] overflow-y-auto rounded-lg border bg-muted/30 p-3">
+              <p className="text-base leading-loose font-chinese">{activePassage.content}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* C5: Prompted speaking topic choices */}
+        <Card>
+          <CardContent className="pt-4 space-y-2">
+            <h3 className="text-sm font-medium">命题说话 · Prompted Speaking — choose 1 of {examTopicChoices.length} in the exam</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {examTopicChoices.map((topic, idx) => (
+                <div key={idx} className="rounded-lg border-2 border-border p-4 text-center">
+                  <p className="text-lg sm:text-xl font-bold font-chinese">{topic}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-center pb-6">
+          <Button size="lg" onClick={beginExam}>
+            Start Exam Now
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // ---- Transition Screen (no scores) ----
   if (examPhase === "transition") {
     const lastRaw = rawDataList[rawDataList.length - 1];
     const nextIndex = currentComponentIndex;
-    const nextComp = COMPONENTS[nextIndex];
+    const nextComp = activeComponents[nextIndex];
 
     return (
       <Card>
@@ -732,7 +932,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
   // ---- Results Screen ----
   if (examPhase === "results") {
     const weightedTotal = componentResults.reduce((sum, cr) => {
-      const config = COMPONENTS.find((c) => c.number === cr.componentNumber);
+      const config = activeComponents.find((c) => c.number === cr.componentNumber);
       return sum + cr.score * (config?.weight ?? 0);
     }, 0);
 
@@ -771,7 +971,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
             <div className="space-y-3">
               <h3 className="text-base font-bold text-muted-foreground uppercase">Component Scores</h3>
               {componentResults.map((cr) => {
-                const config = COMPONENTS.find((c) => c.number === cr.componentNumber);
+                const config = activeComponents.find((c) => c.number === cr.componentNumber);
                 const pscPoints = cr.score * (config?.weight ?? 0);
                 const maxPoints = config?.points ?? 0;
                 return (
@@ -850,14 +1050,14 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
   }
 
   // ---- Active Component ----
-  const currentComp = COMPONENTS[currentComponentIndex];
+  const currentComp = activeComponents[currentComponentIndex];
 
   return (
     <div className="space-y-2">
       {/* Exam progress bar */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <span>Component {currentComp.number} of 5</span>
-        <Progress value={(currentComponentIndex / 5) * 100} className="flex-1 h-2" />
+        <span>Component {currentComp.number} of {activeComponents.length}</span>
+        <Progress value={(currentComponentIndex / activeComponents.length) * 100} className="flex-1 h-2" />
         <Badge variant="outline">{currentComp.name}</Badge>
       </div>
 
@@ -895,7 +1095,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
       )}
       {currentComp.number === 5 && (
         <SpeakingComponent
-          topics={activeTopics}
+          topicChoices={examTopicChoices}
           timeLimitSeconds={currentComp.timeLimitSeconds}
           onComplete={handleComponentDone}
         />
@@ -1614,29 +1814,14 @@ function PassageComponent({ passage, timeLimitSeconds, onComplete }: PassageComp
 // Component 5: Prompted Speaking (follows practice session C5 pattern)
 // ============================================================
 
-// Speaking structure template (matches practice session)
-const SPEAKING_TEMPLATE = {
-  opening: "开头（10-15秒）：我想谈谈……。对我来说……很重要/很有意义。",
-  body: [
-    "第一，……（原因/现象）+（例子）",
-    "第二，……（对比/经历）+（细节）",
-    "第三，……（观点/建议）+（总结）",
-  ],
-  bodyLabel: "主体（2分20秒左右）：",
-  closing: "结尾（10-15秒）：总之……。以后我会……，也希望……",
-};
-
 interface SpeakingComponentProps {
-  topics: string[];
+  // Pre-selected topic choices (lifted to ExamRunner so the prep screen shows the exact choices)
+  topicChoices: string[];
   timeLimitSeconds: number;
   onComplete: (rawData: ComponentRawData) => void;
 }
 
-function SpeakingComponent({ topics, timeLimitSeconds, onComplete }: SpeakingComponentProps) {
-  const [topicChoices] = useState<string[]>(() => {
-    const shuffled = [...topics].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 6);
-  });
+function SpeakingComponent({ topicChoices, timeLimitSeconds, onComplete }: SpeakingComponentProps) {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [phase, setPhase] = useState<"choosing" | "prepare" | "countdown" | "recording">("choosing");
   const [isDone, setIsDone] = useState(false);
@@ -1644,6 +1829,9 @@ function SpeakingComponent({ topics, timeLimitSeconds, onComplete }: SpeakingCom
   const [elapsedTime, setElapsedTime] = useState(0);
   const elapsedTimeRef = useRef(0);
   const [volume, setVolume] = useState(0);
+
+  // Structure + tips tailored to the selected topic's category
+  const guide = selectedTopic ? getSpeakingGuide(selectedTopic) : null;
 
   // PCM WAV recording refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -1939,34 +2127,24 @@ function SpeakingComponent({ topics, timeLimitSeconds, onComplete }: SpeakingCom
           <p className="text-2xl sm:text-3xl font-bold font-chinese">{selectedTopic}</p>
         </div>
 
-        {/* Speaking structure guide */}
+        {/* Speaking structure guide (tailored to topic category) */}
         {(phase === "prepare" || phase === "countdown") && (
-          <div className="rounded-lg border bg-muted/30 p-4 space-y-3 text-sm">
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
             <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
-              万能结构 Speaking Structure Guide
+              万能结构 · {guide?.label ?? "Speaking Structure Guide"}
             </h3>
-            <p className="font-medium">{SPEAKING_TEMPLATE.opening}</p>
-            <div>
-              <p className="font-medium">{SPEAKING_TEMPLATE.bodyLabel}</p>
-              <div className="pl-4 space-y-0.5">
-                {SPEAKING_TEMPLATE.body.map((point, index) => (
-                  <p key={index} className="text-muted-foreground">{point}</p>
-                ))}
-              </div>
-            </div>
-            <p className="font-medium">{SPEAKING_TEMPLATE.closing}</p>
+            <p className="leading-relaxed whitespace-pre-line">{guide?.template}</p>
           </div>
         )}
 
-        {/* Tips (prepare phase) */}
+        {/* Tips (prepare phase, tailored to topic category) */}
         {phase === "prepare" && (
           <div className="rounded-lg border p-3 bg-accent/30">
             <h4 className="text-xs font-bold text-muted-foreground uppercase mb-1">Tips</h4>
-            <ul className="text-xs text-muted-foreground space-y-0.5">
-              <li>Speak naturally and avoid long pauses.</li>
-              <li>Use specific examples and personal experiences.</li>
-              <li>Aim to fill the full 3 minutes.</li>
-              <li>Avoid filler words like 嗯、那个、就是.</li>
+            <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-4">
+              {guide?.tips.map((tip, index) => (
+                <li key={index}>{tip}</li>
+              ))}
             </ul>
           </div>
         )}

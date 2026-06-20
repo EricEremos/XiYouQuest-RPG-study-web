@@ -13,26 +13,18 @@ import { calculateXP } from "@/lib/gamification/xp";
 import { getDialogue } from "@/lib/dialogue";
 import { encodeWAV } from "@/lib/audio-utils";
 import { shuffle } from "@/lib/utils";
+import { getSpeakingGuide } from "@/lib/speaking-guides";
 import { fetchWithRetry } from "@/lib/fetch-retry";
 import { useAchievementToast } from "@/components/shared/achievement-toast";
 import { useBGM } from "@/components/shared/bgm-provider";
 import type { ExpressionName } from "@/types/character";
 import type { ComponentNumber } from "@/types/practice";
 
-// Speaking structure template
-const SPEAKING_TEMPLATE = {
-  opening: "开头（10-15秒）：我想谈谈……。对我来说……很重要/很有意义。",
-  body: [
-    "第一，……（原因/现象）+（例子）",
-    "第二，……（对比/经历）+（细节）",
-    "第三，……（观点/建议）+（总结）",
-  ],
-  bodyLabel: "主体（2分20秒左右）：",
-  closing: "结尾（10-15秒）：总之……。以后我会……，也希望……",
-};
-
 // 3 minutes in seconds
 const TOTAL_TIME = 180;
+
+// Number of topic choices offered (real CBT PSC offers 2)
+const TOPIC_CHOICES = 2;
 
 interface SpeakingSessionProps {
   topics: string[];
@@ -87,6 +79,9 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
   const [countdown, setCountdown] = useState(0);
   const [volume, setVolume] = useState(0);
 
+  // Structure + tips tailored to the selected topic's category
+  const guide = selectedTopic ? getSpeakingGuide(selectedTopic) : null;
+
   // PCM WAV recording refs (replaces MediaRecorder)
   const audioContextRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -97,10 +92,10 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
   const hasPlayedGreeting = useRef(false);
   const handleRecordingCompleteRef = useRef<(blob: Blob) => void>(() => {});
 
-  // Pick 6 random topics on mount
+  // Pick the topic choices on mount
   useEffect(() => {
     const shuffled = shuffle(topics);
-    setDisplayTopics(shuffled.slice(0, 6));
+    setDisplayTopics(shuffled.slice(0, TOPIC_CHOICES));
   }, [topics]);
 
   // Greeting on mount (voice disabled)
@@ -226,7 +221,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
   // Shuffle displayed topics
   const shuffleTopics = useCallback(() => {
     const shuffled = shuffle(topics);
-    setDisplayTopics(shuffled.slice(0, 6));
+    setDisplayTopics(shuffled.slice(0, TOPIC_CHOICES));
   }, [topics]);
 
   // Select a random topic
@@ -464,7 +459,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
     setDialogue(getDialogue(character.name, "c5_initial"));
     hasSavedProgress.current = false;
     const shuffled = shuffle(topics);
-    setDisplayTopics(shuffled.slice(0, 6));
+    setDisplayTopics(shuffled.slice(0, TOPIC_CHOICES));
   }, [topics, character.name]);
 
   // Topic selection screen
@@ -813,44 +808,21 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                 <h2 className="text-3xl font-bold font-chinese sm:text-4xl">{selectedTopic}</h2>
               </div>
 
-              {/* Speaking structure template */}
-              <div className="rounded-lg border bg-muted/30 p-4 sm:p-6 space-y-4 max-h-[50vh] overflow-y-auto">
+              {/* Speaking structure guide (tailored to topic category) */}
+              <div className="rounded-lg border bg-muted/30 p-4 sm:p-6 space-y-2 max-h-[50vh] overflow-y-auto">
                 <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wide">
-                  万能结构 Speaking Structure Guide
+                  万能结构 · {guide?.label ?? "Speaking Structure Guide"}
                 </h3>
-
-                {/* Opening */}
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">{SPEAKING_TEMPLATE.opening}</p>
-                </div>
-
-                {/* Body */}
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">{SPEAKING_TEMPLATE.bodyLabel}</p>
-                  <div className="pl-4 space-y-1">
-                    {SPEAKING_TEMPLATE.body.map((point, index) => (
-                      <p key={index} className="text-sm text-muted-foreground">
-                        {point}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Closing */}
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">{SPEAKING_TEMPLATE.closing}</p>
-                </div>
+                <p className="text-sm leading-relaxed whitespace-pre-line">{guide?.template}</p>
               </div>
 
-              {/* Tips */}
+              {/* Tips (tailored to topic category) */}
               <div className="rounded-lg border p-4 bg-accent/30">
                 <h4 className="text-xs font-bold text-muted-foreground uppercase mb-2">Tips</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>Speak naturally and avoid long pauses.</li>
-                  <li>Follow the opening-body-closing structure.</li>
-                  <li>Use specific examples and personal experiences.</li>
-                  <li>Aim to fill the full 3 minutes.</li>
-                  <li>Avoid filler words like 嗯、那个、就是.</li>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-4">
+                  {guide?.tips.map((tip, index) => (
+                    <li key={index}>{tip}</li>
+                  ))}
                 </ul>
               </div>
 

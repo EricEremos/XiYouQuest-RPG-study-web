@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import dynamic from "next/dynamic";
 import { loadSelectedCharacter } from "@/lib/character-loader";
 import { buildPlayerMemory } from "@/lib/gemini/player-memory";
-import { shuffle } from "@/lib/utils";
+import { shuffle, sampleByTone } from "@/lib/utils";
 
 const PracticeSession = dynamic(() => import("./practice-session").then(m => m.PracticeSession), {
   loading: () => (
@@ -38,9 +38,9 @@ export default async function Component2Page({
     loadSelectedCharacter(supabase, userId),
     supabase
       .from("question_banks")
-      .select("content")
+      .select("content, pinyin")
       .eq("component", 2)
-      .limit(50),
+      .limit(600),
   ]);
 
   const playerMemory = await buildPlayerMemory(supabase, userId, character.id ?? "").catch(() => "");
@@ -66,11 +66,13 @@ export default async function Component2Page({
     }
   }
 
-  const questions: string[] = shuffle(
-    lpQuestions ?? (dbQuestions && dbQuestions.length > 0
-      ? dbQuestions.map((q: { content: string }) => q.content)
-      : DEFAULT_WORDS)
-  );
+  // Learning-path questions are intentionally chosen, so keep them as-is (just shuffled).
+  // Otherwise draw a tone-balanced set so practice isn't skewed toward one tone.
+  const questions: string[] = lpQuestions
+    ? shuffle(lpQuestions)
+    : dbQuestions && dbQuestions.length > 0
+      ? sampleByTone(dbQuestions, 50).map((q) => q.content)
+      : shuffle(DEFAULT_WORDS);
 
   return (
     <div className="space-y-4">

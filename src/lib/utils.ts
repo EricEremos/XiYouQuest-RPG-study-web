@@ -15,6 +15,48 @@ export function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+/**
+ * Extract the (first) tone from a tone-number pinyin string.
+ * e.g. "zhe2" -> 2, "fu2 dian3" -> 2 (first syllable), "ma" / "r5" -> 0 (neutral/unknown).
+ */
+export function toneFromPinyin(pinyin?: string | null): 0 | 1 | 2 | 3 | 4 {
+  if (!pinyin) return 0;
+  const m = pinyin.match(/[1-4]/);
+  return m ? (Number(m[0]) as 1 | 2 | 3 | 4) : 0;
+}
+
+/**
+ * Tone-stratified sample: returns `count` items with an even spread across the four
+ * main tones (1-4), drawing extras/leftovers (incl. neutral) to fill. The result is
+ * shuffled so tones interleave. Falls back to a plain shuffle when there are too few
+ * items. Used so reading sections (C1/C2) don't skew toward one tone (e.g. 3rd tone).
+ */
+export function sampleByTone<T extends { pinyin?: string | null }>(items: T[], count: number): T[] {
+  if (items.length <= count) return shuffle(items);
+
+  const groups: Record<0 | 1 | 2 | 3 | 4, T[]> = { 0: [], 1: [], 2: [], 3: [], 4: [] };
+  for (const item of items) groups[toneFromPinyin(item.pinyin)].push(item);
+  (Object.keys(groups) as unknown as (0 | 1 | 2 | 3 | 4)[]).forEach((k) => {
+    groups[k] = shuffle(groups[k]);
+  });
+
+  const mainTones: (1 | 2 | 3 | 4)[] = [1, 2, 3, 4];
+  const perTone = Math.floor(count / mainTones.length);
+
+  const picked: T[] = [];
+  for (const tone of mainTones) {
+    picked.push(...groups[tone].splice(0, perTone));
+  }
+
+  // Fill the remainder (rounding + any short tone groups) from everything left, neutral included.
+  const leftover = shuffle([...groups[1], ...groups[2], ...groups[3], ...groups[4], ...groups[0]]);
+  while (picked.length < count && leftover.length > 0) {
+    picked.push(leftover.shift()!);
+  }
+
+  return shuffle(picked);
+}
+
 /** Format a date string as a relative time (e.g. "2h ago", "3d ago") */
 export function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();

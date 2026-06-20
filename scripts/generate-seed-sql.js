@@ -178,8 +178,12 @@ function parseC3() {
 
   // Load generated additional word-choice questions
   const wcGenerated = JSON.parse(fs.readFileSync(path.join(__dirname, 'generated-c3-wordchoice.json'), 'utf8'));
-  const allWC = [...wcExisting, ...wcGenerated];
-  console.log(`C3A total: ${allWC.length} word-choice questions`);
+  // C3 is seeded SOLELY from the generated-c3-*.json files, which mirror the corrected
+  // live `question_banks` (component=3). The egquestions.md §3 "自制" items (wcExisting etc.)
+  // are intentionally NOT included — they diverge from production and were the source of the
+  // dual-correct / wrong-key problems. Keep the JSON files in sync with the live DB.
+  const allWC = [...wcGenerated];
+  console.log(`C3A total: ${allWC.length} word-choice questions (egquestions §3A skipped: ${wcExisting.length})`);
 
   // --- C3B: Measure-word (量词搭配) ---
   // The egquestions.md only has prompts like "一___椅子", no answer options
@@ -314,8 +318,8 @@ function parseC3() {
     }
   }
   console.log(`C3B existing: ${mwExisting.length} measure-word questions`);
-  const allMW = [...mwExisting, ...mwGenerated];
-  console.log(`C3B total: ${allMW.length} measure-word questions`);
+  const allMW = [...mwGenerated];
+  console.log(`C3B total: ${allMW.length} measure-word questions (egquestions §3B skipped: ${mwExisting.length})`);
 
   // --- C3C: Sentence-order (语序判断) ---
   const soSection = egRaw.match(/### 3C 语序\/表达判断[\s\S]*?```text\n([\s\S]*?)```/);
@@ -336,8 +340,8 @@ function parseC3() {
   }
   console.log(`C3C existing: ${soExisting.length} sentence-order questions`);
   const soGenerated = JSON.parse(fs.readFileSync(path.join(__dirname, 'generated-c3-sentenceorder.json'), 'utf8'));
-  const allSO = [...soExisting, ...soGenerated];
-  console.log(`C3C total: ${allSO.length} sentence-order questions`);
+  const allSO = [...soGenerated];
+  console.log(`C3C total: ${allSO.length} sentence-order questions (egquestions §3C skipped: ${soExisting.length})`);
 
   // Generate SQL for each C3 subtype
   function c3Values(items, type, startIdx) {

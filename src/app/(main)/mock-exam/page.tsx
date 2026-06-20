@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import dynamic from "next/dynamic";
 import { loadSelectedCharacter } from "@/lib/character-loader";
-import { shuffle } from "@/lib/utils";
+import { shuffle, sampleByTone } from "@/lib/utils";
 import type { QuizQuestion } from "@/types/practice";
 
 const ExamRunner = dynamic(() => import("./exam-runner").then(m => m.ExamRunner), {
@@ -49,14 +49,14 @@ export default async function MockExamPage() {
     loadSelectedCharacter(supabase, userId),
     supabase
       .from("question_banks")
-      .select("content")
+      .select("content, pinyin")
       .eq("component", 1)
-      .limit(100),
+      .limit(1100),
     supabase
       .from("question_banks")
-      .select("content")
+      .select("content, pinyin")
       .eq("component", 2)
-      .limit(100),
+      .limit(600),
     supabase
       .from("question_banks")
       .select("id, content, metadata")
@@ -74,8 +74,13 @@ export default async function MockExamPage() {
       .limit(150),
   ]);
 
-  const examCharacters: string[] = shuffle(c1Questions?.length ? c1Questions.map(q => q.content) : FALLBACK_CHARACTERS);
-  const examWords: string[] = shuffle(c2Questions?.length ? c2Questions.map(q => q.content) : FALLBACK_WORDS);
+  // Tone-stratified selection so the exam isn't skewed toward one tone (e.g. 3rd tone)
+  const examCharacters: string[] = c1Questions?.length
+    ? sampleByTone(c1Questions, 100).map((q) => q.content)
+    : shuffle(FALLBACK_CHARACTERS);
+  const examWords: string[] = c2Questions?.length
+    ? sampleByTone(c2Questions, 50).map((q) => q.content)
+    : shuffle(FALLBACK_WORDS);
 
   // C3: Parse quiz questions — pick 10 word-choice + 10 measure-word + 5 sentence-order
   let examQuizQuestions: QuizQuestion[] | undefined;
