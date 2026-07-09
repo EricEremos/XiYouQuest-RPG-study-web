@@ -53,7 +53,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 <Music className="h-4 w-4 text-muted-foreground" />
                 <span className="font-retro text-sm">Music / Effects</span>
               </div>
-              <span className="font-pixel text-xs text-muted-foreground">
+              <span className="font-pixel text-sm text-muted-foreground">
                 {muted ? "Muted" : `${musicPercent}%`}
               </span>
             </div>
@@ -76,7 +76,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 <Volume2 className="h-4 w-4 text-muted-foreground" />
                 <span className="font-retro text-sm">Character Voice</span>
               </div>
-              <span className="font-pixel text-xs text-muted-foreground">
+              <span className="font-pixel text-sm text-muted-foreground">
                 {muted ? "Muted" : `${ttsPercent}%`}
               </span>
             </div>

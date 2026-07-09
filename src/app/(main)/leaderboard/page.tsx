@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/supabase/server";
 import dynamic from "next/dynamic";
 
 const LeaderboardClient = dynamic(
@@ -30,10 +30,7 @@ const LeaderboardClient = dynamic(
 );
 
 export default async function LeaderboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   return <LeaderboardClient userId={user!.id} />;
 }

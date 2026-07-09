@@ -558,7 +558,7 @@ export function PracticeSession({ questions, character, characterId, component, 
 
       {/* Current category indicator */}
       <div className="flex justify-center">
-        <span className="inline-flex items-center rounded-sm border-2 border-primary/30 bg-primary/10 px-4 py-1.5 font-pixel text-xs text-primary pixel-glow">
+        <span className="inline-flex items-center rounded-sm border-2 border-primary/30 bg-primary/10 px-4 py-1.5 font-pixel text-sm text-primary pixel-glow">
           {currentCategoryLabel}
         </span>
       </div>
@@ -643,7 +643,7 @@ export function PracticeSession({ questions, character, characterId, component, 
                                   item.toneScore >= 80 ? "default" :
                                   item.toneScore >= 60 ? "secondary" : "destructive"
                                 }
-                                className="text-xs"
+                                className="text-sm"
                               >
                                 声调 {item.toneScore}
                               </Badge>

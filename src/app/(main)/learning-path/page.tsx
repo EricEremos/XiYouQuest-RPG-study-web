@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { loadSelectedCharacter } from "@/lib/character-loader";
 import { shuffle } from "@/lib/utils";
 import type { QuizQuestion } from "@/types/practice";
@@ -31,7 +31,7 @@ const FALLBACK_WORDS = [
 
 export default async function LearningPathPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   const userId = user!.id;
 

@@ -129,7 +129,7 @@ export function BossAttack({
             {timeLeft}
           </span>
         </div>
-        <span className="font-retro text-xs text-amber-800/50">
+        <span className="font-retro text-sm text-amber-800/50">
           Q{mcqNumber}/{mcqTotal}
         </span>
       </div>
@@ -170,7 +170,7 @@ export function BossAttack({
               disabled={showResult}
               className={optionClass}
             >
-              <span className="font-retro text-xs text-amber-700/60 mr-2">
+              <span className="font-retro text-sm text-amber-700/60 mr-2">
                 {String.fromCharCode(65 + i)}.
               </span>
               {option}

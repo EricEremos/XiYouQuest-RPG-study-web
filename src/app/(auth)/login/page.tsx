@@ -1,5 +1,4 @@
 import { LoginForm } from "./login-form";
-import { Github } from "lucide-react";
 import Image from "next/image";
 
 export default function LoginPage() {
@@ -16,15 +15,6 @@ export default function LoginPage() {
         />
         <LoginForm />
       </div>
-      <a
-        href="https://github.com/baduru11/XiYouQuest-RPG-study-web"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 pixel-border bg-card/90 px-4 py-2 font-pixel text-sm text-foreground hover:text-primary hover:bg-card transition-colors"
-      >
-        <Github className="h-5 w-5" />
-        View on GitHub
-      </a>
     </div>
   );
 }

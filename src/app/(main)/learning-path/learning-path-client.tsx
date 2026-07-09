@@ -2041,7 +2041,7 @@ function ComponentRow({
                     : "bg-muted-foreground/30"
                 }`} />
                 {n.status === "completed" && n.score !== null && (
-                  <span className={`text-xs font-medium ${
+                  <span className={`text-sm font-medium ${
                     n.score >= 80 ? "text-green-600" : n.score >= 60 ? "text-yellow-600" : "text-red-500"
                   }`}>{n.score}</span>
                 )}

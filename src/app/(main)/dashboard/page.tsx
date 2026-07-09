@@ -1,10 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { CHARACTER_IMAGES } from "@/lib/character-images";
 import { DashboardClient } from "./dashboard-client";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   const userId = user!.id;
 

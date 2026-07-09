@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import dynamic from "next/dynamic";
 
 const SocialClient = dynamic(
@@ -24,7 +24,7 @@ const SocialClient = dynamic(
 
 export default async function SocialPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) redirect("/login");
 
   const { data: profile } = await supabase
@@ -33,14 +33,10 @@ export default async function SocialPage() {
     .eq("id", user.id)
     .single();
 
-  // Check if user linked Discord by checking for discord identity
-  const hasDiscord = !!user.identities?.some(i => i.provider === "discord");
-
   return (
     <SocialClient
       userId={user.id}
       friendCode={profile?.friend_code ?? null}
-      hasDiscord={hasDiscord}
     />
   );
 }

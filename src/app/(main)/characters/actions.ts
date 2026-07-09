@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -8,7 +8,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 export async function selectCharacter(characterId: string) {
   if (!UUID_REGEX.test(characterId)) return { error: "Invalid character ID" };
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) return { error: "Not authenticated" };
 
   // Deselect all characters first
@@ -32,7 +32,7 @@ export async function selectCharacter(characterId: string) {
 export async function unlockCharacterByQuest(characterId: string) {
   if (!UUID_REGEX.test(characterId)) return { error: "Invalid character ID" };
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) return { error: "Not authenticated" };
 
   // Get character's unlock_stage requirement

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 
 interface AudioSettingsContextValue {
   /** Music/effects volume (0-1) */
@@ -66,10 +67,11 @@ export function AudioSettingsProvider({
   const saveToSupabase = useCallback((updates: { audio_volume?: number; tts_volume?: number; audio_muted?: boolean }) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
+      const session = await authClient.getSession();
+      const userId = session.data?.user?.id;
+      if (!userId) return;
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      await supabase.from("profiles").update(updates).eq("id", user.id);
+      await supabase.from("profiles").update(updates).eq("id", userId);
     }, 500);
   }, []);
 

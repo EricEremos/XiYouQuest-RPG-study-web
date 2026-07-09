@@ -723,7 +723,7 @@ export function PracticeSession({ questions, character, characterId, component, 
                     {allTrickyElements.has(word) && (
                       <div className="flex flex-wrap gap-1 justify-center">
                         {allTrickyElements.get(word)!.map((element, elemIdx) => (
-                          <Badge key={elemIdx} variant="secondary" className="text-xs">
+                          <Badge key={elemIdx} variant="secondary" className="text-sm">
                             {element.split(" ")[0]}
                           </Badge>
                         ))}
@@ -755,12 +755,12 @@ export function PracticeSession({ questions, character, characterId, component, 
                                   item.toneScore >= 80 ? "default" :
                                   item.toneScore >= 60 ? "secondary" : "destructive"
                                 }
-                                className="text-xs"
+                                className="text-sm"
                               >
                                 声调 {item.toneScore}
                               </Badge>
                             )}
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-sm text-muted-foreground">
                               {item.score >= 90 ? "Perfect!" :
                                item.score >= 60 ? "Good" : "Practice"}
                             </p>
@@ -810,7 +810,7 @@ export function PracticeSession({ questions, character, characterId, component, 
                 <div className="text-center space-y-3">
                   <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
                   <p className="text-sm font-medium">Analyzing pronunciation...</p>
-                  <p className="text-xs text-muted-foreground">Checking tones, accuracy, and fluency</p>
+                  <p className="text-sm text-muted-foreground">Checking tones, accuracy, and fluency</p>
                 </div>
               )}
 

@@ -29,17 +29,17 @@ export function XPBar({ totalXP }: { totalXP: number }) {
               {totalXP}<span className="hidden sm:inline"> XP</span>
             </span>
           </div>
-          <span className="hidden sm:inline font-pixel text-xs text-muted-foreground">
+          <span className="hidden sm:inline font-pixel text-sm text-muted-foreground">
             {name}
           </span>
         </div>
       </TooltipTrigger>
       <TooltipContent className="pixel-border bg-card">
-        <p className="font-pixel text-xs">Level {level}: {name}</p>
+        <p className="font-pixel text-sm">Level {level}: {name}</p>
         {xpToNext ? (
-          <p className="text-xs text-muted-foreground">{xpToNext} XP to next level</p>
+          <p className="text-sm text-muted-foreground">{xpToNext} XP to next level</p>
         ) : (
-          <p className="text-xs text-muted-foreground">Max level reached!</p>
+          <p className="text-sm text-muted-foreground">Max level reached!</p>
         )}
       </TooltipContent>
     </Tooltip>

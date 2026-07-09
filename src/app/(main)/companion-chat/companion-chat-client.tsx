@@ -683,7 +683,7 @@ export default function CompanionChatClient({
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
               <span>{new Date(historyDetail.session.createdAt).toLocaleDateString()}</span>
               <span>{historyDetail.session.messageCount} messages</span>
               {historyDetail.session.avgScore !== null && historyDetail.session.avgScore > 0 && (
@@ -697,7 +697,7 @@ export default function CompanionChatClient({
                 size="sm"
                 onClick={() => handleResumeSession(historyDetail.session)}
                 disabled={isResuming}
-                className="pixel-btn text-xs"
+                className="pixel-btn text-sm"
               >
                 {isResuming ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Play className="h-3 w-3 mr-1" />}
                 {isActive ? "Continue" : "Resume"}
@@ -706,7 +706,7 @@ export default function CompanionChatClient({
                 size="sm"
                 variant="ghost"
                 onClick={() => handleDeleteSession(historyDetail.session.id)}
-                className="text-xs text-muted-foreground hover:text-destructive"
+                className="text-sm text-muted-foreground hover:text-destructive"
               >
                 <Trash2 className="h-3 w-3 mr-1" /> Delete
               </Button>
@@ -721,7 +721,7 @@ export default function CompanionChatClient({
                 }`}>
                   <p className="font-chinese text-sm">{msg.content}</p>
                   {msg.pronunciationScore !== undefined && (
-                    <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-pixel border ${getScoreBg(msg.pronunciationScore)}`}>
+                    <span className={`inline-block mt-1 px-2 py-0.5 text-sm font-pixel border ${getScoreBg(msg.pronunciationScore)}`}>
                       {Math.round(((msg.pronunciationScore ?? 0) + (msg.toneScore ?? 0) + (msg.fluencyScore ?? 0)) / 3)}
                     </span>
                   )}
@@ -752,7 +752,7 @@ export default function CompanionChatClient({
           {sortedSessions.length > 0 && (
             <button
               onClick={toggleSelectMode}
-              className="font-pixel text-xs text-primary hover:text-primary/80 transition-colors"
+              className="font-pixel text-sm text-primary hover:text-primary/80 transition-colors"
             >
               {isSelecting ? "Cancel" : "Select"}
             </button>
@@ -768,13 +768,13 @@ export default function CompanionChatClient({
                   setSelectedIds(new Set(sortedSessions.map(s => s.id)));
                 }
               }}
-              className="font-pixel text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+              className="font-pixel text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
             >
               {allSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
               {allSelected ? "Deselect All" : "Select All"}
             </button>
             {selectedIds.size > 0 && (
-              <span className="font-pixel text-xs text-muted-foreground">{selectedIds.size} selected</span>
+              <span className="font-pixel text-sm text-muted-foreground">{selectedIds.size} selected</span>
             )}
           </div>
         )}
@@ -829,14 +829,14 @@ export default function CompanionChatClient({
                       </div>
                       <p className="text-sm text-muted-foreground">{session.scenarioTitle}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-sm text-muted-foreground">
                           {new Date(session.createdAt).toLocaleDateString()}
                         </span>
-                        <span className="font-pixel text-xs text-primary">
+                        <span className="font-pixel text-sm text-primary">
                           {session.messageCount} msgs
                         </span>
                         {session.avgScore !== null && session.avgScore > 0 && (
-                          <span className={`font-pixel text-xs ${getScoreColor(session.avgScore)}`}>
+                          <span className={`font-pixel text-sm ${getScoreColor(session.avgScore)}`}>
                             Avg: {formatAvgScore(session.avgScore)}
                           </span>
                         )}
@@ -924,11 +924,11 @@ export default function CompanionChatClient({
                     <div className="flex h-full items-center justify-center text-2xl">?</div>
                   )}
                 </div>
-                <p className="font-pixel text-xs text-foreground leading-relaxed">{char.name}</p>
+                <p className="font-pixel text-sm text-foreground leading-relaxed">{char.name}</p>
                 {char.isUnlocked ? (
-                  <p className="text-xs text-muted-foreground mt-1">{affInfo.name}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{affInfo.name}</p>
                 ) : (
-                  <p className="text-xs text-muted-foreground mt-1">Stage {char.unlockStage}</p>
+                  <p className="text-sm text-muted-foreground mt-1">Stage {char.unlockStage}</p>
                 )}
               </button>
             );
@@ -1052,14 +1052,14 @@ export default function CompanionChatClient({
           )}
           <div>
             <p className="font-pixel text-sm text-primary">{selectedCharacter?.name}</p>
-            <p className="text-xs text-muted-foreground">Select a scenario</p>
+            <p className="text-sm text-muted-foreground">Select a scenario</p>
           </div>
         </div>
 
         {/* Modern Daily Life */}
         {modernDaily.length > 0 && (
           <div className="space-y-2">
-            <p className="font-pixel text-xs text-muted-foreground">
+            <p className="font-pixel text-sm text-muted-foreground">
               {CATEGORY_LABELS.modern_daily.zh} — {CATEGORY_LABELS.modern_daily.en}
             </p>
             {modernDaily.map(renderScenarioButton)}
@@ -1069,7 +1069,7 @@ export default function CompanionChatClient({
         {/* PSC Exam */}
         {pscExam.length > 0 && (
           <div className="space-y-2">
-            <p className="font-pixel text-xs text-muted-foreground">
+            <p className="font-pixel text-sm text-muted-foreground">
               {CATEGORY_LABELS.psc_exam.zh} — {CATEGORY_LABELS.psc_exam.en}
             </p>
             {pscExam.map(renderScenarioButton)}
@@ -1103,7 +1103,7 @@ export default function CompanionChatClient({
                   {steps.map((step, i) => (
                     <div
                       key={i}
-                      className={`flex items-center gap-2 text-xs font-pixel transition-all duration-500 ${
+                      className={`flex items-center gap-2 text-sm font-pixel transition-all duration-500 ${
                         i <= loadingStep ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4"
                       }`}
                     >
@@ -1155,7 +1155,7 @@ export default function CompanionChatClient({
                   {steps.map((step, i) => (
                     <div
                       key={i}
-                      className={`flex items-center gap-2 text-xs font-pixel transition-all duration-500 ${
+                      className={`flex items-center gap-2 text-sm font-pixel transition-all duration-500 ${
                         i <= loadingStep ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4"
                       }`}
                     >
@@ -1184,10 +1184,10 @@ export default function CompanionChatClient({
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="font-pixel text-xs text-primary truncate">{selectedCharacter?.name}</p>
-            <p className="font-chinese text-xs text-muted-foreground truncate">{selectedScenario?.title}</p>
+            <p className="font-pixel text-sm text-primary truncate">{selectedCharacter?.name}</p>
+            <p className="font-chinese text-sm text-muted-foreground truncate">{selectedScenario?.title}</p>
           </div>
-          <span className="font-pixel text-xs text-muted-foreground">{turnCount} turns</span>
+          <span className="font-pixel text-sm text-muted-foreground">{turnCount} turns</span>
           <button
             onClick={() => setFilterOffTopic(prev => !prev)}
             title={filterOffTopic ? "Topic filter: ON" : "Topic filter: OFF"}
@@ -1238,7 +1238,7 @@ export default function CompanionChatClient({
                         <p className="font-chinese text-sm leading-relaxed">{msg.content}</p>
                         <button
                           onClick={() => selectedCharacter && playTTS(msg.content, selectedCharacter.voiceId)}
-                          className="mt-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                          className="mt-1 flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors"
                         >
                           <Volume2 className="h-3 w-3" /> Listen
                         </button>
@@ -1259,13 +1259,13 @@ export default function CompanionChatClient({
                             onClick={() => setMessages(prev => prev.map(m =>
                               m.id === msg.id ? { ...m, expandedScore: !m.expandedScore } : m
                             ))}
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-pixel border ${getScoreBg(overall)} ${getScoreColor(overall)}`}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 text-sm font-pixel border ${getScoreBg(overall)} ${getScoreColor(overall)}`}
                           >
                             {overall}
                             {msg.expandedScore ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                           </button>
                           {msg.expandedScore && (
-                            <div className="mt-2 space-y-1 text-xs">
+                            <div className="mt-2 space-y-1 text-sm">
                               <p>Pronunciation: <span className={getScoreColor(msg.pronunciationScore ?? 0)}>{msg.pronunciationScore}</span></p>
                               <p>Tone: <span className={getScoreColor(msg.toneScore ?? 0)}>{msg.toneScore}</span></p>
                               <p>Fluency: <span className={getScoreColor(msg.fluencyScore ?? 0)}>{msg.fluencyScore}</span></p>
@@ -1283,7 +1283,7 @@ export default function CompanionChatClient({
 
           {/* Per-turn reward toast */}
           {rewardToast && (
-            <div className="sticky bottom-2 mx-auto w-fit px-3 py-1.5 rounded-full bg-primary/90 text-primary-foreground text-xs font-pixel shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="sticky bottom-2 mx-auto w-fit px-3 py-1.5 rounded-full bg-primary/90 text-primary-foreground text-sm font-pixel shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
               +{rewardToast.xp} XP  +{rewardToast.affection} Affection
             </div>
           )}
@@ -1295,18 +1295,18 @@ export default function CompanionChatClient({
             <p className="font-chinese text-sm text-foreground text-center">
               Great conversation! You&apos;ve had {turnCount} turns.
             </p>
-            <p className="text-xs text-muted-foreground text-center">
+            <p className="text-sm text-muted-foreground text-center">
               Leave the chat, or keep going?
             </p>
             <div className="flex gap-2 justify-center">
-              <Button size="sm" onClick={handleEndChat} disabled={isProcessing} className="pixel-btn text-xs">
+              <Button size="sm" onClick={handleEndChat} disabled={isProcessing} className="pixel-btn text-sm">
                 <LogOut className="h-3 w-3 mr-1" /> Leave
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => { setShowSoftLimitDialog(false); setSoftLimitDismissed(true); }}
-                className="text-xs"
+                className="text-sm"
               >
                 Keep Going
               </Button>
@@ -1321,7 +1321,7 @@ export default function CompanionChatClient({
             disabled={isProcessing}
           />
           {isProcessing && (
-            <p className="text-center text-xs text-muted-foreground mt-2 font-pixel animate-pulse">
+            <p className="text-center text-sm text-muted-foreground mt-2 font-pixel animate-pulse">
               Processing...
             </p>
           )}

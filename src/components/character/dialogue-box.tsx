@@ -60,7 +60,7 @@ export function DialogueBox({
       {!isComplete && (
         <button
           onClick={handleSkip}
-          className="mt-1 font-pixel text-xs text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+          className="mt-1 font-pixel text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer"
         >
           Skip &gt;&gt;
         </button>

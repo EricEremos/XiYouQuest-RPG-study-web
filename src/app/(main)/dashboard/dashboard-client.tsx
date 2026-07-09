@@ -12,7 +12,6 @@ import {
   VolumeX,
   Play,
   Flame,
-  Github,
   MessageCircle,
   GraduationCap,
 } from "lucide-react";
@@ -129,7 +128,7 @@ export function DashboardClient({
                   className="h-full bg-pixel-green transition-all duration-700"
                   style={{ width: `${progress}%` }}
                 />
-                <span className="absolute inset-0 flex items-center justify-center font-pixel text-xs text-foreground">
+                <span className="absolute inset-0 flex items-center justify-center font-pixel text-sm text-foreground">
                   {xpToNext ? `${xpToNext} XP to next level` : "MAX LEVEL"}
                 </span>
               </div>
@@ -223,17 +222,6 @@ export function DashboardClient({
           </div>
         </Link>
       ))}
-
-      {/* GitHub link */}
-      <a
-        href="https://github.com/baduru11/XiYouQuest-RPG-study-web"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="fixed bottom-4 left-4 z-50 flex items-center gap-1.5 sm:gap-2 pixel-border bg-card/90 px-2.5 py-1.5 sm:px-4 sm:py-2 font-pixel text-xs sm:text-sm text-foreground hover:text-primary hover:bg-card transition-colors"
-      >
-        <Github className="h-4 w-4 sm:h-5 sm:w-5" />
-        <span className="hidden sm:inline">View on</span> GitHub
-      </a>
     </div>
   );
 }

@@ -159,7 +159,7 @@ export function AchievementsClient({
 
       {/* Friend Activity Feed */}
       <div className="space-y-3">
-        <h2 className="font-pixel text-xs text-foreground flex items-center gap-2">
+        <h2 className="font-pixel text-sm text-foreground flex items-center gap-2">
           <Trophy className="h-4 w-4" />
           Recent Activity
         </h2>

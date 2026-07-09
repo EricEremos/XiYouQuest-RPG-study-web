@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { NavbarClient } from "@/components/shared/navbar-client";
 import { ContentWrapper } from "@/components/shared/content-wrapper";
 import { AchievementToastProvider } from "@/components/shared/achievement-toast";
@@ -12,7 +12,7 @@ export default async function MainLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   if (!user) {
     redirect("/login");

@@ -179,7 +179,7 @@ export function LeaderboardClient({ userId }: LeaderboardClientProps) {
                 &middot; &middot; &middot; &middot; &middot;
               </p>
               <div className="flex items-center gap-3">
-                <span className="font-pixel text-xs text-primary">
+                <span className="font-pixel text-sm text-primary">
                   #{userRank.rank}
                 </span>
                 <span className="font-retro text-lg font-bold text-foreground flex-1">
@@ -306,7 +306,7 @@ function PodiumCard({
       </span>
 
       {/* Stat Value */}
-      <span className="font-pixel text-xs text-primary">
+      <span className="font-pixel text-sm text-primary">
         {tab === "streak" ? (
           <span className="flex items-center gap-1">
             <Flame className="h-3 w-3" />

@@ -18,7 +18,7 @@ export function TurnBanner({ phase, visible }: TurnBannerProps) {
         } backdrop-blur-sm animate-banner-in`}
       >
         <p
-          className={`font-pixel text-xs sm:text-sm md:text-base tracking-wider ${
+          className={`font-pixel text-sm sm:text-sm md:text-base tracking-wider ${
             isPlayer
               ? "text-green-400 pixel-glow-green"
               : "text-red-400 pixel-glow"

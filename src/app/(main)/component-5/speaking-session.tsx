@@ -600,7 +600,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">语音 Pronunciation</span>
-                        <Badge variant="secondary" className="text-xs">{analysis.pronunciation.label}</Badge>
+                        <Badge variant="secondary" className="text-sm">{analysis.pronunciation.label}</Badge>
                       </div>
                       <span className={`text-lg font-bold ${
                         analysis.pronunciation.score >= 17 ? "text-green-600" :
@@ -609,7 +609,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                         {analysis.pronunciation.score}/20
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground">{analysis.pronunciation.notes}</p>
+                    <p className="text-sm text-muted-foreground">{analysis.pronunciation.notes}</p>
                     <Progress value={(analysis.pronunciation.score / 20) * 100} className="h-1.5" />
                   </div>
 
@@ -618,7 +618,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">词汇语法 Vocab & Grammar</span>
-                        <Badge variant="secondary" className="text-xs">{analysis.vocabGrammar.label}</Badge>
+                        <Badge variant="secondary" className="text-sm">{analysis.vocabGrammar.label}</Badge>
                       </div>
                       <span className={`text-lg font-bold ${
                         analysis.vocabGrammar.score >= 4 ? "text-green-600" :
@@ -627,7 +627,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                         {analysis.vocabGrammar.score}/5
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground">{analysis.vocabGrammar.notes}</p>
+                    <p className="text-sm text-muted-foreground">{analysis.vocabGrammar.notes}</p>
                     <Progress value={(analysis.vocabGrammar.score / 5) * 100} className="h-1.5" />
                   </div>
 
@@ -636,7 +636,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">自然流畅 Fluency</span>
-                        <Badge variant="secondary" className="text-xs">{analysis.fluency.label}</Badge>
+                        <Badge variant="secondary" className="text-sm">{analysis.fluency.label}</Badge>
                       </div>
                       <span className={`text-lg font-bold ${
                         analysis.fluency.score >= 4 ? "text-green-600" :
@@ -645,7 +645,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                         {analysis.fluency.score}/5
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground">{analysis.fluency.notes}</p>
+                    <p className="text-sm text-muted-foreground">{analysis.fluency.notes}</p>
                     <Progress value={(analysis.fluency.score / 5) * 100} className="h-1.5" />
                   </div>
 
@@ -656,7 +656,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                         <span className="text-sm font-medium text-red-600">时间扣分 Time Penalty</span>
                         <span className="text-lg font-bold text-red-600">-{analysis.timePenalty}</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         Speak for the full 3 minutes to avoid time penalties.
                       </p>
                     </div>
@@ -732,7 +732,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                 value={Math.min((elapsedTime / TOTAL_TIME) * 100, 100)}
                 className="h-2"
               />
-              <p className={`text-xs font-medium ${
+              <p className={`text-sm font-medium ${
                 elapsedTime >= TOTAL_TIME ? "text-green-600" : "text-orange-500"
               }`}>
                 {elapsedTime >= TOTAL_TIME
@@ -818,7 +818,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
 
               {/* Tips (tailored to topic category) */}
               <div className="rounded-lg border p-4 bg-accent/30">
-                <h4 className="text-xs font-bold text-muted-foreground uppercase mb-2">Tips</h4>
+                <h4 className="text-sm font-bold text-muted-foreground uppercase mb-2">Tips</h4>
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-4">
                   {guide?.tips.map((tip, index) => (
                     <li key={index}>{tip}</li>

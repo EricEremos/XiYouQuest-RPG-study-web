@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import dynamic from "next/dynamic";
 
 const ProfileClient = dynamic(() => import("./profile-client"));
@@ -15,9 +15,7 @@ const COMPONENT_NAMES: Record<number, { name: string; chinese: string }> = {
 
 export default async function ProfilePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   const userId = user!.id;
 

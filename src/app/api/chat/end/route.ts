@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { chatEndSchema } from "@/lib/validations";
 import { checkAndUnlockAchievements } from "@/lib/achievements/check";
 import { XP_VALUES } from "@/types/gamification";
@@ -13,7 +13,7 @@ const MIN_EXCHANGES_FOR_STREAK = 5;
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

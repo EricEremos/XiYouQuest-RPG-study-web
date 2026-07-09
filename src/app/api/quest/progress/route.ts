@@ -1,6 +1,6 @@
 // src/app/api/quest/progress/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { STAGE_CONFIGS } from "@/lib/quest/stage-config";
 import { checkAndUnlockAchievements } from "@/lib/achievements/check";
 import { questProgressSchema } from "@/lib/validations";
@@ -15,7 +15,8 @@ const QUEST_TO_DB_NAME: Record<string, string> = {
 /** GET: Fetch all quest progress for the authenticated user */
 export async function GET() {
   const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const user = await getSessionUser();
+  const authError = user ? null : { message: "Unauthorized" };
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -37,7 +38,8 @@ export async function GET() {
 /** POST: Save/update quest progress for a stage */
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const user = await getSessionUser();
+  const authError = user ? null : { message: "Unauthorized" };
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

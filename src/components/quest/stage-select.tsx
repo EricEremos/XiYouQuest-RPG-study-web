@@ -295,7 +295,7 @@ export function StageSelect({
           return (
             <span
               key={`label-${stageNum}`}
-              className="absolute -translate-x-1/2 font-chinese font-bold text-xs sm:text-lg md:text-2xl text-foreground/75 pointer-events-none whitespace-nowrap mt-5 sm:mt-7 md:mt-10 lg:mt-11"
+              className="absolute -translate-x-1/2 font-chinese font-bold text-sm sm:text-lg md:text-2xl text-foreground/75 pointer-events-none whitespace-nowrap mt-5 sm:mt-7 md:mt-10 lg:mt-11"
               style={{
                 left: `${(pos.x / 1000) * 100}%`,
                 top: `${(pos.y / 500) * 100}%`,
@@ -330,14 +330,14 @@ export function StageSelect({
           {/* Stage info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="font-pixel text-xs md:text-sm text-primary/70">
+              <span className="font-pixel text-sm md:text-sm text-primary/70">
                 Stage {infoStage}
               </span>
-              <span className="font-pixel text-xs md:text-sm text-foreground truncate">
+              <span className="font-pixel text-sm md:text-sm text-foreground truncate">
                 {infoConfig.name}
               </span>
               {infoStatus === "cleared" && (
-                <span className="inline-flex items-center gap-1 bg-green-700/40 text-green-300 font-pixel text-[10px] md:text-xs px-2.5 py-1 rounded-sm pixel-glow-green">
+                <span className="inline-flex items-center gap-1 bg-green-700/40 text-green-300 font-pixel text-[10px] md:text-sm px-2.5 py-1 rounded-sm pixel-glow-green">
                   <Check className="w-3 h-3" />
                   CLEARED
                 </span>
@@ -347,7 +347,7 @@ export function StageSelect({
               {infoConfig.nameCN} — {infoConfig.subtitle}
             </p>
             {infoStatus !== "locked" && (
-              <p className="font-retro text-xs md:text-sm text-amber-600/80 mt-0.5">
+              <p className="font-retro text-sm md:text-sm text-amber-600/80 mt-0.5">
                 Boss: {infoConfig.bossName} ({infoConfig.bossNameCN})
               </p>
             )}

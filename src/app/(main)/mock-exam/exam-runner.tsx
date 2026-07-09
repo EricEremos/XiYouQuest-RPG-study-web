@@ -610,14 +610,14 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
             <p className="text-muted-foreground">
               Complete all {activeComponents.length} components to receive your estimated PSC grade.
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               15 min preparation + ~{totalMinutes} minutes exam
             </p>
           </div>
 
           {/* Exam mode selector */}
           <div className="space-y-2">
-            <h3 className="text-xs font-bold text-muted-foreground uppercase">Exam Format</h3>
+            <h3 className="text-base font-bold text-muted-foreground uppercase">Exam Format</h3>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setExamMode("full")}
@@ -625,8 +625,8 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
                   examMode === "full" ? "border-primary bg-accent" : "border-border hover:border-primary/50"
                 }`}
               >
-                <p className="font-medium text-sm">Full (5 sections)</p>
-                <p className="text-xs text-muted-foreground">Includes 选择判断. Speaking = 30%.</p>
+                <p className="font-medium text-base">Full (5 sections)</p>
+                <p className="text-base text-muted-foreground">Includes 选择判断. Speaking = 30%.</p>
               </button>
               <button
                 onClick={() => setExamMode("no-s3")}
@@ -634,8 +634,8 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
                   examMode === "no-s3" ? "border-primary bg-accent" : "border-border hover:border-primary/50"
                 }`}
               >
-                <p className="font-medium text-sm">No Section 3 (4 sections)</p>
-                <p className="text-xs text-muted-foreground">Common CBT format. Speaking = 40%.</p>
+                <p className="font-medium text-base">No Section 3 (4 sections)</p>
+                <p className="text-base text-muted-foreground">Common CBT format. Speaking = 40%.</p>
               </button>
             </div>
           </div>
@@ -650,10 +650,10 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
                   <p className="text-sm text-muted-foreground">{comp.chineseName}</p>
                 </div>
                 <div className="text-right">
-                  <Badge variant="outline">
+                  <Badge variant="outline" className="text-base">
                     {Math.floor(comp.timeLimitSeconds / 60)}:{String(comp.timeLimitSeconds % 60).padStart(2, "0")}
                   </Badge>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-base text-muted-foreground mt-1">
                     {comp.points} pts
                   </p>
                 </div>
@@ -679,7 +679,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
       ) : history.length > 0 && (
         <Card>
           <CardContent className="pt-4 sm:pt-6 space-y-3">
-            <h3 className="font-pixel text-xs text-primary">Past Exams</h3>
+            <h3 className="font-pixel text-sm text-primary">Past Exams</h3>
             <div className="space-y-2">
               {history.map((exam) => {
                 const date = new Date(exam.created_at);
@@ -699,7 +699,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
                             {date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
                           </span>
                         </p>
-                        <p className="text-xs text-muted-foreground">{mins}m {secs}s &middot; +{exam.total_xp} XP</p>
+                        <p className="text-sm text-muted-foreground">{mins}m {secs}s &middot; +{exam.total_xp} XP</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-lg font-bold">{Math.round(exam.total_score * 10) / 10}</span>
@@ -723,8 +723,8 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
                         })}
                         {exam.ai_feedback && (
                           <div className="mt-2 pt-2 border-t">
-                            <p className="text-xs font-medium text-muted-foreground mb-1">AI Feedback</p>
-                            <p className="text-xs leading-relaxed whitespace-pre-line">{exam.ai_feedback}</p>
+                            <p className="text-sm font-medium text-muted-foreground mb-1">AI Feedback</p>
+                            <p className="text-sm leading-relaxed whitespace-pre-line">{exam.ai_feedback}</p>
                           </div>
                         )}
                       </div>
@@ -775,7 +775,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
         {/* Notes scratchpad (prep only) */}
         <Card>
           <CardContent className="pt-4 space-y-2">
-            <h3 className="text-xs font-bold text-muted-foreground uppercase">Your Notes (preparation only)</h3>
+            <h3 className="text-sm font-bold text-muted-foreground uppercase">Your Notes (preparation only)</h3>
             <textarea
               value={prepNotes}
               onChange={(e) => setPrepNotes(e.target.value)}
@@ -1154,7 +1154,7 @@ function DetailedResultCard({ result }: { result: ComponentResult }) {
                           result.componentNumber === 1 ? "text-lg" : "text-base"
                         }`}>{ws.word}</p>
                       </div>
-                      <p className={`text-xs font-bold ${
+                      <p className={`text-sm font-bold ${
                         ws.score === null ? "text-muted-foreground" :
                         ws.score >= 90 ? "text-green-600" :
                         ws.score >= 60 ? "text-yellow-600" : "text-red-600"
@@ -1175,7 +1175,7 @@ function DetailedResultCard({ result }: { result: ComponentResult }) {
                     <div key={idx}>
                       {showSubsection && (
                         <div className="text-center py-1">
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge variant="secondary" className="text-sm">
                             {qr.question.type === "word-choice"
                               ? "Part A: Word Selection (\u8BCD\u8BED\u5224\u65AD)"
                               : qr.question.type === "measure-word"
@@ -2130,7 +2130,7 @@ function SpeakingComponent({ topicChoices, timeLimitSeconds, onComplete }: Speak
         {/* Speaking structure guide (tailored to topic category) */}
         {(phase === "prepare" || phase === "countdown") && (
           <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
-            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wide">
               万能结构 · {guide?.label ?? "Speaking Structure Guide"}
             </h3>
             <p className="leading-relaxed whitespace-pre-line">{guide?.template}</p>
@@ -2140,8 +2140,8 @@ function SpeakingComponent({ topicChoices, timeLimitSeconds, onComplete }: Speak
         {/* Tips (prepare phase, tailored to topic category) */}
         {phase === "prepare" && (
           <div className="rounded-lg border p-3 bg-accent/30">
-            <h4 className="text-xs font-bold text-muted-foreground uppercase mb-1">Tips</h4>
-            <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-4">
+            <h4 className="text-sm font-bold text-muted-foreground uppercase mb-1">Tips</h4>
+            <ul className="text-sm text-muted-foreground space-y-0.5 list-disc pl-4">
               {guide?.tips.map((tip, index) => (
                 <li key={index}>{tip}</li>
               ))}
@@ -2173,7 +2173,7 @@ function SpeakingComponent({ topicChoices, timeLimitSeconds, onComplete }: Speak
                 value={Math.min((elapsedTime / timeLimitSeconds) * 100, 100)}
                 className="h-2"
               />
-              <p className={`text-xs font-medium ${
+              <p className={`text-sm font-medium ${
                 elapsedTime >= timeLimitSeconds ? "text-green-600" : "text-orange-500"
               }`}>
                 {elapsedTime >= timeLimitSeconds

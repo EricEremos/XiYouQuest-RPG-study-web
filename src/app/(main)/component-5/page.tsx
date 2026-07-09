@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import dynamic from "next/dynamic";
 import { loadSelectedCharacter } from "@/lib/character-loader";
 import { buildPlayerMemory } from "@/lib/gemini/player-memory";
@@ -32,7 +32,7 @@ export default async function Component5Page({
 }) {
   const { lpNode } = await searchParams;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   // Fetch selected character and topics in parallel
   const [character, { data: dbTopics }] = await Promise.all([

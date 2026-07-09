@@ -1,19 +1,16 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { SUPABASE_SERVICE_ROLE_KEY } from "@/lib/env";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
+import { deleteAuthUser } from "@/lib/auth";
 
 export async function DELETE() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const userId = user.id;
+  const supabase = await createClient();
 
   try {
     // Delete user data from all tables (order matters for FK constraints)
@@ -87,12 +84,8 @@ export async function DELETE() {
       }
     }
 
-    // Delete auth user via admin client (requires service role key)
-    const admin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      SUPABASE_SERVICE_ROLE_KEY(),
-    );
-    await admin.auth.admin.deleteUser(userId);
+    // Delete the Better Auth identity (cascades sessions + OAuth accounts).
+    await deleteAuthUser(userId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

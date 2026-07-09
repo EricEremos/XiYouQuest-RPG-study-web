@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { XPBar } from "./xp-bar";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
+import { clearAccessToken } from "@/lib/auth-token";
 import { useRouter } from "next/navigation";
 import {
   AlertDialog,
@@ -73,8 +74,8 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
   const backLabel = isComponentPage ? "Practice" : "Hub";
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await authClient.signOut();
+    clearAccessToken();
     router.push("/login");
   }
 
@@ -176,7 +177,7 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
                 <Users className="h-5 w-5" />
                 Social
                 {pendingRequestCount > 0 && (
-                  <span className="ml-auto inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-bold bg-primary text-primary-foreground pixel-border">
+                  <span className="ml-auto inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-sm font-bold bg-primary text-primary-foreground pixel-border">
                     {pendingRequestCount}
                   </span>
                 )}
@@ -268,7 +269,7 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
               <Users className="h-5 w-5 shrink-0" />
               Social
               {pendingRequestCount > 0 && (
-                <span className="ml-auto inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-bold bg-primary text-primary-foreground pixel-border">
+                <span className="ml-auto inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-sm font-bold bg-primary text-primary-foreground pixel-border">
                   {pendingRequestCount}
                 </span>
               )}

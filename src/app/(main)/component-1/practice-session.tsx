@@ -685,7 +685,7 @@ export function PracticeSession({ questions, character, characterId, component, 
                                   item.toneScore >= 80 ? "default" :
                                   item.toneScore >= 60 ? "secondary" : "destructive"
                                 }
-                                className="text-xs"
+                                className="text-sm"
                               >
                                 声调 {item.toneScore}
                               </Badge>
@@ -736,7 +736,7 @@ export function PracticeSession({ questions, character, characterId, component, 
                 <div className="text-center space-y-3">
                   <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
                   <p className="text-sm font-medium">Analyzing pronunciation...</p>
-                  <p className="text-xs text-muted-foreground">Checking tones, accuracy, and fluency</p>
+                  <p className="text-sm text-muted-foreground">Checking tones, accuracy, and fluency</p>
                 </div>
               )}
 

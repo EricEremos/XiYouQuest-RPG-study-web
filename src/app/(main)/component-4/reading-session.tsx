@@ -590,7 +590,7 @@ export function ReadingSession({ passages, character, characterId, component, lp
                     <p className="text-sm font-medium text-foreground/80 font-chinese line-clamp-3 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
                       {passage.content}
                     </p>
-                    <p className="mt-2 text-xs font-medium text-foreground/70 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
+                    <p className="mt-2 text-sm font-medium text-foreground/70 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
                       {passage.content.length} characters
                     </p>
                   </CardContent>
@@ -669,18 +669,18 @@ export function ReadingSession({ passages, character, characterId, component, lp
                       >
                         {overallScore}
                       </p>
-                      <p className="text-xs text-muted-foreground">Score</p>
+                      <p className="text-sm text-muted-foreground">Score</p>
                     </div>
                   )}
                   <div className="h-8 w-px bg-border" />
                   <div className="text-center">
                     <p className="text-2xl font-bold text-yellow-600">+{totalXPEarned}</p>
-                    <p className="text-xs text-muted-foreground">XP</p>
+                    <p className="text-sm text-muted-foreground">XP</p>
                   </div>
                   <div className="h-8 w-px bg-border" />
                   <div className="text-center">
                     <p className="text-2xl font-bold">{isGood ? "Pass" : "Retry"}</p>
-                    <p className="text-xs text-muted-foreground">Result</p>
+                    <p className="text-sm text-muted-foreground">Result</p>
                   </div>
                 </div>
 

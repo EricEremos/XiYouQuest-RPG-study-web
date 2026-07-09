@@ -1,5 +1,5 @@
 // src/app/(main)/main-quest/page.tsx
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import dynamic from "next/dynamic";
 import type { StageNumber } from "@/lib/quest/types";
 import { getUnlockedCharacters } from "@/lib/quest/battle-logic";
@@ -18,9 +18,7 @@ const MainQuestClient = dynamic(
 
 export default async function MainQuestPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   const userId = user!.id;
 

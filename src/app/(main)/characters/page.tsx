@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ import { CHARACTER_IMAGES } from "@/lib/character-images";
 
 export default async function CharactersPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   const userId = user!.id;
 
@@ -154,7 +154,7 @@ export default async function CharactersPage() {
                   {!isUnlocked && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60">
                       <Lock className="h-8 w-8 text-muted-foreground mb-1" />
-                      <span className="text-xs font-medium text-muted-foreground text-center px-2">
+                      <span className="text-sm font-medium text-muted-foreground text-center px-2">
                         {character.unlock_stage
                           ? `Clear Stage ${character.unlock_stage}: ${stageName}`
                           : "Complete the tutorial"}
@@ -166,7 +166,7 @@ export default async function CharactersPage() {
                 {/* Affection level display (unlocked only) */}
                 {isUnlocked && (
                   <div className="bg-accent/50 p-2 pixel-border space-y-1">
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center justify-between text-sm">
                       <span className="flex items-center gap-1 font-medium">
                         <Heart className="h-3 w-3 text-pink-500" />
                         {affection.name} (Lv.{affection.level})

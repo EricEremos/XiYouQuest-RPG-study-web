@@ -421,7 +421,7 @@ export function PracticeHistoryClient({
                 <Sparkles className="h-5 w-5" />
                 AI Study Insights
                 {insightsDate && (
-                  <span className="font-sans text-xs text-muted-foreground font-normal">· {insightsDate}</span>
+                  <span className="font-sans text-sm text-muted-foreground font-normal">· {insightsDate}</span>
                 )}
               </h2>
               <Button
@@ -494,7 +494,7 @@ export function PracticeHistoryClient({
                   key={p}
                   type="button"
                   onClick={() => setTrendPeriod(p)}
-                  className={`text-xs px-2 py-0.5 rounded cursor-pointer transition-colors ${
+                  className={`text-sm px-2 py-0.5 rounded cursor-pointer transition-colors ${
                     trendPeriod === p
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:bg-accent"
@@ -740,7 +740,7 @@ export function PracticeHistoryClient({
                   <span className={`text-sm sm:text-lg font-bold tabular-nums shrink-0 ${scoreColor(session.score)}`}>
                     {session.score}
                   </span>
-                  <span className="text-yellow-600 text-xs sm:text-base font-medium shrink-0">
+                  <span className="text-yellow-600 text-sm sm:text-base font-medium shrink-0">
                     +{session.xp_earned}
                   </span>
                   {session.duration_seconds > 0 && (
@@ -755,7 +755,7 @@ export function PracticeHistoryClient({
                         : session.characters.name}
                     </span>
                   )}
-                  <span className="text-muted-foreground text-xs sm:text-base shrink-0">
+                  <span className="text-muted-foreground text-sm sm:text-base shrink-0">
                     {timeAgo(session.created_at)}
                   </span>
                 </div>

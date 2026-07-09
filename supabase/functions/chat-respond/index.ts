@@ -4,6 +4,7 @@ import {
   errorResponse,
 } from "../_shared/cors.ts";
 import { createSupabaseClient } from "../_shared/supabase.ts";
+import { verifyUser } from "../_shared/verify-jwt.ts";
 import { transcribeAudio } from "../_shared/iflytek-asr.ts";
 import { assessPronunciation } from "../_shared/iflytek-ise.ts";
 import {
@@ -47,9 +48,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return corsResponse();
 
   const supabase = createSupabaseClient(req);
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await verifyUser(req);
   if (!user) return errorResponse("Unauthorized", 401);
 
   try {

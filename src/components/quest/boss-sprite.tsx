@@ -74,10 +74,10 @@ export function BossSprite({
         <div className="px-1.5 py-1 sm:px-3 sm:py-1.5 space-y-1">
           <div className="flex justify-between items-baseline">
             <div className="min-w-0">
-              <p className="font-pixel text-[8px] sm:text-[10px] md:text-xs text-amber-900 truncate">
+              <p className="font-pixel text-[8px] sm:text-[10px] md:text-sm text-amber-900 truncate">
                 {bossName}
               </p>
-              <p className="font-chinese text-[10px] sm:text-xs md:text-sm text-amber-800 truncate">
+              <p className="font-chinese text-[10px] sm:text-sm md:text-sm text-amber-800 truncate">
                 {bossNameCN}
               </p>
             </div>

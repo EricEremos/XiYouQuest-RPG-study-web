@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { CHARACTER_IMAGES } from "@/lib/character-images";
 import dynamic from "next/dynamic";
 
@@ -24,7 +24,7 @@ function ChatSkeleton() {
 
 export default async function CompanionChatPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   const userId = user!.id;
 
   const [

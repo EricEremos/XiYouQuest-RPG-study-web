@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import dynamic from "next/dynamic";
 
 const PracticeHistoryClient = dynamic(
@@ -21,9 +21,7 @@ const PracticeHistoryClient = dynamic(
 
 export default async function PracticeHistoryPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   const userId = user!.id;
 

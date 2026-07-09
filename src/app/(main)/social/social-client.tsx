@@ -35,7 +35,6 @@ import { timeAgo } from "@/lib/utils";
 interface SocialClientProps {
   userId: string;
   friendCode: string | null;
-  hasDiscord: boolean;
 }
 
 interface UserResult {
@@ -116,7 +115,6 @@ interface FeedEntry {
 export function SocialClient({
   userId,
   friendCode,
-  hasDiscord,
 }: SocialClientProps) {
   const { showAchievementToasts } = useAchievementToast();
   const [copied, setCopied] = useState(false);
@@ -129,8 +127,6 @@ export function SocialClient({
   const [codeLoading, setCodeLoading] = useState(false);
   const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
   const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
-  const [discordSuggestions, setDiscordSuggestions] = useState<UserResult[]>([]);
-  const [discordLoading, setDiscordLoading] = useState(false);
   const [incoming, setIncoming] = useState<RequestEntry[]>([]);
   const [outgoing, setOutgoing] = useState<RequestEntry[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
@@ -354,32 +350,15 @@ export function SocialClient({
     }
   }, []);
 
-  const fetchDiscordSuggestions = useCallback(async () => {
-    if (!hasDiscord) return;
-    setDiscordLoading(true);
-    try {
-      const res = await fetch("/api/social/discord-suggestions");
-      if (res.ok) {
-        const data = await res.json();
-        setDiscordSuggestions(data.filter((u: UserResult) => u.id !== userId));
-      }
-    } catch {
-      // silently fail
-    } finally {
-      setDiscordLoading(false);
-    }
-  }, [hasDiscord, userId]);
-
   useEffect(() => {
     fetchRequests();
     fetchFriends();
-    fetchDiscordSuggestions();
     fetch("/api/achievements/feed")
       .then((res) => res.ok ? res.json() : { feed: [] })
       .then((data) => setActivityFeed(data.feed ?? []))
       .catch(() => setActivityFeed([]))
       .finally(() => setFeedLoading(false));
-  }, [fetchRequests, fetchFriends, fetchDiscordSuggestions]);
+  }, [fetchRequests, fetchFriends]);
 
   useEffect(() => {
     if (searchTimerRef.current) {
@@ -414,7 +393,7 @@ export function SocialClient({
             onClick={copyFriendCode}
             className="flex items-center gap-2 pixel-border bg-accent/50 px-4 py-2 cursor-pointer hover:bg-accent/70 transition-colors"
           >
-            <span className="font-pixel text-xs text-foreground">{friendCode}</span>
+            <span className="font-pixel text-sm text-foreground">{friendCode}</span>
             {copied ? (
               <Check className="h-4 w-4 text-pixel-green" />
             ) : (
@@ -426,7 +405,7 @@ export function SocialClient({
 
       {/* Section 1: Add Friends */}
       <div className="pixel-border bg-card/60 p-4 space-y-4">
-        <h2 className="font-pixel text-xs text-foreground flex items-center gap-2">
+        <h2 className="font-pixel text-sm text-foreground flex items-center gap-2">
           <UserPlus className="h-4 w-4" />
           Add Friends
         </h2>
@@ -533,41 +512,6 @@ export function SocialClient({
           </p>
         )}
 
-        {/* Discord Suggestions */}
-        {hasDiscord && (
-          <>
-            {discordLoading && (
-              <div className="space-y-2 pt-2">
-                <div className="h-4 w-48 rounded animate-shimmer" />
-                <div className="flex items-center gap-3 p-2">
-                  <div className="h-8 w-8 rounded-sm animate-shimmer" />
-                  <div className="flex-1 h-4 w-24 rounded animate-shimmer" />
-                </div>
-              </div>
-            )}
-
-            {!discordLoading && discordSuggestions.length > 0 && (
-              <div className="pt-2 border-t-2 border-border space-y-2">
-                <h3 className="font-pixel text-[10px] text-muted-foreground flex items-center gap-2">
-                  <Users className="h-3 w-3" />
-                  Discord Friends on XiYouQuest
-                </h3>
-                <div className="space-y-1">
-                  {discordSuggestions.map((user) => (
-                    <UserResultCard
-                      key={user.id}
-                      user={user}
-                      requested={requestedIds.has(user.id)}
-                      sending={sendingIds.has(user.id)}
-                      isFriend={friendIds.has(user.id)}
-                      onAdd={() => sendRequest(user.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
       </div>
 
       {/* Section 2: Pending Requests */}
@@ -581,7 +525,7 @@ export function SocialClient({
       )}
       {!requestsLoading && !requestsError && totalPendingRequests > 0 && (
         <div className="pixel-border bg-card/60 p-4 space-y-4">
-          <h2 className="font-pixel text-xs text-foreground flex items-center gap-2">
+          <h2 className="font-pixel text-sm text-foreground flex items-center gap-2">
             <Users className="h-4 w-4" />
             Friend Requests ({totalPendingRequests})
           </h2>
@@ -687,7 +631,7 @@ export function SocialClient({
 
       {/* Section 3: Friends List */}
       <div className="space-y-4">
-        <h2 className="font-pixel text-xs text-foreground flex items-center gap-2">
+        <h2 className="font-pixel text-sm text-foreground flex items-center gap-2">
           <Users className="h-4 w-4" />
           Friends ({friends.length})
         </h2>
@@ -744,7 +688,7 @@ export function SocialClient({
 
       {/* Section 4: Recent Achievement Activity */}
       <div className="space-y-4">
-        <h2 className="font-pixel text-xs text-foreground flex items-center gap-2">
+        <h2 className="font-pixel text-sm text-foreground flex items-center gap-2">
           <Trophy className="h-4 w-4" />
           Recent Activity
         </h2>
@@ -798,7 +742,7 @@ export function SocialClient({
                     unlocked {entry.achievement_emoji}{" "}
                     <span className="font-bold">{entry.achievement_name}</span>
                   </p>
-                  <p className="text-xs sm:text-base font-retro text-muted-foreground">
+                  <p className="text-sm sm:text-base font-retro text-muted-foreground">
                     {timeAgo(entry.unlocked_at)}
                   </p>
                 </div>
@@ -901,14 +845,14 @@ function FriendCard({
           <p className="text-sm sm:text-lg font-retro font-bold text-foreground truncate">
             {friend.display_name}
           </p>
-          <span className="text-xs sm:text-sm font-retro text-amber-700 bg-amber-100 px-1.5 py-0.5">
+          <span className="text-sm sm:text-sm font-retro text-amber-700 bg-amber-100 px-1.5 py-0.5">
             Lv.{friend.current_level}
           </span>
         </div>
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 gap-2 text-xs sm:text-base font-retro">
+      <div className="grid grid-cols-2 gap-2 text-sm sm:text-base font-retro">
         {/* XP with comparison */}
         <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
           <span className="text-muted-foreground shrink-0">XP:</span>
@@ -939,19 +883,19 @@ function FriendCard({
 
       {/* Average Component Scores */}
       <div className="space-y-1.5 min-w-0">
-        <p className="text-xs sm:text-sm font-retro text-muted-foreground">Avg Scores</p>
+        <p className="text-sm sm:text-sm font-retro text-muted-foreground">Avg Scores</p>
         {sortedComponents.map((comp, i) => {
           const score = friend.avg_scores[comp] ?? 0;
           return (
             <div key={comp} className="flex items-center gap-1.5 sm:gap-2">
-              <span className="text-xs sm:text-sm font-retro text-muted-foreground w-5 sm:w-6 shrink-0">
+              <span className="text-sm sm:text-sm font-retro text-muted-foreground w-5 sm:w-6 shrink-0">
                 {COMPONENT_LABELS[comp]}
               </span>
               <Progress
                 value={score}
                 className={SCORE_BAR_CLASSES[i]}
               />
-              <span className="text-xs sm:text-sm font-retro text-foreground w-7 sm:w-8 text-right shrink-0">
+              <span className="text-sm sm:text-sm font-retro text-foreground w-7 sm:w-8 text-right shrink-0">
                 {score > 0 ? `${score}%` : "-"}
               </span>
             </div>

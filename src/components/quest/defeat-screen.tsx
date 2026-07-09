@@ -95,7 +95,7 @@ export function DefeatScreen({
           <p className="font-retro text-sm text-amber-200/80">
             On your next attempt, you can use pinyin and audio hints!
           </p>
-          <p className="font-chinese text-xs text-amber-200/50 mt-1">
+          <p className="font-chinese text-sm text-amber-200/50 mt-1">
             下次挑战时可以使用拼音和音频提示!
           </p>
         </div>

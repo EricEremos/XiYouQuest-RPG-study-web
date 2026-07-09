@@ -122,10 +122,10 @@ export function PartySprites({
           <div className="h-1 bg-linear-to-r from-amber-900/30 via-amber-700/20 to-amber-900/30" />
           <div className="px-1.5 py-1 sm:px-3 sm:py-1.5 space-y-1">
             <div>
-              <p className="font-pixel text-[9px] sm:text-[10px] md:text-xs text-amber-900 text-center leading-relaxed">
+              <p className="font-pixel text-[9px] sm:text-[10px] md:text-sm text-amber-900 text-center leading-relaxed">
                 {unlockedCharacters.map((n) => QUEST_CHARACTERS[n]?.name).filter(Boolean).join(" · ")}
               </p>
-              <p className="font-chinese text-[10px] sm:text-xs md:text-sm text-amber-800 text-center leading-relaxed">
+              <p className="font-chinese text-[10px] sm:text-sm md:text-sm text-amber-800 text-center leading-relaxed">
                 {unlockedCharacters.map((n) => QUEST_CHARACTERS[n]?.nameCN).filter(Boolean).join(" · ")}
               </p>
             </div>

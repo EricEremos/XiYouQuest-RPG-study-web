@@ -387,7 +387,7 @@ export function BattleScreen({
               {speakerName && (
                 <div className="px-3 pt-2 pb-1 sm:px-6 sm:pt-3 flex items-center gap-2 shrink-0">
                   <div className={`w-1.5 h-4 sm:h-5 rounded-sm ${isPlayerTurn ? "bg-amber-600" : "bg-red-700"}`} />
-                  <span className={`font-pixel text-[8px] sm:text-[10px] md:text-xs font-bold ${speakerColor} tracking-wide truncate`}>
+                  <span className={`font-pixel text-[8px] sm:text-[10px] md:text-sm font-bold ${speakerColor} tracking-wide truncate`}>
                     {speakerName}
                   </span>
                   <div className="flex-1 h-px bg-amber-800/20" />
@@ -402,7 +402,7 @@ export function BattleScreen({
                 {/* Player Menu */}
                 {battleState.phase === "player_menu" && (
                   <div className="text-center space-y-4">
-                    <p className="font-pixel text-xs sm:text-sm text-amber-900/80">
+                    <p className="font-pixel text-sm sm:text-sm text-amber-900/80">
                       What will you do?
                     </p>
                     <div className="flex justify-center gap-3 sm:gap-4">
@@ -412,7 +412,7 @@ export function BattleScreen({
                           hover:bg-amber-200/80 hover:border-amber-700 transition-all cursor-pointer rounded-sm min-h-[44px]"
                       >
                         <Swords className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700" />
-                        <span className="font-pixel text-[10px] sm:text-xs font-bold text-amber-900">Attack</span>
+                        <span className="font-pixel text-[10px] sm:text-sm font-bold text-amber-900">Attack</span>
                       </button>
                       <button
                         onClick={onFlee}
@@ -420,7 +420,7 @@ export function BattleScreen({
                           hover:bg-red-100/60 hover:border-red-400 transition-all cursor-pointer rounded-sm min-h-[44px]"
                       >
                         <DoorOpen className="w-4 h-4 sm:w-5 sm:h-5 text-stone-500" />
-                        <span className="font-pixel text-[10px] sm:text-xs text-stone-600">Flee</span>
+                        <span className="font-pixel text-[10px] sm:text-sm text-stone-600">Flee</span>
                       </button>
                     </div>
                   </div>
@@ -440,7 +440,7 @@ export function BattleScreen({
                 {battleState.phase === "boss_attack" && currentMCQ && showMCQAfterBossAnim && (
                   <div className="space-y-3">
                     {enemyTaunt && (
-                      <p className="font-retro text-xs sm:text-sm text-red-900/70 text-center leading-relaxed">
+                      <p className="font-retro text-sm sm:text-sm text-red-900/70 text-center leading-relaxed">
                         {enemyTaunt}
                       </p>
                     )}

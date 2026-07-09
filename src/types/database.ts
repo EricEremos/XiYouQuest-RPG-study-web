@@ -8,7 +8,6 @@ export interface Profile {
   last_login_date: string | null;
   login_streak: number;
   created_at: string;
-  discord_id: string | null;
   friend_code: string | null;
   audio_volume: number;
   tts_volume: number;

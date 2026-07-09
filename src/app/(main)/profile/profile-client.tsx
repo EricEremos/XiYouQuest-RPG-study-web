@@ -504,7 +504,7 @@ export default function ProfileClient({
                   variant="destructive"
                   size="sm"
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="font-pixel text-xs"
+                  className="font-pixel text-sm"
                 >
                   <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                   Delete
@@ -546,7 +546,7 @@ export default function ProfileClient({
                         setDeleting(false);
                       }
                     }}
-                    className="font-pixel text-xs"
+                    className="font-pixel text-sm"
                   >
                     {deleting ? (
                       <>
@@ -565,7 +565,7 @@ export default function ProfileClient({
                       setDeleteConfirmText("");
                     }}
                     disabled={deleting}
-                    className="font-pixel text-xs"
+                    className="font-pixel text-sm"
                   >
                     Cancel
                   </Button>

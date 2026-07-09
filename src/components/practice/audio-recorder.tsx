@@ -190,7 +190,7 @@ export const AudioRecorder = forwardRef<AudioRecorderHandle, AudioRecorderProps>
         <p className="text-sm font-medium text-destructive">
           Microphone access is required
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Please allow microphone access in your browser settings, then try again.
         </p>
         <Button

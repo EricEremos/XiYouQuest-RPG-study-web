@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import dynamic from "next/dynamic";
 import { loadSelectedCharacter } from "@/lib/character-loader";
 import { buildPlayerMemory } from "@/lib/gemini/player-memory";
@@ -37,7 +37,7 @@ export default async function Component6Page({
 }) {
   const { lpNode } = await searchParams;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   const wordsPerCategory = C6_GROUPS_PER_CATEGORY * C6_WORDS_PER_GROUP;
 

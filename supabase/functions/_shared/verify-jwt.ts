@@ -1,0 +1,36 @@
+import { createRemoteJWKSet, jwtVerify } from "npm:jose";
+
+/**
+ * Better Auth issues ES256 JWTs signed with keys published at its JWKS
+ * endpoint (BETTER_AUTH_JWKS_URL). Callers no longer have a Supabase
+ * `auth.users` row, so `supabase.auth.getUser()` cannot be used to gate
+ * requests. This verifies the Better Auth JWT instead.
+ *
+ * The remote JWK set is created ONCE at module scope so `jose` can cache
+ * and reuse the fetched keys across requests (per Deno isolate).
+ */
+const jwks = createRemoteJWKSet(
+  new URL(Deno.env.get("BETTER_AUTH_JWKS_URL")!),
+);
+
+/**
+ * Verify the Better Auth JWT on the incoming request.
+ * @returns `{ id }` (the token subject) on success, or `null` on any failure
+ *          (missing header, malformed/expired/invalid token).
+ */
+export async function verifyUser(
+  req: Request,
+): Promise<{ id: string } | null> {
+  const authHeader = req.headers.get("authorization") ?? "";
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!match) return null;
+  const token = match[1];
+
+  try {
+    const { payload } = await jwtVerify(token, jwks);
+    if (!payload.sub) return null;
+    return { id: String(payload.sub) };
+  } catch {
+    return null;
+  }
+}

@@ -363,7 +363,7 @@ export function QuizSession({ questions, character, characterId, component, lpNo
                     <span className="text-sm font-medium truncate block">
                       Q{index + 1}: {randomizedQuestions[index]?.prompt}
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-sm text-muted-foreground">
                       Your answer: <span className="font-chinese">{result.userAnswer}</span>
                     </span>
                   </div>
@@ -443,7 +443,7 @@ export function QuizSession({ questions, character, characterId, component, lpNo
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xl px-4 py-1.5">{getTypeLabel(currentQuestion.type)}</Badge>
                 {isLoadingFeedback && (
-                  <span className="text-xs text-muted-foreground">Getting explanation...</span>
+                  <span className="text-sm text-muted-foreground">Getting explanation...</span>
                 )}
               </div>
 
@@ -488,12 +488,12 @@ export function QuizSession({ questions, character, characterId, component, lpNo
 
                     {/* Show correct/incorrect indicators */}
                     {phase === "result" && index === currentQuestion.correctIndex && (
-                      <span className="mt-2 block text-xs font-medium text-green-600">
+                      <span className="mt-2 block text-sm font-medium text-green-600">
                         Correct answer
                       </span>
                     )}
                     {phase === "result" && index === selectedAnswer && index !== currentQuestion.correctIndex && (
-                      <span className="mt-2 block text-xs font-medium text-red-600">
+                      <span className="mt-2 block text-sm font-medium text-red-600">
                         Your answer
                       </span>
                     )}

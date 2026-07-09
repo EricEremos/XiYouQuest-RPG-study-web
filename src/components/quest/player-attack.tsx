@@ -224,7 +224,7 @@ export function PlayerAttack({
 
         {/* Overall score */}
         <div className="text-center space-y-1">
-          <p className="font-retro text-xs text-amber-800/60">Overall Score</p>
+          <p className="font-retro text-sm text-amber-800/60">Overall Score</p>
           <p
             className={`font-pixel text-2xl sm:text-3xl ${
               overallScore >= ATTACK_THRESHOLD
@@ -251,7 +251,7 @@ export function PlayerAttack({
         <div className="flex justify-center">
           <button
             onClick={handleContinue}
-            className={`px-6 py-3 border-2 transition-all cursor-pointer rounded-sm font-pixel text-xs min-h-[44px] ${
+            className={`px-6 py-3 border-2 transition-all cursor-pointer rounded-sm font-pixel text-sm min-h-[44px] ${
               attackSucceeds
                 ? "border-green-700/50 bg-green-100/60 hover:bg-green-200/80 text-green-900"
                 : "border-amber-700/50 bg-amber-100/60 hover:bg-amber-200/80 text-amber-900"
@@ -283,7 +283,7 @@ export function PlayerAttack({
               variant="outline"
               size="sm"
               onClick={() => setShowPinyin((prev) => !prev)}
-              className="font-retro text-xs border-amber-800/30 text-amber-800 hover:bg-amber-100/50"
+              className="font-retro text-sm border-amber-800/30 text-amber-800 hover:bg-amber-100/50"
             >
               {showPinyin ? (
                 <EyeOff className="w-3 h-3 mr-1" />
@@ -314,7 +314,7 @@ export function PlayerAttack({
                   {word}
                 </span>
                 {showPinyin && recordingGroup.pinyin?.[i] && (
-                  <span className="font-retro text-xs text-amber-700">
+                  <span className="font-retro text-sm text-amber-700">
                     {recordingGroup.pinyin[i]}
                   </span>
                 )}

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { getAccessToken } from "@/lib/auth-token";
 
 const EDGE_ROUTES: Record<string, string> = {
   "/api/ai/feedback": "ai-feedback",
@@ -43,11 +43,7 @@ export async function resolveEdgeRoute(
   const edgeName = EDGE_ROUTES[pathname];
   if (!edgeName) return null;
 
-  const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token ?? "";
+  const token = (await getAccessToken()) ?? "";
 
   return {
     url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/${edgeName}`,
