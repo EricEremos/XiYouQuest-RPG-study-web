@@ -84,7 +84,30 @@ CREATE INDEX IF NOT EXISTS "verification_identifier_idx" ON better_auth."verific
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS public.handle_new_user();
 
-ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;
+-- Drop the profiles.id -> auth.users(id) FK by discovering its real name,
+-- rather than assuming the default `profiles_id_fkey` (an earlier migration
+-- may have named it differently; a wrong assumption would silently leave the
+-- FK in place and block `DELETE FROM auth.users` below).
+DO $$
+DECLARE
+  fk_name text;
+BEGIN
+  SELECT con.conname INTO fk_name
+  FROM pg_constraint con
+  JOIN pg_class rel ON rel.oid = con.conrelid
+  JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+  JOIN pg_class fref ON fref.oid = con.confrelid
+  JOIN pg_namespace fnsp ON fnsp.oid = fref.relnamespace
+  WHERE con.contype = 'f'
+    AND nsp.nspname = 'public'
+    AND rel.relname = 'profiles'
+    AND fnsp.nspname = 'auth'
+    AND fref.relname = 'users';
+  IF fk_name IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE public.profiles DROP CONSTRAINT %I', fk_name);
+  END IF;
+END $$;
+
 ALTER TABLE public.profiles DROP COLUMN IF EXISTS discord_id;
 
 -- ---------------------------------------------------------------------------

@@ -43,7 +43,14 @@ export async function resolveEdgeRoute(
   const edgeName = EDGE_ROUTES[pathname];
   if (!edgeName) return null;
 
-  const token = (await getAccessToken()) ?? "";
+  // Every edge route requires an authenticated user. If we can't obtain a
+  // Better Auth token, fail fast with a clear signal to re-authenticate
+  // rather than forwarding an empty `Bearer ` (which the function would
+  // reject as an opaque 401).
+  const token = await getAccessToken();
+  if (!token) {
+    throw new Error("Not authenticated. Please sign in again.");
+  }
 
   return {
     url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/${edgeName}`,

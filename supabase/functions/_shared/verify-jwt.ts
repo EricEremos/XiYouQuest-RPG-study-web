@@ -9,14 +9,20 @@ import { createRemoteJWKSet, jwtVerify } from "npm:jose";
  * The remote JWK set is created ONCE at module scope so `jose` can cache
  * and reuse the fetched keys across requests (per Deno isolate).
  */
-const jwks = createRemoteJWKSet(
-  new URL(Deno.env.get("BETTER_AUTH_JWKS_URL")!),
-);
+const jwksUrl = new URL(Deno.env.get("BETTER_AUTH_JWKS_URL")!);
+const jwks = createRemoteJWKSet(jwksUrl);
+
+// Better Auth signs with iss = aud = its baseURL, which is the origin of the
+// JWKS URL (…/api/auth/jwks). Pinning issuer + audience + algorithm closes the
+// trust boundary: a token from any other issuer, tenant, or algorithm is
+// rejected even if it were somehow signed by a key this set could fetch.
+const EXPECTED_ORIGIN = jwksUrl.origin;
 
 /**
  * Verify the Better Auth JWT on the incoming request.
  * @returns `{ id }` (the token subject) on success, or `null` on any failure
- *          (missing header, malformed/expired/invalid token).
+ *          (missing header, malformed/expired/invalid token, wrong
+ *          algorithm/issuer/audience).
  */
 export async function verifyUser(
   req: Request,
@@ -27,7 +33,11 @@ export async function verifyUser(
   const token = match[1];
 
   try {
-    const { payload } = await jwtVerify(token, jwks);
+    const { payload } = await jwtVerify(token, jwks, {
+      algorithms: ["ES256"],
+      issuer: EXPECTED_ORIGIN,
+      audience: EXPECTED_ORIGIN,
+    });
     if (!payload.sub) return null;
     return { id: String(payload.sub) };
   } catch {
