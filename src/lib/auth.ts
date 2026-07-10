@@ -73,11 +73,17 @@ const hkustProviders = [
   {
     providerId: "hkust",
     clientId: process.env.HKUST_XYQ_CLIENT_ID ?? "",
+    // Public-client (PKCE) flow: HKUST's Entra apps authenticate with PKCE and
+    // no client secret (same as the sibling Meli app). Better Auth only puts a
+    // client_secret on the token request when this is non-empty
+    // (@better-auth/core validate-authorization-code.mjs), so leaving it empty
+    // performs a clean public-client exchange. Set HKUST_XYQ_CLIENT_SECRET only
+    // if ITSO ever registers the app as confidential.
     clientSecret: process.env.HKUST_XYQ_CLIENT_SECRET ?? "",
     discoveryUrl: process.env.HKUST_DISCOVERY_URL ?? "",
     scopes: ["openid", "profile", "email"],
-    // Hardens the code flow against interception; Entra supports PKCE for
-    // confidential clients and Microsoft recommends it.
+    // Required for the public-client flow and hardens against code
+    // interception; Entra requires PKCE for public clients.
     pkce: true,
     // Always show the account picker — HKUST users commonly hold both a
     // personal/student and a staff Microsoft session in the same browser.
@@ -90,7 +96,9 @@ const hkustProviders = [
       name: String(profile.name ?? profile.preferred_username ?? "Learner"),
     }),
   },
-].filter((p) => p.clientId && p.clientSecret && p.discoveryUrl);
+  // Mount whenever the client id + discovery URL are present — the client
+  // secret is optional (public-client PKCE).
+].filter((p) => p.clientId && p.discoveryUrl);
 
 export const auth = betterAuth({
   database: pool,
