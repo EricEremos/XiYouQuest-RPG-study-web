@@ -20,6 +20,7 @@ import { jwt, genericOAuth } from "better-auth/plugins";
 import { APIError } from "better-auth/api";
 import { createClient } from "@supabase/supabase-js";
 import { Pool } from "pg";
+import { decodeJwt } from "jose";
 
 import { SUPABASE_SERVICE_ROLE_KEY } from "@/lib/env";
 
@@ -69,6 +70,21 @@ function isAllowedEmail(email: string): boolean {
 // (same pattern as the sibling Meli app; see docs/oidc-redirect-uris.md).
 // The slot is dormant until all three env vars exist, so builds and dev
 // without credentials keep working.
+// HKUST uses the MULTI-TENANT `/organizations/` endpoint (ITSO direction,
+// 2026-07): one app serves both staff (@ust.hk) and students (@connect.ust.hk),
+// and Microsoft routes each user to their home tenant by email domain.
+//
+// We deliberately provide explicit endpoints instead of a discovery URL: the
+// `/organizations/` discovery `issuer` is the templated `.../{tenantid}/v2.0`,
+// and Better Auth's RFC 9207 check compares the callback `iss` (the user's REAL
+// tenant) against that template — which would reject every login with
+// `issuer_mismatch`. With no discoveryUrl/issuer set, that check is skipped; the
+// id_token (fetched back-channel over TLS with PKCE) is the trusted profile.
+const HKUST_AUTHORIZE_URL =
+  "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize";
+const HKUST_TOKEN_URL =
+  "https://login.microsoftonline.com/organizations/oauth2/v2.0/token";
+
 const hkustProviders = [
   {
     providerId: "hkust",
@@ -77,28 +93,43 @@ const hkustProviders = [
     // no client secret (same as the sibling Meli app). Better Auth only puts a
     // client_secret on the token request when this is non-empty
     // (@better-auth/core validate-authorization-code.mjs), so leaving it empty
-    // performs a clean public-client exchange. Set HKUST_XYQ_CLIENT_SECRET only
-    // if ITSO ever registers the app as confidential.
+    // performs a clean public-client exchange.
     clientSecret: process.env.HKUST_XYQ_CLIENT_SECRET ?? "",
-    discoveryUrl: process.env.HKUST_DISCOVERY_URL ?? "",
+    authorizationUrl: HKUST_AUTHORIZE_URL,
+    tokenUrl: HKUST_TOKEN_URL,
     scopes: ["openid", "profile", "email"],
-    // Required for the public-client flow and hardens against code
-    // interception; Entra requires PKCE for public clients.
+    // Required for the public-client flow and hardens against code interception.
     pkce: true,
     // Always show the account picker — HKUST users commonly hold both a
     // personal/student and a staff Microsoft session in the same browser.
     authorizationUrlParams: { prompt: "select_account" },
-    // Entra frequently omits the `email` claim; the address then arrives in
-    // preferred_username. The domain gate below depends on this mapping.
-    mapProfileToUser: (profile: Record<string, unknown>) => ({
-      email: String(profile.email ?? profile.preferred_username ?? "")
-        .toLowerCase(),
-      name: String(profile.name ?? profile.preferred_username ?? "Learner"),
-    }),
+    // Entra frequently omits the `email` claim, so the default getUserInfo
+    // (which needs id_token.email) would fall through to a userinfo URL we
+    // don't configure. Decode the id_token ourselves and fall back to
+    // preferred_username so the domain gate always sees an address.
+    getUserInfo: async (tokens: { idToken?: string }) => {
+      if (!tokens.idToken) return null;
+      const c = decodeJwt(tokens.idToken);
+      if (!c.sub) return null;
+      const email = String(
+        (c.email as string) ?? (c.preferred_username as string) ?? "",
+      ).toLowerCase();
+      return {
+        id: String(c.sub),
+        email,
+        // Institutional SSO account — treated as verified.
+        emailVerified: true,
+        name: String(
+          (c.name as string) ?? (c.preferred_username as string) ?? "Learner",
+        ),
+        image:
+          typeof c.picture === "string" ? (c.picture as string) : undefined,
+      };
+    },
   },
-  // Mount whenever the client id + discovery URL are present — the client
-  // secret is optional (public-client PKCE).
-].filter((p) => p.clientId && p.discoveryUrl);
+  // Mount whenever the client id + endpoints are present — the client secret is
+  // optional (public-client PKCE).
+].filter((p) => p.clientId && p.authorizationUrl && p.tokenUrl);
 
 export const auth = betterAuth({
   database: pool,
