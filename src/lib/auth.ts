@@ -20,19 +20,43 @@ import { jwt, genericOAuth } from "better-auth/plugins";
 import { APIError } from "better-auth/api";
 import { createClient } from "@supabase/supabase-js";
 import { Pool } from "pg";
-import { decodeJwt } from "jose";
+import { createRemoteJWKSet, decodeJwt, jwtVerify } from "jose";
 
 import { SUPABASE_SERVICE_ROLE_KEY } from "@/lib/env";
 
-const databaseUrl =
-  process.env.BETTER_AUTH_DATABASE_URL ??
-  "postgresql://postgres:postgres@localhost:54322/postgres";
+// The localhost fallback is a convenience for local dev ONLY. In production a
+// missing BETTER_AUTH_DATABASE_URL must fail loudly rather than silently
+// connect to a non-existent local DB (which surfaces as opaque hung requests).
+if (
+  process.env.NODE_ENV === "production" &&
+  !process.env.BETTER_AUTH_DATABASE_URL
+) {
+  throw new Error(
+    "BETTER_AUTH_DATABASE_URL is required in production (Better Auth tables).",
+  );
+}
 
-// Session pooler (port 5432) required — Supavisor transaction mode does not
-// reliably honor the search_path startup option.
+// Force the Supabase TRANSACTION pooler port (6543). The session pooler
+// (5432) caps at 15 clients and gets exhausted under serverless concurrency
+// ("EMAXCONNSESSION"). Normalizing here means the fix holds regardless of
+// which port the env var carries. No-op for non-Supabase / already-6543 URLs.
+const databaseUrl = (
+  process.env.BETTER_AUTH_DATABASE_URL ??
+  "postgresql://postgres:postgres@localhost:54322/postgres"
+).replace(/:5432\/(?=[^/]*$)/, ":6543/");
+
+// Use the Supabase TRANSACTION pooler (port 6543). The session pooler
+// (5432) caps at 15 clients and gets exhausted under serverless concurrency
+// ("EMAXCONNSESSION: max clients reached in session mode"); the transaction
+// pooler multiplexes and scales for serverless. Verified empirically that it
+// still honors the `search_path` startup option, so the better_auth schema
+// resolves. Keep `max` small so each Vercel instance holds few connections.
 const pool = new Pool({
   connectionString: databaseUrl,
   options: "-c search_path=better_auth,public",
+  max: 3,
+  idleTimeoutMillis: 20_000,
+  connectionTimeoutMillis: 10_000,
 });
 
 // Single source of truth for the app's own origin: Better Auth's baseURL and
@@ -78,12 +102,48 @@ function isAllowedEmail(email: string): boolean {
 // `/organizations/` discovery `issuer` is the templated `.../{tenantid}/v2.0`,
 // and Better Auth's RFC 9207 check compares the callback `iss` (the user's REAL
 // tenant) against that template — which would reject every login with
-// `issuer_mismatch`. With no discoveryUrl/issuer set, that check is skipped; the
-// id_token (fetched back-channel over TLS with PKCE) is the trusted profile.
+// `issuer_mismatch`. With no discoveryUrl/issuer set, that check is skipped.
+// Because that leaves Better Auth with NO issuer/signature check on the
+// `/organizations/` (any-tenant) endpoint, `getUserInfo` below re-establishes
+// the trust boundary itself: it verifies the id_token signature against the
+// issuing tenant's JWKS and pins the tenant to HKUST's own tenants.
 const HKUST_AUTHORIZE_URL =
   "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize";
 const HKUST_TOKEN_URL =
   "https://login.microsoftonline.com/organizations/oauth2/v2.0/token";
+
+// The only Microsoft Entra tenants HKUST users legitimately belong to. Values
+// are authoritative, read from Microsoft's tenant discovery documents:
+//   https://login.microsoftonline.com/ust.hk/v2.0/.well-known/openid-configuration
+//   https://login.microsoftonline.com/connect.ust.hk/v2.0/.well-known/openid-configuration
+// Staff/faculty (@ust.hk) and students (@connect.ust.hk) live in DIFFERENT
+// tenants — that is why the multi-tenant `/organizations/` endpoint is used.
+// An id_token whose `tid` is not one of these is rejected outright.
+const HKUST_TENANT_ISSUERS: Record<string, string> = {
+  "c917f3e2-9322-4926-9bb3-daca730413ca":
+    "https://login.microsoftonline.com/c917f3e2-9322-4926-9bb3-daca730413ca/v2.0", // ust.hk (staff/faculty)
+  "6c1d4152-39d0-44ca-88d9-b8d6ddca0708":
+    "https://login.microsoftonline.com/6c1d4152-39d0-44ca-88d9-b8d6ddca0708/v2.0", // connect.ust.hk (students)
+};
+
+// One remote JWK set per tenant, created lazily and cached so `jose` reuses the
+// fetched signing keys across requests (per server process).
+const tenantJwksCache = new Map<
+  string,
+  ReturnType<typeof createRemoteJWKSet>
+>();
+function jwksForTenant(tid: string): ReturnType<typeof createRemoteJWKSet> {
+  let jwks = tenantJwksCache.get(tid);
+  if (!jwks) {
+    jwks = createRemoteJWKSet(
+      new URL(
+        `https://login.microsoftonline.com/${tid}/discovery/v2.0/keys`,
+      ),
+    );
+    tenantJwksCache.set(tid, jwks);
+  }
+  return jwks;
+}
 
 const hkustProviders = [
   {
@@ -105,33 +165,81 @@ const hkustProviders = [
     authorizationUrlParams: { prompt: "select_account" },
     // Entra frequently omits the `email` claim, so the default getUserInfo
     // (which needs id_token.email) would fall through to a userinfo URL we
-    // don't configure. Decode the id_token ourselves and fall back to
-    // preferred_username so the domain gate always sees an address.
+    // don't configure. We read the id_token ourselves — but only AFTER
+    // cryptographically verifying it, because the `/organizations/` endpoint
+    // otherwise leaves the token unauthenticated at the app boundary.
+    //
+    // This runs on EVERY sign-in (new and returning users), so the tenant pin
+    // and domain gate below are enforced on every authentication, not just at
+    // account creation.
     getUserInfo: async (tokens: { idToken?: string }) => {
       if (!tokens.idToken) return null;
-      // decodeJwt throws (JWTInvalid) on a malformed token; the caller does not
-      // wrap getUserInfo, so returning null here yields a clean error redirect
-      // instead of an unhandled 500.
-      let c: ReturnType<typeof decodeJwt>;
+
+      // Step 1: peek the (still-unverified) `tid` ONLY to select which tenant's
+      // JWKS to verify against. decodeJwt throws (JWTInvalid) on a malformed
+      // token; the caller does not wrap getUserInfo, so returning null yields a
+      // clean error redirect instead of an unhandled 500.
+      let unverifiedTid: string | undefined;
       try {
-        c = decodeJwt(tokens.idToken);
+        unverifiedTid = decodeJwt(tokens.idToken).tid as string | undefined;
       } catch {
         return null;
       }
-      if (!c.sub) return null;
+      // Reject any token not minted by an HKUST tenant. This is the tenant pin
+      // that replaces the disabled RFC 9207 issuer check.
+      if (!unverifiedTid || !(unverifiedTid in HKUST_TENANT_ISSUERS)) {
+        return null;
+      }
+
+      // Step 2: verify the id_token signature against that tenant's published
+      // keys, pinning issuer + audience + algorithm. A forged `tid` cannot pass
+      // here: the signature would not validate against the claimed tenant's
+      // keys and the pinned `issuer` would not match. Entra v2 id_tokens are
+      // RS256-signed.
+      const clientId = process.env.HKUST_XYQ_CLIENT_ID ?? "";
+      let claims: ReturnType<typeof decodeJwt>;
+      try {
+        const { payload } = await jwtVerify(
+          tokens.idToken,
+          jwksForTenant(unverifiedTid),
+          {
+            issuer: HKUST_TENANT_ISSUERS[unverifiedTid],
+            audience: clientId,
+            algorithms: ["RS256"],
+          },
+        );
+        claims = payload;
+      } catch {
+        // Bad signature / issuer / audience / expiry — reject.
+        return null;
+      }
+
+      if (!claims.sub) return null;
+      // With the tenant verified, `preferred_username` is an HKUST-issued UPN,
+      // so gating the domain on it (when `email` is absent) is safe.
       const email = String(
-        (c.email as string) ?? (c.preferred_username as string) ?? "",
+        (claims.email as string) ??
+          (claims.preferred_username as string) ??
+          "",
       ).toLowerCase();
+      // Per-sign-in domain enforcement: blocks any account whose verified
+      // address is outside the allow-list, for new AND returning users.
+      if (!isAllowedEmail(email)) return null;
+
       return {
-        id: String(c.sub),
+        id: String(claims.sub),
         email,
         // Institutional SSO account — treated as verified.
         emailVerified: true,
         name: String(
-          (c.name as string) ?? (c.preferred_username as string) ?? "Learner",
+          (claims.name as string) ??
+            (claims.preferred_username as string) ??
+            "Learner",
         ),
         image:
-          typeof c.picture === "string" ? (c.picture as string) : undefined,
+          typeof claims.picture === "string"
+            ? (claims.picture as string)
+            : undefined,
       };
     },
   },
