@@ -4,10 +4,16 @@ import {
   errorResponse,
 } from "../_shared/cors.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
-import { synthesizeAcademic } from "../_shared/iflytek-tts.ts";
+import {
+  synthesizeAcademic,
+  VALID_IFLYTEK_VOICES,
+} from "../_shared/iflytek-tts.ts";
 
 const schema = z.object({
-  voiceId: z.string().min(1),
+  voiceId: z.string().min(1).max(50).refine(
+    (v) => VALID_IFLYTEK_VOICES.has(v),
+    { message: "Invalid voice ID" },
+  ),
   text: z.string().min(1).max(500),
 });
 

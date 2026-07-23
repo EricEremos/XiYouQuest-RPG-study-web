@@ -4,7 +4,7 @@ import { buildIflytekWsUrl } from "./iflytek-auth.ts";
 const IFLYTEK_HOST = "tts-api-sg.xf-yun.com";
 const IFLYTEK_PATH = "/v2/tts";
 
-const VALID_IFLYTEK_VOICES = new Set([
+export const VALID_IFLYTEK_VOICES = new Set([
   "x_xiaoyan",
   "x_xiaoyuan",
   "x_xiaoxi",
