@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { leaderboardQuerySchema } from "@/lib/validations";
 
@@ -29,7 +30,11 @@ async function getFriendIds(
     .eq("status", "accepted")
     .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
 
-  if (error || !friendships) {
+  if (error) {
+    throw error;
+  }
+
+  if (!friendships) {
     return [userId];
   }
 
@@ -59,7 +64,11 @@ async function getXpRankings(
 
   const { data, error } = await query;
 
-  if (error || !data) {
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
     return { rankings: [], user_rank: null };
   }
 
@@ -81,17 +90,25 @@ async function getXpRankings(
       userRank = { rank: userInRankings.rank, value: userInRankings.value };
     } else {
       // User not in top 20 — count how many have higher XP
-      const { data: userProfile } = await supabase
+      const { data: userProfile, error: userProfileError } = await supabase
         .from("profiles")
         .select("total_xp")
         .eq("id", userId)
         .single();
 
+      if (userProfileError) {
+        throw userProfileError;
+      }
+
       if (userProfile) {
-        const { count } = await supabase
+        const { count, error: rankCountError } = await supabase
           .from("profiles")
           .select("id", { count: "exact", head: true })
           .gt("total_xp", userProfile.total_xp);
+
+        if (rankCountError) {
+          throw rankCountError;
+        }
 
         userRank = {
           rank: (count ?? 0) + 1,
@@ -121,7 +138,11 @@ async function getAccuracyRankings(
 
   const { data: progressRows, error } = await query;
 
-  if (error || !progressRows) {
+  if (error) {
+    throw error;
+  }
+
+  if (!progressRows) {
     return { rankings: [], user_rank: null };
   }
 
@@ -166,10 +187,14 @@ async function getAccuracyRankings(
 
   // Fetch profiles for the ranked users
   const rankedUserIds = limited.map((u) => u.user_id);
-  const { data: profiles } = await supabase
+  const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
     .select("id, display_name, avatar_url, current_level")
     .in("id", rankedUserIds);
+
+  if (profilesError) {
+    throw profilesError;
+  }
 
   const profileMap = new Map(
     (profiles ?? []).map((p) => [p.id, p])
@@ -231,7 +256,11 @@ async function getStreakRankings(
 
   const { data, error } = await query;
 
-  if (error || !data) {
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
     return { rankings: [], user_rank: null };
   }
 
@@ -253,17 +282,25 @@ async function getStreakRankings(
       userRank = { rank: userInRankings.rank, value: userInRankings.value };
     } else {
       // User not in top 20 — count how many have higher streak
-      const { data: userProfile } = await supabase
+      const { data: userProfile, error: userProfileError } = await supabase
         .from("profiles")
         .select("login_streak")
         .eq("id", userId)
         .single();
 
+      if (userProfileError) {
+        throw userProfileError;
+      }
+
       if (userProfile) {
-        const { count } = await supabase
+        const { count, error: rankCountError } = await supabase
           .from("profiles")
           .select("id", { count: "exact", head: true })
           .gt("login_streak", userProfile.login_streak);
+
+        if (rankCountError) {
+          throw rankCountError;
+        }
 
         userRank = {
           rank: (count ?? 0) + 1,
@@ -277,7 +314,7 @@ async function getStreakRankings(
 }
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
+  const userClient = await createClient();
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -298,21 +335,31 @@ export async function GET(request: NextRequest) {
   const { tab: validTab, scope: validScope } = parsed.data;
 
   try {
+    // Friendship visibility remains user-scoped. Ranking data necessarily
+    // spans multiple profiles, so read only the allowlisted public statistics
+    // through the server-only client after authenticating the caller.
+    const rankingClient = createAdminClient();
+
     // For friends scope, fetch friend IDs first
     const friendIds =
       validScope === "friends"
-        ? await getFriendIds(supabase, user.id)
+        ? await getFriendIds(userClient, user.id)
         : [];
 
     let result: LeaderboardResponse;
 
     switch (validTab) {
       case "xp":
-        result = await getXpRankings(supabase, user.id, validScope, friendIds);
+        result = await getXpRankings(
+          rankingClient,
+          user.id,
+          validScope,
+          friendIds,
+        );
         break;
       case "accuracy":
         result = await getAccuracyRankings(
-          supabase,
+          rankingClient,
           user.id,
           validScope,
           friendIds
@@ -320,7 +367,7 @@ export async function GET(request: NextRequest) {
         break;
       case "streak":
         result = await getStreakRankings(
-          supabase,
+          rankingClient,
           user.id,
           validScope,
           friendIds

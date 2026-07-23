@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET() {
-  const supabase = await createClient();
+  const userClient = await createClient();
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -10,11 +11,15 @@ export async function GET() {
 
   try {
     // Get accepted friend IDs
-    const { data: friendships } = await supabase
+    const { data: friendships, error: friendshipError } = await userClient
       .from("friendships")
       .select("requester_id, addressee_id")
       .eq("status", "accepted")
       .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`);
+
+    if (friendshipError) {
+      throw friendshipError;
+    }
 
     const userIds = [user.id];
     for (const f of friendships ?? []) {
@@ -22,7 +27,8 @@ export async function GET() {
     }
 
     // Fetch recent achievements for all relevant users
-    const { data: feed, error } = await supabase
+    const admin = createAdminClient();
+    const { data: feed, error } = await admin
       .from("user_achievements")
       .select(`
         unlocked_at,

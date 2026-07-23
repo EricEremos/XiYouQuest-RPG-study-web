@@ -11,21 +11,17 @@ export async function selectCharacter(characterId: string) {
   const user = await getSessionUser();
   if (!user) return { error: "Not authenticated" };
 
-  // Deselect all characters first
-  await supabase
-    .from("user_characters")
-    .update({ is_selected: false })
-    .eq("user_id", user.id);
+  const { error } = await supabase.rpc("select_user_character", {
+    target_character_id: characterId,
+  });
 
-  // Select the new one
-  await supabase
-    .from("user_characters")
-    .update({ is_selected: true })
-    .eq("user_id", user.id)
-    .eq("character_id", characterId);
+  if (error) {
+    return { error: "Unable to select this character. Please try again." };
+  }
 
   revalidatePath("/characters");
   revalidatePath("/dashboard");
+  return { success: true };
 }
 
 /** Unlock a character that the user has earned through quest progression */

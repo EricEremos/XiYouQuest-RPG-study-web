@@ -10,15 +10,55 @@ export interface LoadedCharacter {
   expressions: Record<string, string>;
 }
 
-/**
- * Load the user's selected character with expressions from Supabase.
- * Shared across all component pages to avoid duplication.
- */
-export async function loadSelectedCharacter(
+interface CharacterRecord {
+  id?: string;
+  name?: string;
+  personality_prompt?: string | null;
+  voice_id?: string | null;
+  character_expressions?: Array<{
+    expression_name: ExpressionName;
+    image_url: string;
+  }> | null;
+}
+
+interface UserCharacterRecord {
+  characters?: CharacterRecord | null;
+}
+
+const STARTER_CHARACTER_NAME = "Sun Wukong (孙悟空)";
+const STATIC_STUDY_BUDDY: CharacterRecord = {
+  name: STARTER_CHARACTER_NAME,
+  personality_prompt: "You are a friendly and encouraging study companion.",
+  voice_id: "",
+  character_expressions: [],
+};
+
+function toLoadedCharacter(characterData?: CharacterRecord | null): LoadedCharacter {
+  const resolvedCharacter = characterData ?? STATIC_STUDY_BUDDY;
+  const expressions: Record<string, string> = {};
+
+  for (const expression of resolvedCharacter.character_expressions ?? []) {
+    expressions[expression.expression_name] = expression.image_url;
+  }
+
+  const characterName = resolvedCharacter.name ?? STARTER_CHARACTER_NAME;
+
+  return {
+    id: resolvedCharacter.id,
+    name: characterName,
+    personalityPrompt:
+      resolvedCharacter.personality_prompt ??
+      "You are a friendly and encouraging study companion.",
+    voiceId: resolvedCharacter.voice_id ?? "",
+    expressions: getCharacterImageFallback(characterName, expressions),
+  };
+}
+
+async function readSelectedCharacter(
   supabase: SupabaseClient,
-  userId: string
-): Promise<LoadedCharacter> {
-  const { data: userCharacter } = await supabase
+  userId: string,
+) {
+  return supabase
     .from("user_characters")
     .select(`
       *,
@@ -32,23 +72,54 @@ export async function loadSelectedCharacter(
     .order("unlocked_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+}
 
-  let characterData = userCharacter?.characters;
+/**
+ * Load the user's selected character with expressions from Supabase.
+ * Shared across all component pages to avoid duplication.
+ */
+export async function loadSelectedCharacter(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<LoadedCharacter> {
+  const {
+    data: userCharacter,
+    error: selectedCharacterError,
+  } = await readSelectedCharacter(supabase, userId);
+
+  // A failed read is not proof that the user has no selection. Avoid mutating
+  // state during a transient outage and render the safe static fallback.
+  if (selectedCharacterError) {
+    return toLoadedCharacter();
+  }
+
+  let characterData = (userCharacter as UserCharacterRecord | null)?.characters;
   if (!characterData) {
-    const { data: defaultCharacter } = await supabase
+    const {
+      data: defaultCharacters,
+      error: defaultCharacterError,
+    } = await supabase
       .from("characters")
       .select(`
         *,
         character_expressions (*)
       `)
       .eq("is_default", true)
-      .order("name", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .order("name", { ascending: true });
+
+    if (defaultCharacterError) {
+      return toLoadedCharacter();
+    }
+
+    const defaults = (defaultCharacters ?? []) as CharacterRecord[];
+    const defaultCharacter =
+      defaults.find((character) => character.name === STARTER_CHARACTER_NAME) ??
+      defaults[0] ??
+      null;
     characterData = defaultCharacter;
 
     if (defaultCharacter?.id) {
-      await supabase
+      const { error: repairError } = await supabase
         .from("user_characters")
         .upsert(
           {
@@ -58,29 +129,23 @@ export async function loadSelectedCharacter(
           },
           { onConflict: "user_id,character_id" },
         );
+
+      // A concurrent request may have selected a companion between our read and
+      // write. Re-read once after any failed repair and prefer the winning row.
+      if (repairError) {
+        const {
+          data: repairedUserCharacter,
+          error: verificationError,
+        } = await readSelectedCharacter(supabase, userId);
+        const repairedCharacter = (
+          repairedUserCharacter as UserCharacterRecord | null
+        )?.characters;
+        if (!verificationError && repairedCharacter) {
+          characterData = repairedCharacter;
+        }
+      }
     }
   }
 
-  const expressions: Record<string, string> = {};
-
-  if (characterData?.character_expressions) {
-    for (const expr of characterData.character_expressions as Array<{
-      expression_name: ExpressionName;
-      image_url: string;
-    }>) {
-      expressions[expr.expression_name] = expr.image_url;
-    }
-  }
-
-  const characterName = characterData?.name ?? "Study Buddy";
-
-  return {
-    id: characterData?.id,
-    name: characterName,
-    personalityPrompt:
-      characterData?.personality_prompt ??
-      "You are a friendly and encouraging study companion.",
-    voiceId: characterData?.voice_id ?? "",
-    expressions: getCharacterImageFallback(characterName, expressions),
-  };
+  return toLoadedCharacter(characterData);
 }
