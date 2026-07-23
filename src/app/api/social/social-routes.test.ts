@@ -53,60 +53,93 @@ describe("social route data access", () => {
     });
   });
 
-  it("keeps friendship authorization user-scoped but reads friend stats with the server-only client", async () => {
+  it("reads self and friend stats through one bounded authenticated projection", async () => {
+    const rpc = vi.fn(async () => ({
+      data: [
+        {
+          friendship_id: null,
+          is_self: true,
+          id: "11111111-1111-4111-8111-111111111111",
+          display_name: "Current Student",
+          avatar_url: null,
+          current_level: 3,
+          total_xp: 250,
+          login_streak: 4,
+          total_sessions: 8,
+          avg_scores: { "1": 81 },
+          selected_character: {
+            name: "Sun Wukong (孙悟空)",
+            image_url: null,
+          },
+          achievement_count: 2,
+        },
+        {
+          friendship_id: "friendship-1",
+          is_self: false,
+          id: "22222222-2222-4222-8222-222222222222",
+          display_name: "Friend",
+          avatar_url: null,
+          current_level: 2,
+          total_xp: 120,
+          login_streak: 3,
+          total_sessions: 1,
+          avg_scores: { "1": 90 },
+          selected_character: null,
+          achievement_count: 1,
+        },
+      ],
+      error: null,
+    }));
     const userClient = {
-      from: vi.fn(() =>
-        query({
-          data: [
-            {
-              id: "friendship-1",
-              requester_id: "11111111-1111-4111-8111-111111111111",
-              addressee_id: "22222222-2222-4222-8222-222222222222",
-            },
-          ],
-          error: null,
-        }),
-      ),
-    };
-    const adminClient = {
-      from: vi.fn((table: string) => {
-        if (table === "profiles") {
-          return query({
-            data: {
-              id: "22222222-2222-4222-8222-222222222222",
-              display_name: "Friend",
-              avatar_url: null,
-              current_level: 2,
-              total_xp: 120,
-              login_streak: 3,
-            },
-            error: null,
-          });
-        }
-        if (table === "practice_sessions") {
-          return query({ data: [], error: null });
-        }
-        if (table === "user_characters") {
-          return query({ data: null, error: null });
-        }
-        if (table === "user_achievements") {
-          return query({ data: null, error: null, count: 0 });
-        }
-        throw new Error(`Unexpected admin table: ${table}`);
-      }),
+      rpc,
     };
 
     mocks.createClient.mockResolvedValue(userClient);
-    mocks.createAdminClient.mockReturnValue(adminClient);
+
+    const { GET } = await import("./friends/route");
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("get_social_friend_stats");
+    expect(mocks.createAdminClient).not.toHaveBeenCalled();
+    expect(body.self.id).toBe("11111111-1111-4111-8111-111111111111");
+    expect(body.friends).toEqual([
+      {
+        friendship_id: "friendship-1",
+        id: "22222222-2222-4222-8222-222222222222",
+        display_name: "Friend",
+        avatar_url: null,
+        current_level: 2,
+        total_xp: 120,
+        login_streak: 3,
+        total_sessions: 1,
+        avg_scores: { "1": 90 },
+        selected_character: null,
+        achievement_count: 1,
+      },
+    ]);
+  });
+
+  it("fails friend hydration when the bounded projection fails", async () => {
+    mocks.createClient.mockResolvedValue({
+      rpc: vi.fn(async () => ({
+        data: null,
+        error: new Error("projection unavailable"),
+      })),
+    });
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
 
     const { GET } = await import("./friends/route");
     const response = await GET();
 
-    expect(response.status).toBe(200);
-    expect(userClient.from).toHaveBeenCalledTimes(1);
-    expect(userClient.from).toHaveBeenCalledWith("friendships");
-    expect(adminClient.from).toHaveBeenCalledWith("profiles");
-    expect(adminClient.from).toHaveBeenCalledWith("practice_sessions");
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "Failed to fetch friends",
+    });
+    consoleError.mockRestore();
   });
 
   it("uses the server-only client to resolve profiles for authorized pending requests", async () => {
@@ -154,5 +187,45 @@ describe("social route data access", () => {
     expect(userClient.from).toHaveBeenCalledTimes(2);
     expect(adminClient.from).toHaveBeenCalledWith("profiles");
     expect(body.incoming[0].user.display_name).toBe("Friend");
+  });
+
+  it("fails pending-request hydration when the authorized profile projection fails", async () => {
+    const incoming = query({
+      data: [
+        {
+          id: "request-1",
+          requester_id: "22222222-2222-4222-8222-222222222222",
+          created_at: "2026-07-23T00:00:00Z",
+        },
+      ],
+      error: null,
+    });
+    const outgoing = query({ data: [], error: null });
+    mocks.createClient.mockResolvedValue({
+      from: vi
+        .fn()
+        .mockReturnValueOnce(incoming)
+        .mockReturnValueOnce(outgoing),
+    });
+    mocks.createAdminClient.mockReturnValue({
+      from: vi.fn(() =>
+        query({
+          data: null,
+          error: new Error("profiles unavailable"),
+        }),
+      ),
+    });
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const { GET } = await import("./requests/route");
+    const response = await GET();
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "Failed to fetch requests",
+    });
+    consoleError.mockRestore();
   });
 });

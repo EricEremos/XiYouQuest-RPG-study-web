@@ -66,10 +66,14 @@ export async function GET() {
     > = {};
 
     if (userIdArray.length > 0) {
-      const { data: profiles } = await admin
+      const { data: profiles, error: profilesError } = await admin
         .from("profiles")
         .select("id, display_name, avatar_url, current_level")
         .in("id", userIdArray);
+
+      if (profilesError) {
+        throw profilesError;
+      }
 
       if (profiles) {
         profileMap = Object.fromEntries(profiles.map((p) => [p.id, p]));

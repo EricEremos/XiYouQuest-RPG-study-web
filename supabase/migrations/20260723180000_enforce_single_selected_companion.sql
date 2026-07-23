@@ -1,6 +1,6 @@
 -- Multiple concurrent repair or selection requests must never leave a profile
--- with more than one active companion. Keep the intended starter character
--- when duplicates already exist, then enforce the invariant at the database.
+-- with zero or multiple active companions. First normalize historical rows,
+-- then enforce the exact-one invariant at transaction boundaries.
 
 WITH ranked_selections AS (
   SELECT
@@ -9,7 +9,6 @@ WITH ranked_selections AS (
     ROW_NUMBER() OVER (
       PARTITION BY uc.user_id
       ORDER BY
-        (c.name = 'Sun Wukong (孙悟空)') DESC,
         uc.unlocked_at DESC,
         uc.character_id
     ) AS selection_rank
@@ -23,6 +22,60 @@ FROM ranked_selections ranked
 WHERE ranked.selection_rank > 1
   AND uc.user_id = ranked.user_id
   AND uc.character_id = ranked.character_id;
+
+WITH default_character AS (
+  SELECT c.id
+  FROM public.characters c
+  WHERE c.is_default = true
+  ORDER BY (c.name = 'Sun Wukong (孙悟空)') DESC, c.name
+  LIMIT 1
+)
+INSERT INTO public.user_characters (user_id, character_id, is_selected)
+SELECT p.id, dc.id, false
+FROM public.profiles p
+CROSS JOIN default_character dc
+ON CONFLICT (user_id, character_id) DO NOTHING;
+
+WITH default_character AS (
+  SELECT c.id
+  FROM public.characters c
+  WHERE c.is_default = true
+  ORDER BY (c.name = 'Sun Wukong (孙悟空)') DESC, c.name
+  LIMIT 1
+),
+profiles_without_selection AS (
+  SELECT p.id
+  FROM public.profiles p
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.user_characters uc
+    WHERE uc.user_id = p.id
+      AND uc.is_selected = true
+  )
+)
+UPDATE public.user_characters uc
+SET is_selected = true
+FROM default_character dc, profiles_without_selection p
+WHERE uc.user_id = p.id
+  AND uc.character_id = dc.id;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.profiles p
+    WHERE (
+      SELECT count(*)
+      FROM public.user_characters uc
+      WHERE uc.user_id = p.id
+        AND uc.is_selected = true
+    ) <> 1
+  ) THEN
+    RAISE EXCEPTION
+      'Cannot enforce companion invariant: every profile needs exactly one selected character';
+  END IF;
+END
+$$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS user_characters_one_selected_per_user_idx
   ON public.user_characters (user_id)
@@ -80,3 +133,46 @@ FROM PUBLIC, anon;
 
 GRANT EXECUTE ON FUNCTION public.select_user_character(UUID)
 TO authenticated;
+
+-- The partial index prevents multiple selections. This deferred constraint
+-- trigger also prevents a transaction from committing with no selection.
+-- Deferral allows the RPC above to deselect and select atomically.
+CREATE OR REPLACE FUNCTION public.enforce_exactly_one_selected_character()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  affected_user_id UUID := COALESCE(NEW.user_id, OLD.user_id);
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.profiles p
+    WHERE p.id = affected_user_id
+  ) AND (
+    SELECT count(*)
+    FROM public.user_characters uc
+    WHERE uc.user_id = affected_user_id
+      AND uc.is_selected = true
+  ) <> 1 THEN
+    RAISE EXCEPTION
+      'A profile must have exactly one selected character'
+      USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NULL;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.enforce_exactly_one_selected_character()
+FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS user_characters_exactly_one_selected_trigger
+ON public.user_characters;
+
+CREATE CONSTRAINT TRIGGER user_characters_exactly_one_selected_trigger
+AFTER INSERT OR UPDATE OR DELETE ON public.user_characters
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_exactly_one_selected_character();
