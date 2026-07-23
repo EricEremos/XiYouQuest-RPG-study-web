@@ -163,10 +163,25 @@ export function DashboardClient({
   // ── Dashboard content ──
   return (
     <div className="mx-auto max-w-2xl space-y-2.5">
-      {/* Mute button */}
+      {/* Mute control. On phones it sits in the page flow so it can never
+          cover the card stack at 320/390 widths; on md+ it floats
+          bottom-right where the wider layout leaves clear space. */}
+      <div className="flex justify-end md:hidden">
+        <button
+          onClick={toggleMuted}
+          className="pixel-border bg-card p-2 hover:pixel-border-primary transition-all"
+          aria-label={muted ? "Unmute music" : "Mute music"}
+        >
+          {muted ? (
+            <VolumeX className="h-5 w-5 text-muted-foreground" />
+          ) : (
+            <Volume2 className="h-5 w-5 text-primary" />
+          )}
+        </button>
+      </div>
       <button
         onClick={toggleMuted}
-        className="fixed bottom-4 right-4 z-50 pixel-border bg-card p-2 hover:pixel-border-primary transition-all"
+        className="hidden md:block fixed bottom-4 right-4 z-50 pixel-border bg-card p-2 hover:pixel-border-primary transition-all"
         aria-label={muted ? "Unmute music" : "Mute music"}
       >
         {muted ? (

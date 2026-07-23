@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-/** Fisher-Yates shuffle — returns a new shuffled copy of the array */
+/** Fisher-Yates shuffle: returns a new shuffled copy of the array */
 export function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -54,7 +54,16 @@ export function sampleByTone<T extends { pinyin?: string | null }>(items: T[], c
     picked.push(leftover.shift()!);
   }
 
-  return shuffle(picked);
+  const ordered = shuffle(picked);
+  // FU Laoshi feedback: "the first question is also too random." Open on a first-tone
+  // (阴平) item (the conventional warm-up tone) so the reading section always starts
+  // on a predictable, easy tone instead of an arbitrary one. Rest stays shuffled.
+  const openerIdx = ordered.findIndex((it) => toneFromPinyin(it.pinyin) === 1);
+  if (openerIdx > 0) {
+    const [opener] = ordered.splice(openerIdx, 1);
+    ordered.unshift(opener);
+  }
+  return ordered;
 }
 
 /** Format a date string as a relative time (e.g. "2h ago", "3d ago") */

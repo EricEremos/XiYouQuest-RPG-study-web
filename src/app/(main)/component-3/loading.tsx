@@ -1,15 +1,11 @@
+import { PracticeLoading } from "@/components/shared/practice-loading";
+
 export default function Component3Loading() {
   return (
-    <div className="space-y-4">
-      <div>
-        <div className="h-7 w-full max-w-80 rounded animate-shimmer" />
-        <div className="h-4 w-full max-w-96 rounded animate-shimmer mt-2" />
-      </div>
-      <div className="pixel-border p-4 sm:p-6 space-y-4">
-        <div className="h-24 w-24 mx-auto rounded-full animate-shimmer" />
-        <div className="h-16 w-full rounded animate-shimmer" />
-        <div className="h-10 w-32 mx-auto rounded animate-shimmer" />
-      </div>
-    </div>
+    <PracticeLoading
+      title="Component 3: Vocabulary & Grammar Judgment"
+      chinese="选择判断"
+      description="Choose the correct or more standard Putonghua vocabulary and grammar."
+    />
   );
 }

@@ -2,7 +2,7 @@ import { createClient, getSessionUser } from "@/lib/supabase/server";
 import dynamic from "next/dynamic";
 import { loadSelectedCharacter } from "@/lib/character-loader";
 import { buildPlayerMemory } from "@/lib/gemini/player-memory";
-import { shuffle } from "@/lib/utils";
+import { randomizeAnswerPositions, shuffle } from "@/lib/utils";
 import { QUIZ_SIZES } from "@/lib/constants";
 import type { QuizQuestion } from "@/types/practice";
 
@@ -105,6 +105,10 @@ export default async function Component7Page({
   } else {
     questions = FALLBACK_QUESTIONS;
   }
+
+  // Randomize answer order on the server only. The client must never
+  // re-shuffle: SSR and hydration would disagree and throw React error 418.
+  questions = questions.map(randomizeAnswerPositions);
 
   return (
     <div className="space-y-4">

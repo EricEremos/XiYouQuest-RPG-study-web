@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CharacterDisplay } from "@/components/character/character-display";
@@ -10,7 +10,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { calculateXP } from "@/lib/gamification/xp";
-import { randomizeAnswerPositions } from "@/lib/utils";
 import { fetchWithRetry } from "@/lib/fetch-retry";
 import { useAchievementToast } from "@/components/shared/achievement-toast";
 import { useBGM } from "@/components/shared/bgm-provider";
@@ -37,10 +36,11 @@ export function QuizSession({ questions, character, characterId, component, lpNo
   const router = useRouter();
   const { showAchievementToasts } = useAchievementToast();
   const { setLearningActive } = useBGM();
-  // Randomize answer positions on client side
-  const randomizedQuestions = useMemo(() => {
-    return questions.map(randomizeAnswerPositions);
-  }, [questions]);
+  // Answer positions are randomized ONCE on the server (see the page
+  // components). Re-randomizing here ran during both SSR and hydration with
+  // different Math.random() results, producing React error 418 (server/client
+  // text mismatch) on every fresh load.
+  const randomizedQuestions = questions;
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [phase, setPhase] = useState<SessionPhase>("answering");
