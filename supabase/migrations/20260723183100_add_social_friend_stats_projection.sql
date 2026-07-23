@@ -34,19 +34,34 @@ BEGIN
       NULL::UUID AS friendship_id,
       true AS is_self
     UNION ALL
-    SELECT
-      CASE
-        WHEN f.requester_id = auth.uid() THEN f.addressee_id
-        ELSE f.requester_id
-      END AS user_id,
-      f.id AS friendship_id,
-      false AS is_self
-    FROM public.friendships f
-    WHERE f.status = 'accepted'
-      AND (
-        f.requester_id = auth.uid()
-        OR f.addressee_id = auth.uid()
-      )
+    (
+      SELECT
+        bounded_friends.user_id,
+        bounded_friends.friendship_id,
+        false AS is_self
+      FROM (
+        SELECT DISTINCT ON (friend_candidate.user_id)
+          friend_candidate.user_id,
+          friend_candidate.friendship_id
+        FROM (
+          SELECT
+            CASE
+              WHEN f.requester_id = auth.uid() THEN f.addressee_id
+              ELSE f.requester_id
+            END AS user_id,
+            f.id AS friendship_id
+          FROM public.friendships f
+          WHERE f.status = 'accepted'
+            AND (
+              f.requester_id = auth.uid()
+              OR f.addressee_id = auth.uid()
+            )
+        ) AS friend_candidate
+        ORDER BY friend_candidate.user_id, friend_candidate.friendship_id
+      ) AS bounded_friends
+      ORDER BY bounded_friends.friendship_id, bounded_friends.user_id
+      LIMIT 200
+    )
   ),
   component_scores AS (
     SELECT

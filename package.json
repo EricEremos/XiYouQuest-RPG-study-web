@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run",
+    "test": "vitest run && node --test scripts/db-contract-test-helpers.test.mjs",
+    "test:unit": "vitest run",
     "test:db-contracts": "node scripts/verify-database-contracts.mjs",
+    "test:db-concurrency": "node scripts/verify-database-selection-concurrency.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {

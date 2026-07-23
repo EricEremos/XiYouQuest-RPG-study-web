@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { socialProfileLookupSchema } from "@/lib/social-service-role-schemas";
 
 export async function GET(request: NextRequest) {
   const user = await getSessionUser();
@@ -40,7 +41,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(profile);
+    const parsed = socialProfileLookupSchema.parse(profile);
+    return NextResponse.json(parsed);
   } catch (error) {
     console.error("Lookup error:", error);
     return NextResponse.json({ error: "Lookup failed" }, { status: 500 });

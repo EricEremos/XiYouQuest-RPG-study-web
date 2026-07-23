@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
@@ -20,6 +21,15 @@ type QueryResult = {
   error: unknown;
   count?: number | null;
 };
+
+const currentUser = {
+  id: "11111111-1111-4111-8111-111111111111",
+  email: "student@connect.ust.hk",
+};
+
+function request(path: string) {
+  return new NextRequest(`https://cle-xyq.hkust.edu.hk/api/social${path}`);
+}
 
 function query(result: QueryResult) {
   const builder = {
@@ -47,10 +57,7 @@ describe("social route data access", () => {
     mocks.createClient.mockReset();
     mocks.createAdminClient.mockReset();
     mocks.getSessionUser.mockReset();
-    mocks.getSessionUser.mockResolvedValue({
-      id: "11111111-1111-4111-8111-111111111111",
-      email: "student@connect.ust.hk",
-    });
+    mocks.getSessionUser.mockResolvedValue(currentUser);
   });
 
   it("reads self and friend stats through one bounded authenticated projection", async () => {
@@ -169,11 +176,53 @@ describe("social route data access", () => {
     consoleError.mockRestore();
   });
 
+  it.each([
+    { current_level: null, total_xp: 250 },
+    { current_level: 3, total_xp: "" },
+  ])(
+    "rejects null and empty social numeric wire values: %o",
+    async ({ current_level, total_xp }) => {
+      mocks.createClient.mockResolvedValue({
+        rpc: vi.fn(async () => ({
+          data: [
+            {
+              friendship_id: null,
+              is_self: true,
+              id: "11111111-1111-4111-8111-111111111111",
+              display_name: "Current Student",
+              avatar_url: null,
+              current_level,
+              total_xp,
+              login_streak: 4,
+              total_sessions: 8,
+              avg_scores: { "1": 81 },
+              selected_character: null,
+              achievement_count: 2,
+            },
+          ],
+          error: null,
+        })),
+      });
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      const { GET } = await import("./friends/route");
+      const response = await GET();
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        error: "Failed to fetch friends",
+      });
+      consoleError.mockRestore();
+    },
+  );
+
   it("uses the server-only client to resolve profiles for authorized pending requests", async () => {
     const incoming = query({
       data: [
         {
-          id: "request-1",
+          id: "44444444-4444-4444-8444-444444444444",
           requester_id: "22222222-2222-4222-8222-222222222222",
           created_at: "2026-07-23T00:00:00Z",
         },
@@ -212,6 +261,8 @@ describe("social route data access", () => {
 
     expect(response.status).toBe(200);
     expect(userClient.from).toHaveBeenCalledTimes(2);
+    expect(incoming.limit).toHaveBeenCalledWith(200);
+    expect(outgoing.limit).toHaveBeenCalledWith(200);
     expect(adminClient.from).toHaveBeenCalledWith("profiles");
     expect(body.incoming[0].user.display_name).toBe("Friend");
   });
@@ -220,7 +271,7 @@ describe("social route data access", () => {
     const incoming = query({
       data: [
         {
-          id: "request-1",
+          id: "44444444-4444-4444-8444-444444444444",
           requester_id: "22222222-2222-4222-8222-222222222222",
           created_at: "2026-07-23T00:00:00Z",
         },
@@ -242,6 +293,196 @@ describe("social route data access", () => {
         }),
       ),
     });
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const { GET } = await import("./requests/route");
+    const response = await GET();
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "Failed to fetch requests",
+    });
+    consoleError.mockRestore();
+  });
+
+  it("rejects malformed profile lookup rows from service-role projection", async () => {
+    const adminQuery = query({
+      data: {
+        id: currentUser.id,
+        display_name: "Current Student",
+        avatar_url: null,
+        current_level: "high",
+        friend_code: "STU123",
+      },
+      error: null,
+    });
+
+    mocks.createAdminClient.mockReturnValue({
+      from: vi.fn(() => adminQuery),
+    });
+    mocks.createClient.mockResolvedValue({
+      from: vi.fn(() => query({ data: [], error: null })),
+    });
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const { GET } = await import("./lookup/route");
+    const response = await GET(request("/lookup?code=STU123"));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: "Lookup failed" });
+    consoleError.mockRestore();
+  });
+
+  it("rejects malformed social search rows from service-role projection", async () => {
+    const supabaseClient = {
+      from: vi.fn(() => query({ data: [], error: null })),
+    };
+    const adminClient = {
+      from: vi.fn(() =>
+        query({
+          data: [
+            {
+              id: "not-a-uuid",
+              display_name: "Bad",
+              avatar_url: null,
+              current_level: "bad-number",
+            },
+          ],
+          error: null,
+        }),
+      ),
+    };
+
+    mocks.createClient.mockResolvedValue(supabaseClient);
+    mocks.createAdminClient.mockReturnValue(adminClient);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const { GET } = await import("./search/route");
+    const response = await GET(request("/search?q=stu"));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: "Search failed" });
+    consoleError.mockRestore();
+    expect(supabaseClient.from).toHaveBeenCalledWith("friendships");
+    expect(adminClient.from).toHaveBeenCalledWith("profiles");
+  });
+
+  it("preserves a validated friend code in social search results", async () => {
+    const supabaseClient = {
+      from: vi.fn(() => query({ data: [], error: null })),
+    };
+    const adminClient = {
+      from: vi.fn(() =>
+        query({
+          data: [
+            {
+              id: "22222222-2222-4222-8222-222222222222",
+              display_name: "Friend",
+              avatar_url: null,
+              current_level: "2",
+              friend_code: "FRIEND-1",
+            },
+          ],
+          error: null,
+        }),
+      ),
+    };
+
+    mocks.createClient.mockResolvedValue(supabaseClient);
+    mocks.createAdminClient.mockReturnValue(adminClient);
+
+    const { GET } = await import("./search/route");
+    const response = await GET(request("/search?q=fri"));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual([
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        display_name: "Friend",
+        avatar_url: null,
+        current_level: 2,
+        friend_code: "FRIEND-1",
+      },
+    ]);
+  });
+
+  it("rejects malformed pending request rows before hydration", async () => {
+    const incoming = query({
+      data: [
+        {
+          id: "44444444-4444-4444-8444-444444444444",
+          requester_id: "not-a-uuid",
+          created_at: "2026-07-23T00:00:00Z",
+        },
+      ],
+      error: null,
+    });
+    const outgoing = query({ data: [], error: null });
+
+    mocks.createClient.mockResolvedValue({
+      from: vi
+        .fn()
+        .mockReturnValueOnce(incoming)
+        .mockReturnValueOnce(outgoing),
+    });
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const { GET } = await import("./requests/route");
+    const response = await GET();
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "Failed to fetch requests",
+    });
+    expect(mocks.createAdminClient).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("rejects malformed request profile rows from service-role hydration", async () => {
+    const incoming = query({
+      data: [
+        {
+          id: "44444444-4444-4444-8444-444444444444",
+          requester_id: "22222222-2222-4222-8222-222222222222",
+          created_at: "2026-07-23T00:00:00Z",
+        },
+      ],
+      error: null,
+    });
+    const outgoing = query({ data: [], error: null });
+    const userClient = {
+      from: vi
+        .fn()
+        .mockReturnValueOnce(incoming)
+        .mockReturnValueOnce(outgoing),
+    };
+    const adminClient = {
+      from: vi.fn(() =>
+        query({
+          data: [
+            {
+              id: "22222222-2222-4222-8222-222222222222",
+              display_name: "Friend",
+              avatar_url: null,
+              current_level: null,
+            },
+          ],
+          error: null,
+        }),
+      ),
+    };
+
+    mocks.createClient.mockResolvedValue(userClient);
+    mocks.createAdminClient.mockReturnValue(adminClient);
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);

@@ -187,6 +187,42 @@ describe("GET /api/leaderboard", () => {
     consoleError.mockRestore();
   });
 
+  it.each([
+    { current_level: null, value: 250 },
+    { current_level: 3, value: "" },
+  ])(
+    "rejects null and empty numeric wire values: %o",
+    async ({ current_level, value }) => {
+      mocks.createClient.mockResolvedValue({
+        rpc: vi.fn(async () => ({
+          data: [
+            {
+              rank: 1,
+              id: currentUser.id,
+              display_name: "Current Student",
+              avatar_url: null,
+              current_level,
+              value,
+            },
+          ],
+          error: null,
+        })),
+      });
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      const { GET } = await import("./route");
+      const response = await GET(request("xp", "global"));
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        error: "Failed to fetch leaderboard",
+      });
+      consoleError.mockRestore();
+    },
+  );
+
   it("does not create a data client for an unauthenticated request", async () => {
     mocks.getSessionUser.mockResolvedValue(null);
 

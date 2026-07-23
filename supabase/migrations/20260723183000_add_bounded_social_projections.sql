@@ -2,6 +2,12 @@
 -- The application receives only the fields it renders; raw progress history
 -- and general service-role table access stay out of request handlers.
 
+CREATE INDEX IF NOT EXISTS friendships_requester_status_id_idx
+ON public.friendships (requester_id, status, id);
+
+CREATE INDEX IF NOT EXISTS friendships_addressee_status_id_idx
+ON public.friendships (addressee_id, status, id);
+
 CREATE OR REPLACE FUNCTION public.get_leaderboard_projection(
   requested_metric TEXT,
   requested_scope TEXT DEFAULT 'global'
@@ -33,20 +39,32 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  WITH permitted_users AS (
-    SELECT auth.uid() AS user_id
-    UNION
+  WITH friend_candidates AS (
     SELECT
       CASE
         WHEN f.requester_id = auth.uid() THEN f.addressee_id
         ELSE f.requester_id
-      END
+      END AS user_id,
+      min(f.id::TEXT)::UUID AS first_friendship_id
     FROM public.friendships f
     WHERE f.status = 'accepted'
       AND (
         f.requester_id = auth.uid()
         OR f.addressee_id = auth.uid()
       )
+    GROUP BY
+      CASE
+        WHEN f.requester_id = auth.uid() THEN f.addressee_id
+        ELSE f.requester_id
+      END
+    ORDER BY first_friendship_id, user_id
+    LIMIT 200
+  ),
+  permitted_users AS (
+    SELECT auth.uid() AS user_id
+    UNION
+    SELECT friend_candidates.user_id
+    FROM friend_candidates
   ),
   metric_values AS (
     SELECT

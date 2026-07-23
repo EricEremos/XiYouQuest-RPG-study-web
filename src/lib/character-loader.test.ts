@@ -4,18 +4,16 @@ import { loadSelectedCharacter } from "@/lib/character-loader";
 function queryResult({
   data,
   error = null,
-  upsertError = null,
 }: {
   data: unknown;
   error?: unknown;
-  upsertError?: unknown;
 }) {
   const query = {
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
     order: vi.fn(() => query),
     limit: vi.fn(() => query),
-    upsert: vi.fn(async () => ({ error: upsertError })),
+    upsert: vi.fn(),
     maybeSingle: vi.fn(async () => ({ data, error })),
     single: vi.fn(async () => ({ data, error })),
     then: (
@@ -27,7 +25,7 @@ function queryResult({
 }
 
 const wukong = {
-  id: "default-wukong",
+  id: "44444444-4444-4444-8444-444444444444",
   name: "Sun Wukong (孙悟空)",
   personality_prompt: "Bold and encouraging",
   voice_id: "wukong-voice",
@@ -36,7 +34,7 @@ const wukong = {
 };
 
 const sanzang = {
-  id: "selected-sanzang",
+  id: "55555555-5555-4555-8555-555555555555",
   name: "Tang Sanzang (三藏)",
   personality_prompt: "Patient and thoughtful",
   voice_id: "sanzang-voice",
@@ -59,7 +57,7 @@ describe("loadSelectedCharacter", () => {
     );
 
     expect(result).toEqual({
-      id: "selected-sanzang",
+      id: "55555555-5555-4555-8555-555555555555",
       name: "Tang Sanzang (三藏)",
       personalityPrompt: "Patient and thoughtful",
       voiceId: "sanzang-voice",
@@ -71,7 +69,7 @@ describe("loadSelectedCharacter", () => {
     expect(selectedQuery.upsert).not.toHaveBeenCalled();
   });
 
-  it("uses the default character when an existing user has no selected companion row", async () => {
+  it("uses the visible default without repairing state in a read helper", async () => {
     const selectedQuery = queryResult({ data: null });
     const defaultQuery = queryResult({ data: [wukong] });
 
@@ -89,7 +87,7 @@ describe("loadSelectedCharacter", () => {
     );
 
     expect(result).toEqual({
-      id: "default-wukong",
+      id: "44444444-4444-4444-8444-444444444444",
       name: "Sun Wukong (孙悟空)",
       personalityPrompt: "Bold and encouraging",
       voiceId: "wukong-voice",
@@ -101,14 +99,8 @@ describe("loadSelectedCharacter", () => {
       ascending: false,
     });
     expect(selectedQuery.limit).toHaveBeenCalledWith(1);
-    expect(selectedQuery.upsert).toHaveBeenCalledWith(
-      {
-        user_id: "existing-profile-without-user-character",
-        character_id: "default-wukong",
-        is_selected: true,
-      },
-      { onConflict: "user_id,character_id" },
-    );
+    expect(selectedQuery.upsert).not.toHaveBeenCalled();
+    expect(defaultQuery.upsert).not.toHaveBeenCalled();
   });
 
   it("does not write a default row when the selected-character read fails", async () => {
@@ -162,82 +154,22 @@ describe("loadSelectedCharacter", () => {
     expect(defaultQuery.upsert).not.toHaveBeenCalled();
   });
 
-  it("re-reads the selected companion when a concurrent repair wins the write race", async () => {
-    const initialSelectedQuery = queryResult({ data: null });
-    const defaultQuery = queryResult({ data: [wukong] });
-    const writeQuery = queryResult({
-      data: null,
-      upsertError: { code: "23505", message: "unique constraint" },
-    });
-    const retrySelectedQuery = queryResult({
-      data: { characters: sanzang },
-    });
-    const supabase = {
-      from: vi
-        .fn()
-        .mockReturnValueOnce(initialSelectedQuery)
-        .mockReturnValueOnce(defaultQuery)
-        .mockReturnValueOnce(writeQuery)
-        .mockReturnValueOnce(retrySelectedQuery),
-    };
-
-    const result = await loadSelectedCharacter(
-      supabase as never,
-      "profile-with-concurrent-selection",
-    );
-
-    expect(writeQuery.upsert).toHaveBeenCalledTimes(1);
-    expect(result.id).toBe("selected-sanzang");
-    expect(result.name).toBe("Tang Sanzang (三藏)");
-  });
-
-  it("keeps the visible default when the repair write and verification read both fail", async () => {
-    const initialSelectedQuery = queryResult({ data: null });
-    const defaultQuery = queryResult({ data: [wukong] });
-    const writeQuery = queryResult({
-      data: null,
-      upsertError: { message: "temporary write failure" },
-    });
-    const retrySelectedQuery = queryResult({
-      data: null,
-      error: { message: "temporary verification read failure" },
-    });
-    const supabase = {
-      from: vi
-        .fn()
-        .mockReturnValueOnce(initialSelectedQuery)
-        .mockReturnValueOnce(defaultQuery)
-        .mockReturnValueOnce(writeQuery)
-        .mockReturnValueOnce(retrySelectedQuery),
-    };
-
-    const result = await loadSelectedCharacter(
-      supabase as never,
-      "profile-during-write-outage",
-    );
-
-    expect(result.id).toBe("default-wukong");
-    expect(result.name).toBe("Sun Wukong (孙悟空)");
-  });
-
   it("prefers Sun Wukong when more than one character is marked as default", async () => {
     const selectedQuery = queryResult({ data: null });
     const defaultQuery = queryResult({
       data: [
         {
           ...sanzang,
-          id: "default-sanzang",
+          id: "66666666-6666-4666-8666-666666666666",
         },
         wukong,
       ],
     });
-    const writeQuery = queryResult({ data: null });
     const supabase = {
       from: vi
         .fn()
         .mockReturnValueOnce(selectedQuery)
-        .mockReturnValueOnce(defaultQuery)
-        .mockReturnValueOnce(writeQuery),
+        .mockReturnValueOnce(defaultQuery),
     };
 
     const result = await loadSelectedCharacter(
@@ -245,14 +177,9 @@ describe("loadSelectedCharacter", () => {
       "profile-with-several-defaults",
     );
 
-    expect(result.id).toBe("default-wukong");
-    expect(writeQuery.upsert).toHaveBeenCalledWith(
-      {
-        user_id: "profile-with-several-defaults",
-        character_id: "default-wukong",
-        is_selected: true,
-      },
-      { onConflict: "user_id,character_id" },
-    );
+    expect(result.id).toBe("44444444-4444-4444-8444-444444444444");
+    expect(supabase.from).toHaveBeenCalledTimes(2);
+    expect(selectedQuery.upsert).not.toHaveBeenCalled();
+    expect(defaultQuery.upsert).not.toHaveBeenCalled();
   });
 });

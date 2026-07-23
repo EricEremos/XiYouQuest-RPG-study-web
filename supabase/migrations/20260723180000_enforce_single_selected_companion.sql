@@ -9,6 +9,43 @@
 LOCK TABLE public.profiles, public.user_characters
 IN SHARE ROW EXCLUSIVE MODE;
 
+-- Profile creation must either provision one selected default companion or
+-- fail atomically. A missing default is a catalog/configuration defect, not a
+-- valid profile state.
+CREATE OR REPLACE FUNCTION public.handle_unlock_defaults()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  default_character_id UUID;
+BEGIN
+  SELECT c.id
+    INTO default_character_id
+  FROM public.characters c
+  WHERE c.is_default = true
+  ORDER BY (c.name = 'Sun Wukong (孙悟空)') DESC, c.name, c.id
+  LIMIT 1;
+
+  IF default_character_id IS NULL THEN
+    RAISE EXCEPTION
+      'Cannot create profile: no default character is configured'
+      USING ERRCODE = '23514';
+  END IF;
+
+  INSERT INTO public.user_characters (user_id, character_id, is_selected)
+  VALUES (NEW.id, default_character_id, true)
+  ON CONFLICT (user_id, character_id) DO UPDATE
+  SET is_selected = true;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.handle_unlock_defaults()
+FROM PUBLIC, anon, authenticated;
+
 WITH ranked_selections AS (
   SELECT
     uc.user_id,
@@ -133,22 +170,38 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  affected_user_id UUID := COALESCE(NEW.user_id, OLD.user_id);
+  old_user_id UUID;
+  new_user_id UUID;
+  affected_user_id UUID;
 BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM public.profiles p
-    WHERE p.id = affected_user_id
-  ) AND (
-    SELECT count(*)
-    FROM public.user_characters uc
-    WHERE uc.user_id = affected_user_id
-      AND uc.is_selected = true
-  ) <> 1 THEN
-    RAISE EXCEPTION
-      'A profile must have exactly one selected character'
-      USING ERRCODE = '23514';
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN
+    old_user_id := OLD.user_id;
   END IF;
+
+  IF TG_OP IN ('INSERT', 'UPDATE') THEN
+    new_user_id := NEW.user_id;
+  END IF;
+
+  FOR affected_user_id IN
+    SELECT DISTINCT candidate.user_id
+    FROM unnest(ARRAY[old_user_id, new_user_id]) AS candidate(user_id)
+    WHERE candidate.user_id IS NOT NULL
+  LOOP
+    IF EXISTS (
+      SELECT 1
+      FROM public.profiles p
+      WHERE p.id = affected_user_id
+    ) AND (
+      SELECT count(*)
+      FROM public.user_characters uc
+      WHERE uc.user_id = affected_user_id
+        AND uc.is_selected = true
+    ) <> 1 THEN
+      RAISE EXCEPTION
+        'A profile must have exactly one selected character'
+        USING ERRCODE = '23514';
+    END IF;
+  END LOOP;
 
   RETURN NULL;
 END;

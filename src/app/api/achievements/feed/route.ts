@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  socialAcceptedFriendshipSchema,
+  socialAchievementFeedRowSchema,
+} from "@/lib/social-service-role-schemas";
 
 export async function GET() {
   const userClient = await createClient();
@@ -15,14 +19,20 @@ export async function GET() {
       .from("friendships")
       .select("requester_id, addressee_id")
       .eq("status", "accepted")
-      .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`);
+      .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`)
+      .order("id", { ascending: true })
+      .limit(200);
 
     if (friendshipError) {
       throw friendshipError;
     }
 
+    const parsedFriendships = socialAcceptedFriendshipSchema.array().parse(
+      friendships ?? []
+    );
+
     const userIds = [user.id];
-    for (const f of friendships ?? []) {
+    for (const f of parsedFriendships) {
       userIds.push(f.requester_id === user.id ? f.addressee_id : f.requester_id);
     }
 
@@ -45,9 +55,11 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to fetch feed" }, { status: 500 });
     }
 
-    const entries = (feed ?? []).map((entry: Record<string, unknown>) => {
-      const achievements = entry.achievements as { key: string; name: string; emoji: string; tier: string } | null;
-      const profiles = entry.profiles as { display_name: string | null; avatar_url: string | null } | null;
+    const parsedFeed = socialAchievementFeedRowSchema.array().parse(feed ?? []);
+
+    const entries = parsedFeed.map((entry) => {
+      const achievements = entry.achievements;
+      const profiles = entry.profiles;
       return {
         unlocked_at: entry.unlocked_at,
         user_id: entry.user_id,

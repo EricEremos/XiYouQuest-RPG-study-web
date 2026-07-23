@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { createClient, getSessionUser } from "@/lib/supabase/server";
+import { postgresIntegerSchema } from "@/lib/postgres-wire";
 
 const socialStatsRowsSchema = z.array(
   z.object({
@@ -10,10 +11,10 @@ const socialStatsRowsSchema = z.array(
     id: z.string().uuid(),
     display_name: z.string().nullable(),
     avatar_url: z.string().nullable(),
-    current_level: z.coerce.number().int(),
-    total_xp: z.coerce.number().int(),
-    login_streak: z.coerce.number().int(),
-    total_sessions: z.coerce.number().int().nonnegative(),
+    current_level: postgresIntegerSchema,
+    total_xp: postgresIntegerSchema,
+    login_streak: postgresIntegerSchema,
+    total_sessions: postgresIntegerSchema.pipe(z.number().nonnegative()),
     avg_scores: z.record(z.string(), z.number().nullable()),
     selected_character: z
       .object({
@@ -21,7 +22,7 @@ const socialStatsRowsSchema = z.array(
         image_url: z.string().nullable(),
       })
       .nullable(),
-    achievement_count: z.coerce.number().int().nonnegative(),
+    achievement_count: postgresIntegerSchema.pipe(z.number().nonnegative()),
   }),
 );
 

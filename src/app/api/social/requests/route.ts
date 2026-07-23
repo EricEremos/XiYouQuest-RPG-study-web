@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  socialPendingIncomingRequestSchema,
+  socialPendingOutgoingRequestSchema,
+  socialProfileProjectionSchema,
+} from "@/lib/social-service-role-schemas";
 
 export async function GET() {
   const supabase = await createClient();
@@ -10,8 +15,6 @@ export async function GET() {
   }
 
   try {
-    const admin = createAdminClient();
-
     // Fetch incoming and outgoing pending requests in parallel
     const [incomingResult, outgoingResult] = await Promise.all([
       supabase
@@ -19,14 +22,16 @@ export async function GET() {
         .select("id, requester_id, created_at")
         .eq("addressee_id", user.id)
         .eq("status", "pending")
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(200),
 
       supabase
         .from("friendships")
         .select("id, addressee_id, created_at")
         .eq("requester_id", user.id)
         .eq("status", "pending")
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(200),
     ]);
 
     if (incomingResult.error || outgoingResult.error) {
@@ -43,12 +48,15 @@ export async function GET() {
     const incoming = incomingResult.data ?? [];
     const outgoing = outgoingResult.data ?? [];
 
+    const parsedIncoming = socialPendingIncomingRequestSchema.array().parse(incoming);
+    const parsedOutgoing = socialPendingOutgoingRequestSchema.array().parse(outgoing);
+
     // Collect all unique user IDs to batch-fetch profiles
     const userIds = new Set<string>();
-    for (const r of incoming) {
+    for (const r of parsedIncoming) {
       userIds.add(r.requester_id);
     }
-    for (const r of outgoing) {
+    for (const r of parsedOutgoing) {
       userIds.add(r.addressee_id);
     }
 
@@ -66,6 +74,7 @@ export async function GET() {
     > = {};
 
     if (userIdArray.length > 0) {
+      const admin = createAdminClient();
       const { data: profiles, error: profilesError } = await admin
         .from("profiles")
         .select("id, display_name, avatar_url, current_level")
@@ -76,17 +85,18 @@ export async function GET() {
       }
 
       if (profiles) {
-        profileMap = Object.fromEntries(profiles.map((p) => [p.id, p]));
+        const parsedProfiles = socialProfileProjectionSchema.array().parse(profiles);
+        profileMap = Object.fromEntries(parsedProfiles.map((p) => [p.id, p]));
       }
     }
 
     return NextResponse.json({
-      incoming: incoming.map((r) => ({
+      incoming: parsedIncoming.map((r) => ({
         friendship_id: r.id,
         created_at: r.created_at,
         user: profileMap[r.requester_id] ?? null,
       })),
-      outgoing: outgoing.map((r) => ({
+      outgoing: parsedOutgoing.map((r) => ({
         friendship_id: r.id,
         created_at: r.created_at,
         user: profileMap[r.addressee_id] ?? null,

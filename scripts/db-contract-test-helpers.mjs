@@ -1,31 +1,78 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import path from "node:path";
-
-import { parse } from "dotenv";
 
 let savepointCounter = 0;
 
-export function loadDatabaseUrl(repoRoot) {
-  const localEnvPath = path.join(repoRoot, ".env.local");
-  const localEnv = fs.existsSync(localEnvPath)
-    ? parse(fs.readFileSync(localEnvPath))
-    : {};
-  const connectionString =
-    process.env.XIYOUQUEST_DATABASE_URL ??
-    process.env.BETTER_AUTH_DATABASE_URL ??
-    localEnv.BETTER_AUTH_DATABASE_URL;
+export function loadDatabaseUrl() {
+  const connectionString = process.env.XIYOUQUEST_DATABASE_URL;
+  const expectedTargetId = process.env.XIYOUQUEST_DB_TARGET_ID;
 
   assert.ok(
     connectionString,
-    "Set XIYOUQUEST_DATABASE_URL or provide BETTER_AUTH_DATABASE_URL",
+    "Set XIYOUQUEST_DATABASE_URL explicitly; repository environment files are never used by this verifier",
+  );
+  assert.ok(
+    expectedTargetId,
+    "Set XIYOUQUEST_DB_TARGET_ID to the confirmed project reference, or to local for a loopback database",
   );
 
   const target = new URL(connectionString);
   assert.match(target.protocol, /^postgres(ql)?:$/);
+  const isLocalTarget = ["localhost", "127.0.0.1", "::1"].includes(
+    target.hostname,
+  );
+  const isSupabaseTarget =
+    target.hostname.endsWith(".supabase.co") ||
+    target.hostname.endsWith(".supabase.com");
+  const targetIdentity = `${decodeURIComponent(target.username)}@${target.hostname}`;
+
+  if (isLocalTarget) {
+    assert.equal(
+      expectedTargetId,
+      "local",
+      "Loopback database checks require XIYOUQUEST_DB_TARGET_ID=local",
+    );
+  } else {
+    assert.ok(
+      targetIdentity
+        .split(/[.@]/)
+        .some((segment) => segment === expectedTargetId),
+      "XIYOUQUEST_DB_TARGET_ID does not match the explicit connection target",
+    );
+  }
+
+  const explicitCaPath = process.env.XIYOUQUEST_DB_CA_FILE;
+  const trustedCa = explicitCaPath
+    ? fs.readFileSync(explicitCaPath, "utf8")
+    : isSupabaseTarget
+      ? fs.readFileSync(
+          new URL("./certs/supabase-root-2021-ca.crt", import.meta.url),
+          "utf8",
+        )
+      : undefined;
+
+  // node-postgres lets SSL query parameters replace the explicit `ssl`
+  // object. Remove them so remote targets always retain certificate
+  // verification; plaintext is allowed only for an explicit loopback target.
+  for (const parameter of [
+    "sslmode",
+    "sslcert",
+    "sslkey",
+    "sslrootcert",
+  ]) {
+    target.searchParams.delete(parameter);
+  }
 
   return {
-    connectionString,
+    clientConfig: {
+      connectionString: target.toString(),
+      ssl: isLocalTarget
+        ? false
+        : {
+            rejectUnauthorized: true,
+            ...(trustedCa ? { ca: trustedCa } : {}),
+          },
+    },
     safeTarget: `${target.hostname}/${target.pathname.replace(/^\//, "")}`,
   };
 }

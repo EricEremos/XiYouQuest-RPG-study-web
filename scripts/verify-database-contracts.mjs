@@ -13,6 +13,9 @@ import {
 } from "./db-contract-test-helpers.mjs";
 import {
   verifyMigrationLock,
+  verifyProjectionBounds,
+  verifyPrivilegedOwnerReassignmentInvariant,
+  verifyProfileProvisioningInvariant,
   verifyPrivilegesAndInvariant,
   verifyProjections,
 } from "./db-contract-verifiers.mjs";
@@ -24,20 +27,14 @@ if (process.env.XIYOUQUEST_DB_INTEGRATION !== "1") {
 }
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const { connectionString, safeTarget } = loadDatabaseUrl(repoRoot);
+const { clientConfig, safeTarget } = loadDatabaseUrl();
 const migrationFiles = [
   "20260723180000_enforce_single_selected_companion.sql",
   "20260723183000_add_bounded_social_projections.sql",
   "20260723183100_add_social_friend_stats_projection.sql",
 ];
-const control = new pg.Client({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-});
-const contender = new pg.Client({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-});
+const control = new pg.Client(clientConfig);
+const contender = new pg.Client(clientConfig);
 const checks = [];
 const fixtureIds = [];
 
@@ -53,13 +50,18 @@ try {
   }
   checks.push("all three migrations execute in PostgreSQL");
 
-  await verifyMigrationLock(contender);
-  checks.push("migration lock excludes concurrent companion writes");
+  await verifyMigrationLock(control, contender);
+  checks.push(
+    "migration holds explicit table locks and excludes concurrent companion writes",
+  );
 
   const fixture = await seedRollbackOnlyFixtures(control, fixtureIds);
   checks.push(
     ...(await verifyPrivilegesAndInvariant(control, fixture)),
+    await verifyProfileProvisioningInvariant(control, fixtureIds),
+    await verifyPrivilegedOwnerReassignmentInvariant(control, fixture),
     ...(await verifyProjections(control, fixture)),
+    await verifyProjectionBounds(control, fixture),
   );
 
   const { rows: exactOneRows } = await control.query(`

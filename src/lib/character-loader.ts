@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ExpressionName } from "@/types/character";
+import { z } from "zod";
+
 import { getCharacterImageFallback } from "@/lib/character-images";
 
 export interface LoadedCharacter {
@@ -10,28 +11,35 @@ export interface LoadedCharacter {
   expressions: Record<string, string>;
 }
 
-interface CharacterRecord {
-  id?: string;
-  name?: string;
-  personality_prompt?: string | null;
-  voice_id?: string | null;
-  character_expressions?: Array<{
-    expression_name: ExpressionName;
-    image_url: string;
-  }> | null;
-}
+const characterRecordSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  personality_prompt: z.string().nullable(),
+  voice_id: z.string().nullable(),
+  character_expressions: z
+    .array(
+      z.object({
+        expression_name: z.string().min(1),
+        image_url: z.string().min(1),
+      }),
+    )
+    .nullable()
+    .optional(),
+});
 
-interface UserCharacterRecord {
-  characters?: CharacterRecord | null;
-}
+const userCharacterRecordSchema = z.object({
+  characters: characterRecordSchema.nullable(),
+});
+
+type CharacterRecord = z.infer<typeof characterRecordSchema>;
 
 const STARTER_CHARACTER_NAME = "Sun Wukong (孙悟空)";
-const STATIC_STUDY_BUDDY: CharacterRecord = {
+const STATIC_STUDY_BUDDY = {
   name: STARTER_CHARACTER_NAME,
   personality_prompt: "You are a friendly and encouraging study companion.",
   voice_id: "",
   character_expressions: [],
-};
+} satisfies Omit<CharacterRecord, "id">;
 
 function toLoadedCharacter(characterData?: CharacterRecord | null): LoadedCharacter {
   const resolvedCharacter = characterData ?? STATIC_STUDY_BUDDY;
@@ -44,7 +52,7 @@ function toLoadedCharacter(characterData?: CharacterRecord | null): LoadedCharac
   const characterName = resolvedCharacter.name ?? STARTER_CHARACTER_NAME;
 
   return {
-    id: resolvedCharacter.id,
+    id: characterData?.id,
     name: characterName,
     personalityPrompt:
       resolvedCharacter.personality_prompt ??
@@ -93,7 +101,11 @@ export async function loadSelectedCharacter(
     return toLoadedCharacter();
   }
 
-  let characterData = (userCharacter as UserCharacterRecord | null)?.characters;
+  const selectedCharacter = userCharacterRecordSchema.safeParse(userCharacter);
+  let characterData = selectedCharacter.success
+    ? selectedCharacter.data.characters
+    : null;
+
   if (!characterData) {
     const {
       data: defaultCharacters,
@@ -111,40 +123,19 @@ export async function loadSelectedCharacter(
       return toLoadedCharacter();
     }
 
-    const defaults = (defaultCharacters ?? []) as CharacterRecord[];
+    const parsedDefaults = z
+      .array(characterRecordSchema)
+      .safeParse(defaultCharacters ?? []);
+    if (!parsedDefaults.success) {
+      return toLoadedCharacter();
+    }
+
+    const defaults = parsedDefaults.data;
     const defaultCharacter =
       defaults.find((character) => character.name === STARTER_CHARACTER_NAME) ??
       defaults[0] ??
       null;
     characterData = defaultCharacter;
-
-    if (defaultCharacter?.id) {
-      const { error: repairError } = await supabase
-        .from("user_characters")
-        .upsert(
-          {
-            user_id: userId,
-            character_id: defaultCharacter.id,
-            is_selected: true,
-          },
-          { onConflict: "user_id,character_id" },
-        );
-
-      // A concurrent request may have selected a companion between our read and
-      // write. Re-read once after any failed repair and prefer the winning row.
-      if (repairError) {
-        const {
-          data: repairedUserCharacter,
-          error: verificationError,
-        } = await readSelectedCharacter(supabase, userId);
-        const repairedCharacter = (
-          repairedUserCharacter as UserCharacterRecord | null
-        )?.characters;
-        if (!verificationError && repairedCharacter) {
-          characterData = repairedCharacter;
-        }
-      }
-    }
   }
 
   return toLoadedCharacter(characterData);

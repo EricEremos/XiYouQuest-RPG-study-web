@@ -3,6 +3,10 @@ import { z } from "zod";
 
 import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { leaderboardQuerySchema } from "@/lib/validations";
+import {
+  postgresIntegerSchema,
+  postgresNumberSchema,
+} from "@/lib/postgres-wire";
 
 interface RankingEntry {
   rank: number;
@@ -15,12 +19,12 @@ interface RankingEntry {
 
 const projectionRowsSchema = z.array(
   z.object({
-    rank: z.coerce.number().int().positive(),
+    rank: postgresIntegerSchema.pipe(z.number().positive()),
     id: z.string().uuid(),
     display_name: z.string().nullable(),
     avatar_url: z.string().nullable(),
-    current_level: z.coerce.number().int(),
-    value: z.coerce.number().finite(),
+    current_level: postgresIntegerSchema,
+    value: postgresNumberSchema,
   }),
 );
 

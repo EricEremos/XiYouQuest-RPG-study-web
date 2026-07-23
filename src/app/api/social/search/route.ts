@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isValidUUID } from "@/lib/validations";
+import { socialSearchProfilesSchema } from "@/lib/social-service-role-schemas";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -59,7 +60,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(profiles ?? []);
+    const parsedProfiles = socialSearchProfilesSchema.parse(profiles ?? []);
+
+    return NextResponse.json(parsedProfiles);
   } catch (error) {
     console.error("Search error:", error);
     return NextResponse.json({ error: "Search failed" }, { status: 500 });

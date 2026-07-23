@@ -6,6 +6,11 @@ const mocks = vi.hoisted(() => ({
   getSessionUser: vi.fn(),
 }));
 
+const currentUser = {
+  id: "11111111-1111-4111-8111-111111111111",
+  email: "student@connect.ust.hk",
+};
+
 vi.mock("@/lib/supabase/server", () => ({
   createClient: mocks.createClient,
   getSessionUser: mocks.getSessionUser,
@@ -27,7 +32,7 @@ function query(result: QueryResult) {
     in: vi.fn(() => builder),
     limit: vi.fn(() => builder),
     order: vi.fn(() => builder),
-    or: vi.fn(async () => result),
+    or: vi.fn(() => builder),
     then: (
       resolve: (value: QueryResult) => unknown,
       reject?: (reason: unknown) => unknown,
@@ -42,10 +47,7 @@ describe("GET /api/achievements/feed", () => {
     mocks.createClient.mockReset();
     mocks.createAdminClient.mockReset();
     mocks.getSessionUser.mockReset();
-    mocks.getSessionUser.mockResolvedValue({
-      id: "11111111-1111-4111-8111-111111111111",
-      email: "student@connect.ust.hk",
-    });
+    mocks.getSessionUser.mockResolvedValue(currentUser);
   });
 
   it("uses user-scoped friendships and server-only cross-profile feed reads", async () => {
@@ -102,6 +104,10 @@ describe("GET /api/achievements/feed", () => {
 
     expect(response.status).toBe(200);
     expect(userClient.from).toHaveBeenCalledWith("friendships");
+    expect(friendshipQuery.order).toHaveBeenCalledWith("id", {
+      ascending: true,
+    });
+    expect(friendshipQuery.limit).toHaveBeenCalledWith(200);
     expect(adminClient.from).toHaveBeenCalledWith("user_achievements");
     expect(feedQuery.in).toHaveBeenCalledWith("user_id", [
       "11111111-1111-4111-8111-111111111111",
@@ -155,5 +161,88 @@ describe("GET /api/achievements/feed", () => {
 
     expect(response.status).toBe(401);
     expect(mocks.createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed friendship rows before attempting feed hydration", async () => {
+    const friendshipQuery = query({
+      data: [
+        {
+          requester_id: "not-a-uuid",
+          addressee_id: "22222222-2222-4222-8222-222222222222",
+        },
+      ],
+      error: null,
+    });
+    const userClient = {
+      from: vi.fn(() => friendshipQuery),
+    };
+
+    mocks.createClient.mockResolvedValue(userClient);
+    mocks.createAdminClient.mockReturnValue({ from: vi.fn() });
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const { GET } = await import("./route");
+    const response = await GET();
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "Failed to fetch feed",
+    });
+    expect(mocks.createAdminClient).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("rejects malformed feed rows from joined service-role reads", async () => {
+    const friendshipQuery = query({
+      data: [
+        {
+          requester_id: currentUser.id,
+          addressee_id: "22222222-2222-4222-8222-222222222222",
+        },
+      ],
+      error: null,
+    });
+    const userClient = {
+      from: vi.fn(() => friendshipQuery),
+    };
+    const feedQuery = query({
+      data: [
+        {
+          unlocked_at: "2026-07-23T09:00:00Z",
+          user_id: "not-a-uuid",
+          achievements: {
+            key: "friend_added",
+            name: "Fellow Traveler",
+            emoji: "👥",
+            tier: "common",
+          },
+          profiles: {
+            display_name: "Study Partner",
+            avatar_url: null,
+          },
+        },
+      ],
+      error: null,
+    });
+    const adminClient = {
+      from: vi.fn(() => feedQuery),
+    };
+
+    mocks.createClient.mockResolvedValue(userClient);
+    mocks.createAdminClient.mockReturnValue(adminClient);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const { GET } = await import("./route");
+    const response = await GET();
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "Failed to fetch feed",
+    });
+    consoleError.mockRestore();
   });
 });
