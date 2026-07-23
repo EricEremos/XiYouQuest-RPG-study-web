@@ -26,8 +26,18 @@ export function checkRateLimit(
   windowMs: number,
   now: number = Date.now(),
 ): boolean {
-  if (windows.size > MAX_TRACKED_KEYS) {
+  if (windows.size >= MAX_TRACKED_KEYS) {
     pruneExpired(now);
+    // Still full after pruning: evict the oldest windows so the map has a
+    // hard upper bound. An evicted key simply restarts its window, which is
+    // acceptable for best-effort damping (keys are per authenticated user,
+    // so filling the map requires that many distinct accounts).
+    for (const staleKey of windows.keys()) {
+      if (windows.size < MAX_TRACKED_KEYS) {
+        break;
+      }
+      windows.delete(staleKey);
+    }
   }
 
   const existing = windows.get(key);
