@@ -54,6 +54,14 @@ FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_friend_code_profile(TEXT)
 TO authenticated;
 
+-- Name search runs a leading-wildcard ILIKE, which a btree index cannot
+-- serve. The trigram index keeps search_profiles_for_friends from scanning
+-- every profile as the user base grows.
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA extensions;
+
+CREATE INDEX IF NOT EXISTS profiles_display_name_trgm_idx
+ON public.profiles USING gin (display_name extensions.gin_trgm_ops);
+
 CREATE OR REPLACE FUNCTION public.search_profiles_for_friends(
   search_term TEXT
 )
