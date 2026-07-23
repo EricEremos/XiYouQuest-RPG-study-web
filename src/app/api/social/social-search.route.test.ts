@@ -1,10 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  currentUser,
-  query,
-  request,
-} from "./social-routes.test-setup";
+import { currentUser, request } from "./social-routes.test-setup";
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
@@ -30,78 +26,68 @@ describe("social search route", () => {
     mocks.getSessionUser.mockResolvedValue(currentUser);
   });
 
-  it("rejects malformed social search rows from service-role projection", async () => {
-    const supabaseClient = {
-      from: vi.fn(() => query({ data: [], error: null })),
-    };
-    const adminClient = {
-      from: vi.fn(() =>
-        query({
-          data: [
-            {
-              id: "not-a-uuid",
-              display_name: "Bad",
-              avatar_url: null,
-              current_level: "bad-number",
-            },
-          ],
-          error: null,
-        }),
-      ),
-    };
+  it("searches through the bounded projection and never returns friend codes", async () => {
+    const rpc = vi.fn(async () => ({
+      data: [
+        {
+          id: "22222222-2222-4222-8222-222222222222",
+          display_name: "Study Partner",
+          avatar_url: null,
+          current_level: 2,
+        },
+      ],
+      error: null,
+    }));
+    mocks.createClient.mockResolvedValue({ rpc });
 
-    mocks.createClient.mockResolvedValue(supabaseClient);
-    mocks.createAdminClient.mockReturnValue(adminClient);
+    const { GET } = await import("./search/route");
+    const response = await GET(request("/search?q=Study"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("search_profiles_for_friends", {
+      search_term: "Study",
+    });
+    expect(mocks.createAdminClient).not.toHaveBeenCalled();
+    expect(body).toEqual([
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        display_name: "Study Partner",
+        avatar_url: null,
+        current_level: 2,
+      },
+    ]);
+    expect(body[0]).not.toHaveProperty("friend_code");
+  });
+
+  it("rejects malformed projection rows instead of trusting an unchecked cast", async () => {
+    mocks.createClient.mockResolvedValue({
+      rpc: vi.fn(async () => ({
+        data: [{ id: "not-a-uuid" }],
+        error: null,
+      })),
+    });
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
 
     const { GET } = await import("./search/route");
-    const response = await GET(request("/search?q=stu"));
+    const response = await GET(request("/search?q=Study"));
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: "Search failed" });
     consoleError.mockRestore();
-    expect(supabaseClient.from).toHaveBeenCalledWith("friendships");
-    expect(adminClient.from).toHaveBeenCalledWith("profiles");
   });
 
-  it("preserves a validated friend code in social search results", async () => {
-    const supabaseClient = {
-      from: vi.fn(() => query({ data: [], error: null })),
-    };
-    const adminClient = {
-      from: vi.fn(() =>
-        query({
-          data: [
-            {
-              id: "22222222-2222-4222-8222-222222222222",
-              display_name: "Friend",
-              avatar_url: null,
-              current_level: "2",
-              friend_code: "FRIEND-1",
-            },
-          ],
-          error: null,
-        }),
-      ),
-    };
-
-    mocks.createClient.mockResolvedValue(supabaseClient);
-    mocks.createAdminClient.mockReturnValue(adminClient);
+  it("rejects search terms that are too short or too long", async () => {
+    mocks.createClient.mockResolvedValue({ rpc: vi.fn() });
 
     const { GET } = await import("./search/route");
-    const response = await GET(request("/search?q=fri"));
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual([
-      {
-        id: "22222222-2222-4222-8222-222222222222",
-        display_name: "Friend",
-        avatar_url: null,
-        current_level: 2,
-        friend_code: "FRIEND-1",
-      },
-    ]);
+    const tooShort = await GET(request("/search?q=a"));
+    expect(tooShort.status).toBe(400);
+
+    const tooLong = await GET(request(`/search?q=${"a".repeat(51)}`));
+    expect(tooLong.status).toBe(400);
   });
 });

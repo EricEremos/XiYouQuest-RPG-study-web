@@ -8,11 +8,16 @@ export async function seedRollbackOnlyFixtures(client, fixtureIds) {
   const decoyIds = Array.from({ length: 25 }, () => crypto.randomUUID());
   fixtureIds.push(currentUserId, friendId, outsiderId, ...decoyIds);
 
+  const currentFriendCode = `PSC-CONTRACT-CUR-${currentUserId.slice(0, 8)}`;
+  const outsiderFriendCode = `PSC-CONTRACT-OUT-${outsiderId.slice(0, 8)}`;
+
   const profiles = [
     {
       id: currentUserId,
       username: `contract-current-${currentUserId.slice(0, 8)}`,
       display_name: "Contract Current User",
+      avatar_url: "https://avatars.contract.test/current.png",
+      friend_code: currentFriendCode,
       total_xp: -100,
       current_level: 1,
       login_streak: 3,
@@ -21,6 +26,8 @@ export async function seedRollbackOnlyFixtures(client, fixtureIds) {
       id: friendId,
       username: `contract-friend-${friendId.slice(0, 8)}`,
       display_name: "Contract Accepted Friend",
+      avatar_url: "https://avatars.contract.test/friend.png",
+      friend_code: null,
       total_xp: 10,
       current_level: 2,
       login_streak: 5,
@@ -29,6 +36,8 @@ export async function seedRollbackOnlyFixtures(client, fixtureIds) {
       id: outsiderId,
       username: `contract-outsider-${outsiderId.slice(0, 8)}`,
       display_name: "Contract Outsider",
+      avatar_url: "https://avatars.contract.test/outsider.png",
+      friend_code: outsiderFriendCode,
       total_xp: 20,
       current_level: 3,
       login_streak: 7,
@@ -37,6 +46,8 @@ export async function seedRollbackOnlyFixtures(client, fixtureIds) {
       id,
       username: `contract-decoy-${index}-${id.slice(0, 8)}`,
       display_name: `Contract Decoy ${index}`,
+      avatar_url: `https://avatars.contract.test/decoy-${index}.png`,
+      friend_code: null,
       total_xp: 1_000 + index,
       current_level: 10,
       login_streak: index,
@@ -45,11 +56,14 @@ export async function seedRollbackOnlyFixtures(client, fixtureIds) {
 
   await client.query(
     `INSERT INTO public.profiles
-       (id, username, display_name, total_xp, current_level, login_streak)
+       (id, username, display_name, avatar_url, friend_code,
+        total_xp, current_level, login_streak)
      SELECT
        fixture.id,
        fixture.username,
        fixture.display_name,
+       fixture.avatar_url,
+       fixture.friend_code,
        fixture.total_xp,
        fixture.current_level,
        fixture.login_streak
@@ -57,6 +71,8 @@ export async function seedRollbackOnlyFixtures(client, fixtureIds) {
        id UUID,
        username TEXT,
        display_name TEXT,
+       avatar_url TEXT,
+       friend_code TEXT,
        total_xp INTEGER,
        current_level INTEGER,
        login_streak INTEGER
@@ -132,5 +148,8 @@ export async function seedRollbackOnlyFixtures(client, fixtureIds) {
     outsiderId,
     currentTargetId,
     friendOnlyTargetId,
+    currentFriendCode,
+    outsiderFriendCode,
+    friendHasAchievement: Boolean(achievementRows[0]),
   };
 }

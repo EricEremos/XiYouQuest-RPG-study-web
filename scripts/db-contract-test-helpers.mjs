@@ -85,8 +85,16 @@ export function readMigration(repoRoot, fileName) {
   );
 }
 
+// SET ROLE cannot take a bind parameter, so the role name is mapped through
+// a fixed allowlist of literal statements instead of being interpolated.
+const ROLE_STATEMENTS = {
+  authenticated: "SET LOCAL ROLE authenticated",
+  anon: "SET LOCAL ROLE anon",
+};
+
 export async function setAuthContext(client, role, userId = null) {
-  assert.ok(role === "authenticated" || role === "anon");
+  const roleStatement = ROLE_STATEMENTS[role];
+  assert.ok(roleStatement, `Unsupported role: ${role}`);
   const claims = userId
     ? JSON.stringify({ sub: userId, role })
     : JSON.stringify({ role });
@@ -97,7 +105,7 @@ export async function setAuthContext(client, role, userId = null) {
        set_config('request.jwt.claims', $2, true)`,
     [userId ?? "", claims],
   );
-  await client.query(`SET LOCAL ROLE ${role}`);
+  await client.query(roleStatement);
 }
 
 export async function withRollbackSavepoint(client, label, work) {

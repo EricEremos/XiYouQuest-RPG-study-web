@@ -1,6 +1,13 @@
 -- Keep cross-profile social reads inside narrow authenticated projections.
 -- The application receives only the fields it renders; raw progress history
 -- and general service-role table access stay out of request handlers.
+--
+-- Privacy decision (intentional, product-approved): the global leaderboard
+-- exposes display_name, current_level, and the ranked metric value of the
+-- top 20 profiles to every authenticated user, which is broader than the
+-- own-row-only RLS policy on public.profiles. avatar_url is NOT part of
+-- that broadening: it is returned only for the caller and the caller's
+-- accepted friends, and is NULL for every other global row.
 
 CREATE INDEX IF NOT EXISTS friendships_requester_status_id_idx
 ON public.friendships (requester_id, status, id);
@@ -140,7 +147,14 @@ BEGIN
     ranked.rank,
     ranked.id,
     ranked.display_name,
-    ranked.avatar_url,
+    -- Avatars stay scoped to self and accepted friends even on the global
+    -- board; strangers in the top 20 are listed without their avatar_url.
+    CASE
+      WHEN ranked.id IN (
+        SELECT permitted_users.user_id FROM permitted_users
+      ) THEN ranked.avatar_url
+      ELSE NULL
+    END AS avatar_url,
     ranked.current_level,
     ranked.value
   FROM ranked

@@ -1,106 +1,62 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+
 import { createClient, getSessionUser } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  socialPendingIncomingRequestSchema,
-  socialPendingOutgoingRequestSchema,
-  socialProfileProjectionSchema,
-} from "@/lib/social-service-role-schemas";
+
+const requestRowsSchema = z.array(
+  z.object({
+    direction: z.enum(["incoming", "outgoing"]),
+    friendship_id: z.string().uuid(),
+    created_at: z.string(),
+    id: z.string().uuid(),
+    display_name: z.string().nullable(),
+    avatar_url: z.string().nullable(),
+    current_level: z.coerce.number().int(),
+  }),
+);
+
+type RequestRow = z.infer<typeof requestRowsSchema>[number];
+
+function toRequestEntry(row: RequestRow) {
+  return {
+    friendship_id: row.friendship_id,
+    created_at: row.created_at,
+    user: {
+      id: row.id,
+      display_name: row.display_name,
+      avatar_url: row.avatar_url,
+      current_level: row.current_level,
+    },
+  };
+}
 
 export async function GET() {
-  const supabase = await createClient();
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    // Fetch incoming and outgoing pending requests in parallel
-    const [incomingResult, outgoingResult] = await Promise.all([
-      supabase
-        .from("friendships")
-        .select("id, requester_id, created_at")
-        .eq("addressee_id", user.id)
-        .eq("status", "pending")
-        .order("created_at", { ascending: false })
-        .limit(200),
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("get_pending_friend_requests");
 
-      supabase
-        .from("friendships")
-        .select("id, addressee_id, created_at")
-        .eq("requester_id", user.id)
-        .eq("status", "pending")
-        .order("created_at", { ascending: false })
-        .limit(200),
-    ]);
-
-    if (incomingResult.error || outgoingResult.error) {
-      console.error(
-        "Requests fetch error:",
-        incomingResult.error || outgoingResult.error
-      );
+    if (error) {
+      console.error("Requests fetch error:", error);
       return NextResponse.json(
         { error: "Failed to fetch requests" },
         { status: 500 }
       );
     }
 
-    const incoming = incomingResult.data ?? [];
-    const outgoing = outgoingResult.data ?? [];
-
-    const parsedIncoming = socialPendingIncomingRequestSchema.array().parse(incoming);
-    const parsedOutgoing = socialPendingOutgoingRequestSchema.array().parse(outgoing);
-
-    // Collect all unique user IDs to batch-fetch profiles
-    const userIds = new Set<string>();
-    for (const r of parsedIncoming) {
-      userIds.add(r.requester_id);
-    }
-    for (const r of parsedOutgoing) {
-      userIds.add(r.addressee_id);
-    }
-
-    const userIdArray = Array.from(userIds);
-
-    // Batch-fetch profiles
-    let profileMap: Record<
-      string,
-      {
-        id: string;
-        display_name: string | null;
-        avatar_url: string | null;
-        current_level: number;
-      }
-    > = {};
-
-    if (userIdArray.length > 0) {
-      const admin = createAdminClient();
-      const { data: profiles, error: profilesError } = await admin
-        .from("profiles")
-        .select("id, display_name, avatar_url, current_level")
-        .in("id", userIdArray);
-
-      if (profilesError) {
-        throw profilesError;
-      }
-
-      if (profiles) {
-        const parsedProfiles = socialProfileProjectionSchema.array().parse(profiles);
-        profileMap = Object.fromEntries(parsedProfiles.map((p) => [p.id, p]));
-      }
-    }
+    const rows = requestRowsSchema.parse(data ?? []);
 
     return NextResponse.json({
-      incoming: parsedIncoming.map((r) => ({
-        friendship_id: r.id,
-        created_at: r.created_at,
-        user: profileMap[r.requester_id] ?? null,
-      })),
-      outgoing: parsedOutgoing.map((r) => ({
-        friendship_id: r.id,
-        created_at: r.created_at,
-        user: profileMap[r.addressee_id] ?? null,
-      })),
+      incoming: rows
+        .filter((row) => row.direction === "incoming")
+        .map(toRequestEntry),
+      outgoing: rows
+        .filter((row) => row.direction === "outgoing")
+        .map(toRequestEntry),
     });
   } catch (error) {
     console.error("Requests error:", error);

@@ -13,6 +13,8 @@ import {
 } from "./db-contract-test-helpers.mjs";
 import {
   verifyAchievementCatalog,
+  verifyDirectoryProjections,
+  verifyLeaderboardAvatarMasking,
   verifyMigrationLock,
   verifyProjectionBounds,
   verifyPrivilegedOwnerReassignmentInvariant,
@@ -34,6 +36,7 @@ const migrationFiles = [
   "20260723180000_enforce_single_selected_companion.sql",
   "20260723183000_add_bounded_social_projections.sql",
   "20260723183100_add_social_friend_stats_projection.sql",
+  "20260723190000_add_social_directory_projections.sql",
 ];
 const control = new pg.Client(clientConfig);
 const contender = new pg.Client(clientConfig);
@@ -50,7 +53,7 @@ try {
   for (const migrationFile of migrationFiles) {
     await control.query(readMigration(repoRoot, migrationFile));
   }
-  checks.push("all four migrations execute in PostgreSQL");
+  checks.push("all five migrations execute in PostgreSQL");
   checks.push(await verifyAchievementCatalog(control));
 
   await verifyMigrationLock(control, contender);
@@ -65,6 +68,8 @@ try {
     await verifyPrivilegedOwnerReassignmentInvariant(control, fixture),
     ...(await verifyProjections(control, fixture)),
     await verifyProjectionBounds(control, fixture),
+    await verifyLeaderboardAvatarMasking(control, fixture),
+    ...(await verifyDirectoryProjections(control, fixture)),
   );
 
   const { rows: exactOneRows } = await control.query(`

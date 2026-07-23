@@ -1,14 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
 import { createClient, getSessionUser } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { isValidUUID } from "@/lib/validations";
-import { socialSearchProfilesSchema } from "@/lib/social-service-role-schemas";
+import { checkRateLimit } from "@/lib/rate-limit";
+
+const SEARCH_LIMIT_PER_MINUTE = 30;
+
+// friend_code is deliberately absent: search results are for sending requests
+// by id, and returning other users' codes would widen the enumeration surface.
+const searchRowsSchema = z.array(
+  z.object({
+    id: z.string().uuid(),
+    display_name: z.string().nullable(),
+    avatar_url: z.string().nullable(),
+    current_level: z.coerce.number().int(),
+  }),
+);
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!checkRateLimit(`social-search:${user.id}`, SEARCH_LIMIT_PER_MINUTE, 60_000)) {
+    return NextResponse.json(
+      { error: "Too many searches, try again in a minute" },
+      { status: 429 },
+    );
   }
 
   const q = request.nextUrl.searchParams.get("q");
@@ -18,39 +37,18 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
+  if (q.trim().length > 50) {
+    return NextResponse.json(
+      { error: "Query must be at most 50 characters" },
+      { status: 400 }
+    );
+  }
 
   try {
-    const admin = createAdminClient();
-
-    // Get IDs of users who have any existing friendship with the current user
-    const { data: existingFriendships } = await supabase
-      .from("friendships")
-      .select("requester_id, addressee_id")
-      .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`);
-
-    const excludeIds = new Set<string>([user.id]);
-    if (existingFriendships) {
-      for (const f of existingFriendships) {
-        excludeIds.add(f.requester_id);
-        excludeIds.add(f.addressee_id);
-      }
-    }
-
-    // Validate all exclude IDs are proper UUIDs to prevent injection
-    const excludeArray = Array.from(excludeIds).filter(isValidUUID);
-
-    // Search profiles by display_name using ILIKE, excluding self and existing friendships
-    let query = admin
-      .from("profiles")
-      .select("id, display_name, avatar_url, current_level, friend_code")
-      .ilike("display_name", `%${q.trim().replace(/[%_\\]/g, "\\$&")}%`)
-      .limit(10);
-
-    if (excludeArray.length > 0) {
-      query = query.not("id", "in", `(${excludeArray.join(",")})`);
-    }
-
-    const { data: profiles, error } = await query;
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("search_profiles_for_friends", {
+      search_term: q.trim(),
+    });
 
     if (error) {
       console.error("Search error:", error);
@@ -60,9 +58,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const parsedProfiles = socialSearchProfilesSchema.parse(profiles ?? []);
-
-    return NextResponse.json(parsedProfiles);
+    return NextResponse.json(searchRowsSchema.parse(data ?? []));
   } catch (error) {
     console.error("Search error:", error);
     return NextResponse.json({ error: "Search failed" }, { status: 500 });

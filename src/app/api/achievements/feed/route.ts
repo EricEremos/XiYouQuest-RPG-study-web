@@ -1,77 +1,48 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+
 import { createClient, getSessionUser } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  socialAcceptedFriendshipSchema,
-  socialAchievementFeedRowSchema,
-} from "@/lib/social-service-role-schemas";
+
+const feedRowsSchema = z.array(
+  z.object({
+    unlocked_at: z.string(),
+    user_id: z.string().uuid(),
+    display_name: z.string().nullable(),
+    avatar_url: z.string().nullable(),
+    achievement_key: z.string(),
+    achievement_name: z.string(),
+    achievement_emoji: z.string().nullable(),
+    achievement_tier: z.string(),
+    is_self: z.boolean(),
+  }),
+);
 
 export async function GET() {
-  const userClient = await createClient();
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    // Get accepted friend IDs
-    const { data: friendships, error: friendshipError } = await userClient
-      .from("friendships")
-      .select("requester_id, addressee_id")
-      .eq("status", "accepted")
-      .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`)
-      .order("id", { ascending: true })
-      .limit(200);
-
-    if (friendshipError) {
-      throw friendshipError;
-    }
-
-    const parsedFriendships = socialAcceptedFriendshipSchema.array().parse(
-      friendships ?? []
-    );
-
-    const userIds = [user.id];
-    for (const f of parsedFriendships) {
-      userIds.push(f.requester_id === user.id ? f.addressee_id : f.requester_id);
-    }
-
-    // Fetch recent achievements for all relevant users
-    const admin = createAdminClient();
-    const { data: feed, error } = await admin
-      .from("user_achievements")
-      .select(`
-        unlocked_at,
-        user_id,
-        achievements!inner(key, name, emoji, tier),
-        profiles!user_id(display_name, avatar_url)
-      `)
-      .in("user_id", userIds)
-      .order("unlocked_at", { ascending: false })
-      .limit(20);
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("get_achievement_feed");
 
     if (error) {
       console.error("Achievement feed query error:", error);
       return NextResponse.json({ error: "Failed to fetch feed" }, { status: 500 });
     }
 
-    const parsedFeed = socialAchievementFeedRowSchema.array().parse(feed ?? []);
-
-    const entries = parsedFeed.map((entry) => {
-      const achievements = entry.achievements;
-      const profiles = entry.profiles;
-      return {
-        unlocked_at: entry.unlocked_at,
-        user_id: entry.user_id,
-        display_name: profiles?.display_name ?? "Unknown",
-        avatar_url: profiles?.avatar_url ?? null,
-        achievement_key: achievements.key,
-        achievement_name: achievements.name,
-        achievement_emoji: achievements.emoji,
-        achievement_tier: achievements.tier,
-        is_self: entry.user_id === user.id,
-      };
-    });
+    const entries = feedRowsSchema.parse(data ?? []).map((row) => ({
+      unlocked_at: row.unlocked_at,
+      user_id: row.user_id,
+      display_name: row.display_name ?? "Unknown",
+      avatar_url: row.avatar_url,
+      achievement_key: row.achievement_key,
+      achievement_name: row.achievement_name,
+      achievement_emoji: row.achievement_emoji,
+      achievement_tier: row.achievement_tier,
+      is_self: row.is_self,
+    }));
 
     return NextResponse.json({ feed: entries });
   } catch (err) {
