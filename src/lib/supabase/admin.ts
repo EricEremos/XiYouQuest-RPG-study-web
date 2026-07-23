@@ -2,11 +2,14 @@ import "server-only";
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
-import { SUPABASE_SERVICE_ROLE_KEY } from "@/lib/env";
+import {
+  NEXT_PUBLIC_SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY,
+} from "@/lib/env";
 
 export function createAdminClient() {
   return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    NEXT_PUBLIC_SUPABASE_URL(),
     SUPABASE_SERVICE_ROLE_KEY(),
     {
       auth: {

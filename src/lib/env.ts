@@ -34,6 +34,9 @@ export function OPENROUTER_API_KEY() {
 }
 
 // --- Supabase (service role — server-side only) ---
+export function NEXT_PUBLIC_SUPABASE_URL() {
+  return requireEnv("NEXT_PUBLIC_SUPABASE_URL");
+}
 export function SUPABASE_SERVICE_ROLE_KEY() {
   return requireEnv("SUPABASE_SERVICE_ROLE_KEY");
 }

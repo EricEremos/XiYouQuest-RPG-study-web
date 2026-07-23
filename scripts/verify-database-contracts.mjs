@@ -12,6 +12,7 @@ import {
   readMigration,
 } from "./db-contract-test-helpers.mjs";
 import {
+  verifyAchievementCatalog,
   verifyMigrationLock,
   verifyProjectionBounds,
   verifyPrivilegedOwnerReassignmentInvariant,
@@ -29,6 +30,7 @@ if (process.env.XIYOUQUEST_DB_INTEGRATION !== "1") {
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { clientConfig, safeTarget } = loadDatabaseUrl();
 const migrationFiles = [
+  "20260723082001_repair_default_companions_and_achievement_catalog.sql",
   "20260723180000_enforce_single_selected_companion.sql",
   "20260723183000_add_bounded_social_projections.sql",
   "20260723183100_add_social_friend_stats_projection.sql",
@@ -48,7 +50,8 @@ try {
   for (const migrationFile of migrationFiles) {
     await control.query(readMigration(repoRoot, migrationFile));
   }
-  checks.push("all three migrations execute in PostgreSQL");
+  checks.push("all four migrations execute in PostgreSQL");
+  checks.push(await verifyAchievementCatalog(control));
 
   await verifyMigrationLock(control, contender);
   checks.push(

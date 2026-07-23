@@ -6,8 +6,10 @@ import {
 } from "./db-contract-verifiers/projections.mjs";
 import { verifyPrivilegesAndInvariant } from "./db-contract-verifiers/privileges.mjs";
 import { verifyPrivilegedOwnerReassignmentInvariant } from "./db-contract-verifiers/profile-owner-invariants.mjs";
+import { verifyAchievementCatalog } from "./db-contract-verifiers/achievement-catalog.mjs";
 
 export {
+  verifyAchievementCatalog,
   verifyMigrationLock,
   verifyPrivilegesAndInvariant,
   verifyProfileProvisioningInvariant,

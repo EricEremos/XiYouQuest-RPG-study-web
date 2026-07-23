@@ -33,6 +33,16 @@ const userCharacterRecordSchema = z.object({
 
 type CharacterRecord = z.infer<typeof characterRecordSchema>;
 
+type CharacterReadResult = {
+  data: unknown;
+  error: unknown;
+};
+
+export interface CharacterReader {
+  readSelected(userId: string): Promise<CharacterReadResult>;
+  readDefaults(): Promise<CharacterReadResult>;
+}
+
 const STARTER_CHARACTER_NAME = "Sun Wukong (孙悟空)";
 const STATIC_STUDY_BUDDY = {
   name: STARTER_CHARACTER_NAME,
@@ -62,38 +72,47 @@ function toLoadedCharacter(characterData?: CharacterRecord | null): LoadedCharac
   };
 }
 
-async function readSelectedCharacter(
+function createCharacterReader(
   supabase: SupabaseClient,
-  userId: string,
-) {
-  return supabase
-    .from("user_characters")
-    .select(`
-      *,
-      characters (
-        *,
-        character_expressions (*)
-      )
-    `)
-    .eq("user_id", userId)
-    .eq("is_selected", true)
-    .order("unlocked_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+): CharacterReader {
+  return {
+    async readSelected(userId) {
+      return await supabase
+        .from("user_characters")
+        .select(`
+          *,
+          characters (
+            *,
+            character_expressions (*)
+          )
+        `)
+        .eq("user_id", userId)
+        .eq("is_selected", true)
+        .order("unlocked_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    },
+    async readDefaults() {
+      return await supabase
+        .from("characters")
+        .select(`
+          *,
+          character_expressions (*)
+        `)
+        .eq("is_default", true)
+        .order("name", { ascending: true });
+    },
+  };
 }
 
-/**
- * Load the user's selected character with expressions from Supabase.
- * Shared across all component pages to avoid duplication.
- */
-export async function loadSelectedCharacter(
-  supabase: SupabaseClient,
-  userId: string
+export async function loadSelectedCharacterFromReader(
+  reader: CharacterReader,
+  userId: string,
 ): Promise<LoadedCharacter> {
   const {
     data: userCharacter,
     error: selectedCharacterError,
-  } = await readSelectedCharacter(supabase, userId);
+  } = await reader.readSelected(userId);
 
   // A failed read is not proof that the user has no selection. Avoid mutating
   // state during a transient outage and render the safe static fallback.
@@ -110,14 +129,7 @@ export async function loadSelectedCharacter(
     const {
       data: defaultCharacters,
       error: defaultCharacterError,
-    } = await supabase
-      .from("characters")
-      .select(`
-        *,
-        character_expressions (*)
-      `)
-      .eq("is_default", true)
-      .order("name", { ascending: true });
+    } = await reader.readDefaults();
 
     if (defaultCharacterError) {
       return toLoadedCharacter();
@@ -139,4 +151,18 @@ export async function loadSelectedCharacter(
   }
 
   return toLoadedCharacter(characterData);
+}
+
+/**
+ * Load the user's selected character with expressions from Supabase.
+ * Shared across all component pages to avoid duplication.
+ */
+export async function loadSelectedCharacter(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<LoadedCharacter> {
+  return loadSelectedCharacterFromReader(
+    createCharacterReader(supabase),
+    userId,
+  );
 }

@@ -9,6 +9,7 @@ import {
   loadDatabaseUrl,
   setAuthContext,
 } from "./db-contract-test-helpers.mjs";
+import { verifyAchievementCatalog } from "./db-contract-verifiers.mjs";
 
 if (
   process.env.XIYOUQUEST_DB_INTEGRATION !== "1" ||
@@ -73,6 +74,7 @@ try {
      WHERE version = ANY($1::TEXT[])`,
     [
       [
+        "20260723082001",
         "20260723180000",
         "20260723183000",
         "20260723183100",
@@ -81,9 +83,10 @@ try {
   );
   assert.equal(
     appliedMigrations.length,
-    3,
+    4,
     "reviewed migrations must be recorded as applied before concurrency verification",
   );
+  await verifyAchievementCatalog(setup);
 
   const { rows: targetCharacters } = await setup.query(
     `SELECT id

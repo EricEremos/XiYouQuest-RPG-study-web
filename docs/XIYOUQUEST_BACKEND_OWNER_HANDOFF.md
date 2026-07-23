@@ -26,7 +26,7 @@ authoritative project through the team's normal release process.
 
 The repaired application expects one selected companion per profile and narrow
 authenticated projections for leaderboard and social data. Those guarantees
-depend on three PostgreSQL migrations as well as the frontend/backend
+depend on four PostgreSQL migrations as well as the frontend/backend
 environment variables pointing to the same Supabase project.
 
 Codex does not know which external Supabase project the owner designates as the
@@ -65,11 +65,14 @@ the migration history.
 Review and apply through the owner's established Supabase migration process,
 in this order:
 
-1. `supabase/migrations/20260723180000_enforce_single_selected_companion.sql`
-2. `supabase/migrations/20260723183000_add_bounded_social_projections.sql`
-3. `supabase/migrations/20260723183100_add_social_friend_stats_projection.sql`
+1. `supabase/migrations/20260723082001_repair_default_companions_and_achievement_catalog.sql`
+2. `supabase/migrations/20260723180000_enforce_single_selected_companion.sql`
+3. `supabase/migrations/20260723183000_add_bounded_social_projections.sql`
+4. `supabase/migrations/20260723183100_add_social_friend_stats_projection.sql`
 
-The first migration takes explicit table locks while it repairs historical
+The first migration repairs historical starter-character rows and the four
+personalized-learning achievement catalog entries. The second migration takes
+explicit table locks while it repairs historical
 selection state and installs the invariant. Apply it during an owner-approved
 maintenance window or against a staging clone first. PostgreSQL applies each
 migration transactionally; do not copy individual statements into production
@@ -110,7 +113,9 @@ npm run test:db-contracts
 
 Expected result:
 
-- all three migrations execute inside the test transaction;
+- all four migrations execute inside the test transaction;
+- all four personalized-learning achievement rows match the application
+  catalog exactly;
 - profile creation fails if no default companion exists;
 - zero or multiple selections are rejected;
 - old and new owners are both checked on privileged reassignment;
