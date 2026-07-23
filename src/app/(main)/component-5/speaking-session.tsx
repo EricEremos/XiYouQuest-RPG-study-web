@@ -492,12 +492,19 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
               {displayTopics.map((topic, index) => (
                 <Card
                   key={`${topic}-${index}`}
-                  className="cursor-pointer transition-all hover:border-primary hover:shadow-md h-fit"
-                  onClick={() => handleSelectTopic(topic)}
+                  className="transition-all hover:border-primary hover:shadow-md focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/50 h-fit relative"
                 >
                   <CardContent className="flex items-center justify-center py-6">
                     <p className="text-lg font-medium text-center font-chinese">{topic}</p>
                   </CardContent>
+                  {/* Native button covering the card: one Tab stop with a
+                      stable name and Enter/Space activation. */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTopic(topic)}
+                    aria-label={`Speak about: ${topic}`}
+                    className="absolute inset-0 z-10 cursor-pointer focus:outline-none"
+                  />
                 </Card>
               ))}
             </div>

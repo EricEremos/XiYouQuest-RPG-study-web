@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { calculateXP } from "@/lib/gamification/xp";
 import { fetchWithRetry } from "@/lib/fetch-retry";
 import { getDialogue } from "@/lib/dialogue";
+import { ChineseText } from "@/components/shared/chinese-text";
 import { useAudioSettings } from "@/components/shared/audio-settings";
 import { useAchievementToast } from "@/components/shared/achievement-toast";
 import type { ExpressionName } from "@/types/character";
@@ -576,8 +577,7 @@ export function ReadingSession({ passages, character, characterId, component, lp
               {passages.map((passage) => (
                 <Card
                   key={passage.id}
-                  className="cursor-pointer transition-all hover:border-primary hover:shadow-md h-fit relative overflow-hidden"
-                  onClick={() => handleSelectPassage(passage)}
+                  className="transition-all hover:border-primary hover:shadow-md focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/50 h-fit relative overflow-hidden"
                 >
                   {passage.passageNumber && (
                     <div
@@ -588,12 +588,20 @@ export function ReadingSession({ passages, character, characterId, component, lp
                   <CardContent className="pt-6 relative">
                     <h3 className="text-lg font-bold font-chinese mb-2 drop-shadow-md [text-shadow:_0_1px_3px_rgb(255_255_255_/_80%)]">{passage.title}</h3>
                     <p className="text-sm font-medium text-foreground/80 font-chinese line-clamp-3 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
-                      {passage.content}
+                      <ChineseText text={passage.content} />
                     </p>
                     <p className="mt-2 text-sm font-medium text-foreground/70 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
                       {passage.content.length} characters
                     </p>
                   </CardContent>
+                  {/* Native button covering the card: one Tab stop with a
+                      stable name, Enter/Space activation, focus ring above. */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectPassage(passage)}
+                    aria-label={`Practice passage: ${passage.title}`}
+                    className="absolute inset-0 z-10 cursor-pointer focus:outline-none"
+                  />
                 </Card>
               ))}
             </div>
@@ -803,14 +811,20 @@ export function ReadingSession({ passages, character, characterId, component, lp
                 )}
               </div>
 
-              {/* Passage content with clickable sentences */}
+              {/* Passage content with per-sentence playback. Each sentence is
+                  a native button: one Tab stop, Enter/Space plays audio, and
+                  aria-pressed exposes which sentence is playing. */}
               <div className="rounded-lg border bg-muted/30 p-4 sm:p-6 leading-relaxed max-h-[60vh] overflow-y-auto">
                 {sentences.map((sentence, index) => (
-                  <span
+                  <button
                     key={index}
+                    type="button"
                     onClick={() => playSentence(sentence, index)}
+                    aria-label={`Play sentence ${index + 1}: ${sentence}`}
+                    aria-pressed={playingSentenceIndex === index}
                     className={`
-                      cursor-pointer transition-all duration-200 rounded-md px-1 py-0.5
+                      inline cursor-pointer text-left transition-all duration-200 rounded-md px-1 py-0.5
+                      focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2
                       ${playingSentenceIndex === index
                         ? "bg-primary/30 text-primary font-medium shadow-sm scale-105"
                         : "hover:bg-primary/10 hover:shadow-sm hover:scale-[1.02]"
@@ -819,7 +833,7 @@ export function ReadingSession({ passages, character, characterId, component, lp
                     title="🔊 Click to hear this sentence"
                   >
                     <span className="text-lg leading-loose font-chinese">{sentence}</span>
-                  </span>
+                  </button>
                 ))}
               </div>
 

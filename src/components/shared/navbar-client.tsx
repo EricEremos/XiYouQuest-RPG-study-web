@@ -31,7 +31,7 @@ function NavbarSkeleton() {
             className="object-contain"
           />
         </div>
-        <div className="hidden md:flex items-center gap-1.5">
+        <div className="hidden xl:flex items-center gap-1.5">
           <div className="h-5 w-56 bg-muted rounded" />
         </div>
         <div className="flex items-center gap-2 sm:gap-4">

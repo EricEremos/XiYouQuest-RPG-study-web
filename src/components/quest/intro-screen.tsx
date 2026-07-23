@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { QUEST_INTRO_TEXT } from "@/lib/quest/story-text";
 
@@ -16,19 +16,6 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
     if (allShown) return;
     setVisibleParagraphs((prev) => Math.min(prev + 1, QUEST_INTRO_TEXT.length));
   }, [allShown]);
-
-  // Keyboard / click to advance paragraphs
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't advance if user pressed Tab or similar navigation keys
-      if (e.key === "Tab" || e.key === "Shift") return;
-      if (allShown) return;
-      advance();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [allShown, advance]);
 
   return (
     <div
@@ -47,8 +34,9 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
           西游记
         </p>
 
-        {/* Story paragraphs */}
-        <div className="space-y-4 w-full">
+        {/* Story paragraphs. aria-live announces each newly revealed
+            paragraph to screen readers as the reader advances. */}
+        <div aria-live="polite" className="space-y-4 w-full">
           {QUEST_INTRO_TEXT.slice(0, visibleParagraphs).map((text, i) => (
             <p
               key={i}
@@ -69,13 +57,22 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
             }}
             size="lg"
             className="mt-4 animate-fade-in-up font-pixel text-sm"
+            autoFocus
           >
             Begin Journey 开始旅程
           </Button>
         ) : (
-          <p className="font-retro text-sm text-amber-300/60 animate-blink mt-2">
+          <button
+            type="button"
+            autoFocus
+            onClick={(e) => {
+              e.stopPropagation();
+              advance();
+            }}
+            className="font-retro text-sm text-amber-300/60 animate-blink mt-2 p-2 min-h-[44px] cursor-pointer hover:text-amber-300 focus-visible:text-amber-300 focus-visible:outline-2 focus-visible:outline-amber-300 focus-visible:outline-offset-2"
+          >
             Tap to continue...
-          </p>
+          </button>
         )}
       </div>
     </div>

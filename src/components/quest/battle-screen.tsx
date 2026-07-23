@@ -80,7 +80,9 @@ export function BattleScreen({
 }: BattleScreenProps) {
   const [battleState, setBattleState] = useState<BattleState>(initialState);
   const battleStateRef = useRef(battleState);
-  battleStateRef.current = battleState;
+  useEffect(() => {
+    battleStateRef.current = battleState;
+  }, [battleState]);
 
 
   // Duck BGM during active play phases (recording + MCQ)
@@ -243,7 +245,9 @@ export function BattleScreen({
     },
     [onVictory, onDefeat, flashTurnBanner, stage]
   );
-  checkOutcomeRef.current = checkOutcomeAndAdvance;
+  useEffect(() => {
+    checkOutcomeRef.current = checkOutcomeAndAdvance;
+  }, [checkOutcomeAndAdvance]);
 
   // Attack animation hook
   const handleAttackAnimComplete = useCallback(
