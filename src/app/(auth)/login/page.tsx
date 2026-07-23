@@ -1,20 +1,29 @@
 import { LoginForm } from "./login-form";
 import Image from "next/image";
 
+// Rendered per request so the proxy's CSP nonce reaches the page's inline
+// scripts; a statically cached copy would carry stale, mismatched nonces and
+// the strict production CSP would block hydration.
+export const dynamic = "force-dynamic";
+
 export default function LoginPage() {
   return (
-    <div className="relative flex min-h-screen items-center justify-center p-4 pb-24">
-      <div className="flex flex-col items-center">
+    <main className="relative flex min-h-screen items-center justify-center overflow-x-clip p-4 pb-24">
+      {/* w-full keeps the column sized by the viewport, not by the logo's
+          intrinsic 450px width, so nothing overflows a 320px screen. */}
+      <div className="flex w-full max-w-md flex-col items-center">
         <Image
           src="/img/background/Logo.webp"
           alt="XiYouQuest"
           width={450}
           height={150}
           priority
-          className="drop-shadow-lg max-w-full h-auto"
+          fetchPriority="high"
+          sizes="(max-width: 480px) calc(100vw - 2rem), 448px"
+          className="w-full h-auto drop-shadow-lg"
         />
         <LoginForm />
       </div>
-    </div>
+    </main>
   );
 }
