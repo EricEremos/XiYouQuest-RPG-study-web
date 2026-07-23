@@ -3,7 +3,7 @@ import {
   jsonResponse,
   errorResponse,
 } from "../_shared/cors.ts";
-import { createSupabaseClient } from "../_shared/supabase.ts";
+import { createRequestClient } from "../_shared/supabase.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
 import {
   generatePhase,
@@ -15,9 +15,9 @@ import { generatePlanSchema } from "../_shared/validations.ts";
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return corsResponse();
 
-  const supabase = createSupabaseClient(req);
   const user = await verifyUser(req);
   if (!user) return errorResponse("Unauthorized", 401);
+  const supabase = createRequestClient(user);
 
   try {
     const body = await req.json();

@@ -14,6 +14,20 @@ export const friendRespondSchema = z.object({
   action: z.enum(["accept", "reject"]),
 });
 
+// --- Profile API Schemas ---
+
+export const profileSettingsSchema = z
+  .object({
+    display_name: z.string().trim().min(1).max(15).optional(),
+    audio_volume: z.number().min(0).max(1).optional(),
+    tts_volume: z.number().min(0).max(1).optional(),
+    audio_muted: z.boolean().optional(),
+  })
+  .refine(
+    (v) => Object.values(v).some((field) => field !== undefined),
+    { message: "At least one field is required" },
+  );
+
 // --- Progress API Schemas ---
 
 export const progressUpdateSchema = z.object({
@@ -99,7 +113,15 @@ export const ttsSpeakSchema = z.object({
 });
 
 export const ttsCompanionSchema = z.object({
-  voiceId: z.string().min(1),
+  // Bound the voice id to the iFlytek id shape (e.g. `x_xiaoyan`,
+  // `x4_lingfeizhe_assist`) and a sane length instead of accepting an arbitrary
+  // string. Companion voices are a broader set than ttsSpeak's fixed allowlist,
+  // so we constrain the format rather than pin an exact list.
+  voiceId: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-z0-9_]+$/i, { message: "Invalid voice ID" }),
   text: z.string().min(1).max(500),
 });
 

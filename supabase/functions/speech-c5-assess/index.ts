@@ -3,7 +3,6 @@ import {
   jsonResponse,
   errorResponse,
 } from "../_shared/cors.ts";
-import { createSupabaseClient } from "../_shared/supabase.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
 import { transcribeAudio } from "../_shared/iflytek-asr.ts";
 import {
@@ -26,21 +25,21 @@ const EMPTY_RESULT: C5AssessmentResult = {
     score: 0,
     deduction: 20,
     level: 6,
-    label: "六档",
+    label: "å…­æ¡£",
     notes: "No speech detected",
   },
   vocabGrammar: {
     score: 0,
     deduction: 5,
     level: 3,
-    label: "三档",
+    label: "ä¸‰æ¡£",
     notes: "No speech detected",
   },
   fluency: {
     score: 0,
     deduction: 5,
     level: 3,
-    label: "三档",
+    label: "ä¸‰æ¡£",
     notes: "No speech detected",
   },
   timePenalty: 30,
@@ -179,7 +178,6 @@ async function assessFullAudio(
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return corsResponse();
 
-  const supabase = createSupabaseClient(req);
   const user = await verifyUser(req);
   if (!user) return errorResponse("Unauthorized", 401);
 
@@ -216,7 +214,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!transcript) {
-      console.log("[C5] Empty transcript — returning zeroed result");
+      console.log("[C5] Empty transcript â€” returning zeroed result");
       return jsonResponse(EMPTY_RESULT);
     }
 

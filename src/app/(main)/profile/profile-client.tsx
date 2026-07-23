@@ -2,10 +2,10 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createClient } from "@/lib/supabase/client";
 import { getUserLevel, getAffectionLevel } from "@/lib/gamification/xp";
 import { STREAK_MULTIPLIERS, USER_LEVELS } from "@/types/gamification";
 import {
@@ -118,46 +118,49 @@ export default function ProfileClient({
     if (!profile || nameValue.trim() === "") return;
     const trimmed = nameValue.trim().slice(0, 15);
     setSaving(true);
-    const supabase = createClient();
-    await supabase
-      .from("profiles")
-      .update({ display_name: trimmed })
-      .eq("id", profile.id);
-    setDisplayName(trimmed);
-    setEditingName(false);
-    setSaving(false);
-    router.refresh();
+    try {
+      const res = await fetch("/api/profile/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_name: trimmed }),
+      });
+      if (!res.ok) throw new Error(`Save failed (${res.status})`);
+      setDisplayName(trimmed);
+      setEditingName(false);
+      router.refresh();
+    } catch {
+      toast.error("Couldn't save your display name. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
     setSaving(true);
-
-    const supabase = createClient();
-    const ext = file.name.split(".").pop() || "png";
-    const path = `${profile.id}/avatar.${ext}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(path, file, { upsert: true });
-
-    if (!uploadError) {
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("avatars").getPublicUrl(path);
-
-      // Append cache-buster to force refresh
-      const url = `${publicUrl}?t=${Date.now()}`;
-      await supabase
-        .from("profiles")
-        .update({ avatar_url: url })
-        .eq("id", profile.id);
-      setAvatarUrl(url);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/profile/avatar", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error ?? `Upload failed (${res.status})`);
+      }
+      setAvatarUrl(data.avatarUrl);
       router.refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : "Couldn't upload your avatar. Please try again.",
+      );
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
   }
 
   return (
@@ -187,7 +190,8 @@ export default function ProfileClient({
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={saving}
-                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                aria-label="Change avatar"
+                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
               >
                 <Camera className="h-6 w-6 text-white" />
               </button>
@@ -221,6 +225,7 @@ export default function ProfileClient({
                       variant="ghost"
                       onClick={handleSaveName}
                       disabled={saving}
+                      aria-label="Save display name"
                     >
                       <Check className="h-4 w-4" />
                     </Button>
@@ -228,6 +233,7 @@ export default function ProfileClient({
                       size="sm"
                       variant="ghost"
                       onClick={() => setEditingName(false)}
+                      aria-label="Cancel editing name"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -244,6 +250,7 @@ export default function ProfileClient({
                         setNameValue(displayName);
                         setEditingName(true);
                       }}
+                      aria-label="Edit display name"
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -258,7 +265,9 @@ export default function ProfileClient({
                   Lv.{level} {levelName}
                 </span>
                 <span className="text-sm sm:text-xl text-muted-foreground">
-                  Member since {formatDate(profile?.created_at ?? null)}
+                  {profile?.created_at
+                    ? `Member since ${formatDate(profile.created_at)}`
+                    : "New member"}
                 </span>
               </div>
             </div>

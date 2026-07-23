@@ -3,7 +3,6 @@ import {
   corsResponse,
   errorResponse,
 } from "../_shared/cors.ts";
-import { createSupabaseClient } from "../_shared/supabase.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
 import { synthesizeAcademic } from "../_shared/iflytek-tts.ts";
 
@@ -15,7 +14,6 @@ const schema = z.object({
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return corsResponse();
 
-  const supabase = createSupabaseClient(req);
   const user = await verifyUser(req);
   if (!user) return errorResponse("Unauthorized", 401);
 

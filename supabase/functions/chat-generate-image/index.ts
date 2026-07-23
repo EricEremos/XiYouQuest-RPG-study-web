@@ -4,7 +4,7 @@ import {
   errorResponse,
 } from "../_shared/cors.ts";
 import {
-  createSupabaseClient,
+  createRequestClient,
   createAdminClient,
 } from "../_shared/supabase.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
@@ -21,9 +21,9 @@ function base64ToUint8Array(base64: string): Uint8Array {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return corsResponse();
 
-  const supabase = createSupabaseClient(req);
   const user = await verifyUser(req);
   if (!user) return errorResponse("Unauthorized", 401);
+  const supabase = createRequestClient(user);
 
   try {
     const body = await req.json();
