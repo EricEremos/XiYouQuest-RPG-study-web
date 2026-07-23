@@ -18,23 +18,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid sessionId" }, { status: 400 });
     }
 
-    const [{ data: session }, { data: messages }] = await Promise.all([
-      supabase
-        .from("chat_sessions")
-        .select("*, characters(name, voice_id, image_url), chat_scenarios(title, category)")
-        .eq("id", sessionId)
-        .eq("user_id", user.id)
-        .single(),
-      supabase
-        .from("chat_messages")
-        .select("*")
-        .eq("session_id", sessionId)
-        .order("created_at", { ascending: true }),
-    ]);
+    // Verify session ownership BEFORE fetching its messages. The server
+    // client runs with the service role (RLS does not apply), so gating the
+    // message fetch on a confirmed-owned session is the authorization check:
+    // another user's session id returns 404 and the message query is never
+    // issued for it.
+    const { data: session } = await supabase
+      .from("chat_sessions")
+      .select("*, characters(name, voice_id, image_url), chat_scenarios(title, category)")
+      .eq("id", sessionId)
+      .eq("user_id", user.id)
+      .single();
 
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
+
+    const { data: messages } = await supabase
+      .from("chat_messages")
+      .select("*")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: true });
 
     return NextResponse.json({ session, messages: messages ?? [] });
   }

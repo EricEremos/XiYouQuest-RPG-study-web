@@ -2,18 +2,28 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { requireEnv, SUPABASE_SERVICE_ROLE_KEY } from "./env.ts";
 
 /**
- * Create authenticated Supabase client from request's Authorization header.
- * Mirrors the cookie-based auth in src/lib/supabase/server.ts.
+ * DB client for a request whose Better Auth user has already been verified
+ * via verify-jwt.ts.
+ *
+ * Supabase third-party auth only trusts the JWKS of five named providers
+ * (Clerk, Firebase, Auth0, Cognito, WorkOS), so PostgREST can never verify a
+ * Better Auth JWT itself. The previous approach (forwarding the request's
+ * Authorization header on an anon-key client) therefore made every
+ * user-scoped query fail with 401. Instead, a verified request gets the
+ * service-role client; callers MUST keep scoping every query by the verified
+ * user id. Unverified requests get an anon client, which RLS restricts to
+ * public reference data.
  */
-export function createSupabaseClient(req: Request): SupabaseClient {
-  const authHeader = req.headers.get("authorization") ?? "";
-  return createClient(
-    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
-    {
-      global: { headers: { Authorization: authHeader } },
-    },
-  );
+export function createRequestClient(
+  user: { id: string } | null,
+): SupabaseClient {
+  if (!user) {
+    return createClient(
+      requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+      requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+    );
+  }
+  return createAdminClient();
 }
 
 /** Admin client with service role key (bypasses RLS). */

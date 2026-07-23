@@ -83,7 +83,7 @@ Structure your response in exactly 3 sections with these headers (use ** for bol
 1-2 sentences on what went well. Reference specific components and scores.
 
 **Areas for Improvement**
-2-3 sentences identifying the weakest areas. Be specific — mention problem words, question types, or pronunciation patterns. If word scores are provided, call out the lowest-scoring ones.
+2-3 sentences identifying the weakest areas. Be specific â€” mention problem words, question types, or pronunciation patterns. If word scores are provided, call out the lowest-scoring ones.
 
 **Study Plan**
 2-3 sentences with a prioritized action plan. Suggest specific drills (e.g. "practice tone pairs for C1", "review measure words for C3"). Focus on what will improve the PSC grade the most.
@@ -91,7 +91,7 @@ Structure your response in exactly 3 sections with these headers (use ** for bol
 Rules:
 - English only. No emojis. No bullet points within sections.
 - Reference components by name: C1=Monosyllabic Characters, C2=Multisyllabic Words, C3=Vocabulary & Grammar, C4=Passage Reading, C5=Prompted Speaking.
-- Keep it tight — every sentence must add value. Total response under 200 words.
+- Keep it tight â€” every sentence must add value. Total response under 200 words.
 - Be encouraging but honest.`;
 
     const summary = componentResults.map((cr) => {
@@ -125,7 +125,7 @@ Rules:
       return parts.join(" | ");
     });
 
-    const userPrompt = `Mock exam results — Total: ${totalScore}/100, Grade: ${grade}\n${summary.join("\n")}`;
+    const userPrompt = `Mock exam results â€” Total: ${totalScore}/100, Grade: ${grade}\n${summary.join("\n")}`;
 
     const feedback = await quickCompletion(systemPrompt, userPrompt, 500);
 

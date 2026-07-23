@@ -107,8 +107,12 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
           </Link>
         </div>
 
-        {/* Center: Desktop nav links */}
-        <div className="hidden xl:flex items-center gap-1.5">
+        {/* Center: Desktop nav links. One anchor per destination (Button with
+            asChild renders the Link itself), so keyboard users get exactly one
+            focus stop and no button-inside-link nesting. The full-width nav
+            needs ~1300px including the profile cluster, so it only appears at
+            xl and above; below that the drawer covers every destination. */}
+        <div className="hidden xl:flex items-center gap-1 2xl:gap-1.5">
           {NAV_LINKS.map((link) => {
             const isActive = pathname === link.href;
             return (
@@ -117,13 +121,16 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
                 asChild
                 variant="ghost"
                 size="sm"
-                className={`gap-2 font-pixel text-sm px-3 py-2 transition-colors ${
+                className={`gap-1.5 font-pixel text-sm px-2 2xl:px-3 py-2 transition-colors ${
                   isActive
                     ? "text-primary bg-primary/15 pixel-border"
                     : "text-foreground/80 hover:text-primary hover:bg-primary/10"
                 }`}
               >
-                <Link href={link.href}>
+                <Link
+                  href={link.href}
+                  aria-current={isActive ? "page" : undefined}
+                >
                   <link.icon className="h-4 w-4" />
                   {link.label}
                 </Link>
@@ -132,11 +139,11 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
           })}
         </div>
 
-        {/* Right: XP + Hamburger (mobile) + Profile */}
-        <div className="flex items-center gap-1.5 sm:gap-2 md:gap-4">
+        {/* Right: XP + Hamburger (below xl) + Profile */}
+        <div className="flex items-center gap-1.5 sm:gap-2 2xl:gap-4">
           <XPBar totalXP={totalXP} />
 
-          {/* Mobile hamburger */}
+          {/* Hamburger for every width where the desktop nav is hidden */}
           <Button
             variant="ghost"
             size="sm"
@@ -147,7 +154,7 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
             <Menu className="h-5 w-5" />
           </Button>
 
-          {/* Desktop profile dropdown — hidden on mobile */}
+          {/* Desktop profile dropdown, hidden while the drawer is in use */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -167,7 +174,11 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
                 ) : (
                   <User className="h-4 w-4" />
                 )}
-                <span>{displayName || "Profile"}</span>
+                {/* Cap long display names so the header cannot overflow at
+                    the xl breakpoint. */}
+                <span className="max-w-[9rem] truncate">
+                  {displayName || "Profile"}
+                </span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[10rem] p-2">

@@ -68,3 +68,4 @@ doc/
 
 # Supabase CLI temp files
 supabase/.temp/
+.gstack/

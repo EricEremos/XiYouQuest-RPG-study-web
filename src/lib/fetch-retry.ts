@@ -7,6 +7,7 @@
  */
 
 import { resolveEdgeRoute } from "./edge-routing";
+import { clearAccessToken, getAccessToken } from "./auth-token";
 
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503]);
 
@@ -32,10 +33,36 @@ export async function fetchWithRetry(
   }
 
   let lastError: Error | undefined;
+  let refreshedToken = false;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const response = await fetch(input, init);
+
+      // The cached Better Auth JWT may have expired/rotated mid-session. On a
+      // 401 for an authenticated edge request, drop the cached token, mint a
+      // fresh one, and retry ONCE before surfacing the 401 to the caller.
+      if (response.status === 401 && edge && !refreshedToken) {
+        refreshedToken = true;
+        clearAccessToken();
+        const freshToken = await getAccessToken();
+        if (freshToken) {
+          // Only now is the response abandoned; cancel its body to release
+          // the connection before retrying with the fresh token.
+          await response.body?.cancel().catch(() => {});
+          const headers = new Headers(init?.headers);
+          headers.set("Authorization", `Bearer ${freshToken}`);
+          init = { ...init, headers };
+          // The auth refresh gets its own retry; it must not consume a
+          // regular attempt, or a 401 on the last attempt would fall out of
+          // the loop and be masked by the generic retry error.
+          attempt--;
+          continue;
+        }
+        // No fresh token available: surface the 401 with its body intact so
+        // callers can still read the error payload.
+        return response;
+      }
 
       if (RETRYABLE_STATUSES.has(response.status) && attempt < maxRetries) {
         // Drain response body to release the TCP connection

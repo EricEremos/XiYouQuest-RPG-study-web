@@ -1,33 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-
 import { createClient, getSessionUser } from "@/lib/supabase/server";
-import { checkRateLimit } from "@/lib/rate-limit";
-
-// Friend codes are shared identifiers, but they are also enumerable, so the
-// lookup budget per user stays small.
-const LOOKUP_LIMIT_PER_MINUTE = 20;
-
-const lookupRowsSchema = z.array(
-  z.object({
-    id: z.string().uuid(),
-    display_name: z.string().nullable(),
-    avatar_url: z.string().nullable(),
-    current_level: z.coerce.number().int(),
-  }),
-);
 
 export async function GET(request: NextRequest) {
+  const supabase = await createClient();
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!checkRateLimit(`social-lookup:${user.id}`, LOOKUP_LIMIT_PER_MINUTE, 60_000)) {
-    return NextResponse.json(
-      { error: "Too many lookups, try again in a minute" },
-      { status: 429 },
-    );
   }
 
   const code = request.nextUrl.searchParams.get("code");
@@ -47,24 +25,21 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc("get_friend_code_profile", {
-      requested_code: trimmedCode,
-    });
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("id, display_name, avatar_url, current_level, friend_code")
+      .eq("friend_code", trimmedCode)
+      .neq("id", user.id)
+      .single();
 
-    if (error) {
-      throw error;
-    }
-
-    const rows = lookupRowsSchema.parse(data ?? []);
-    if (rows.length === 0) {
+    if (error || !profile) {
       return NextResponse.json(
         { error: "User not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(rows[0]);
+    return NextResponse.json(profile);
   } catch (error) {
     console.error("Lookup error:", error);
     return NextResponse.json({ error: "Lookup failed" }, { status: 500 });

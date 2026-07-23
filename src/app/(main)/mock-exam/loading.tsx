@@ -1,6 +1,6 @@
 export default function MockExamLoading() {
   return (
-    <div className="space-y-4" role="status">
+    <div className="space-y-4">
       <div>
         <div className="h-7 w-48 rounded animate-shimmer" />
         <div className="h-4 w-full max-w-80 rounded animate-shimmer mt-2" />

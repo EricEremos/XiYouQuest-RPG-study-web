@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-/** Fisher-Yates shuffle — returns a new shuffled copy of the array */
+/** Fisher-Yates shuffle: returns a new shuffled copy of the array */
 export function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -13,21 +13,6 @@ export function shuffle<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
-}
-
-function createSeededRandom(seed: string): () => number {
-  let state = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    state ^= seed.charCodeAt(i);
-    state = Math.imul(state, 16777619);
-  }
-  return () => {
-    state += 0x6d2b79f5;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 /**
@@ -69,7 +54,16 @@ export function sampleByTone<T extends { pinyin?: string | null }>(items: T[], c
     picked.push(leftover.shift()!);
   }
 
-  return shuffle(picked);
+  const ordered = shuffle(picked);
+  // FU Laoshi feedback: "the first question is also too random." Open on a first-tone
+  // (阴平) item (the conventional warm-up tone) so the reading section always starts
+  // on a predictable, easy tone instead of an arbitrary one. Rest stays shuffled.
+  const openerIdx = ordered.findIndex((it) => toneFromPinyin(it.pinyin) === 1);
+  if (openerIdx > 0) {
+    const [opener] = ordered.splice(openerIdx, 1);
+    ordered.unshift(opener);
+  }
+  return ordered;
 }
 
 /** Format a date string as a relative time (e.g. "2h ago", "3d ago") */
@@ -85,18 +79,10 @@ export function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
-/** Randomize answer positions in a quiz question, deterministically when a session seed is supplied. */
-export function randomizeAnswerPositions<T extends { options: string[]; correctIndex: number }>(
-  question: T,
-  sessionSeed?: string,
-): T {
+/** Randomize answer positions in a quiz question */
+export function randomizeAnswerPositions<T extends { options: string[]; correctIndex: number }>(question: T): T {
   const indices = question.options.map((_, i) => i);
-  const random = sessionSeed ? createSeededRandom(sessionSeed) : Math.random;
-  const shuffledIndices = [...indices];
-  for (let i = shuffledIndices.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]];
-  }
+  const shuffledIndices = shuffle(indices);
   const shuffledOptions = shuffledIndices.map(i => question.options[i]);
   const newCorrectIndex = shuffledIndices.indexOf(question.correctIndex);
 

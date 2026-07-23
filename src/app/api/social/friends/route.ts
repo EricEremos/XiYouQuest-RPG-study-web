@@ -1,30 +1,110 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
-
 import { createClient, getSessionUser } from "@/lib/supabase/server";
-import { postgresIntegerSchema } from "@/lib/postgres-wire";
+import { SupabaseClient } from "@supabase/supabase-js";
 
-const socialStatsRowsSchema = z.array(
-  z.object({
-    friendship_id: z.string().uuid().nullable(),
-    is_self: z.boolean(),
-    id: z.string().uuid(),
-    display_name: z.string().nullable(),
-    avatar_url: z.string().nullable(),
-    current_level: postgresIntegerSchema,
-    total_xp: postgresIntegerSchema,
-    login_streak: postgresIntegerSchema,
-    total_sessions: postgresIntegerSchema.pipe(z.number().nonnegative()),
-    avg_scores: z.record(z.string(), z.number().nullable()),
-    selected_character: z
-      .object({
-        name: z.string(),
-        image_url: z.string().nullable(),
-      })
-      .nullable(),
-    achievement_count: postgresIntegerSchema.pipe(z.number().nonnegative()),
-  }),
-);
+interface UserStats {
+  id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  current_level: number;
+  total_xp: number;
+  login_streak: number;
+  total_sessions: number;
+  avg_scores: Record<number, number | null>;
+  selected_character: {
+    name: string;
+    image_url: string;
+  } | null;
+  achievement_count: number;
+}
+
+async function getUserStats(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<UserStats | null> {
+  // Fetch profile, practice sessions, and selected character in parallel
+  const [profileResult, sessionsResult, selectedCharResult, achievementCountResult] = await Promise.all(
+    [
+      supabase
+        .from("profiles")
+        .select(
+          "id, display_name, avatar_url, current_level, total_xp, login_streak"
+        )
+        .eq("id", userId)
+        .single(),
+
+      supabase
+        .from("practice_sessions")
+        .select("component, score")
+        .eq("user_id", userId),
+
+      supabase
+        .from("user_characters")
+        .select("character_id, characters(name, image_url)")
+        .eq("user_id", userId)
+        .eq("is_selected", true)
+        .single(),
+
+      supabase
+        .from("user_achievements")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId),
+    ]
+  );
+
+  if (profileResult.error || !profileResult.data) {
+    return null;
+  }
+
+  const profile = profileResult.data;
+  const sessions = sessionsResult.data ?? [];
+
+  // Calculate total sessions and avg scores per component
+  const totalSessions = sessions.length;
+  const avgScores: Record<number, number | null> = {};
+  for (let c = 1; c <= 7; c++) {
+    const componentSessions = sessions.filter(
+      (s: { component: number; score: number }) => s.component === c
+    );
+    if (componentSessions.length > 0) {
+      const sum = componentSessions.reduce(
+        (acc: number, s: { score: number }) => acc + s.score,
+        0
+      );
+      avgScores[c] = Math.round(sum / componentSessions.length);
+    } else {
+      avgScores[c] = null;
+    }
+  }
+
+  // Extract selected character info
+  let selectedCharacter: { name: string; image_url: string } | null = null;
+  if (selectedCharResult.data) {
+    const charData = selectedCharResult.data as unknown as {
+      character_id: string;
+      characters: { name: string; image_url: string } | null;
+    };
+    if (charData.characters) {
+      selectedCharacter = {
+        name: charData.characters.name,
+        image_url: charData.characters.image_url,
+      };
+    }
+  }
+
+  return {
+    id: profile.id,
+    display_name: profile.display_name,
+    avatar_url: profile.avatar_url,
+    current_level: profile.current_level,
+    total_xp: profile.total_xp,
+    login_streak: profile.login_streak,
+    total_sessions: totalSessions,
+    avg_scores: avgScores,
+    selected_character: selectedCharacter,
+    achievement_count: achievementCountResult.count ?? 0,
+  };
+}
 
 export async function GET() {
   const supabase = await createClient();
@@ -34,7 +114,12 @@ export async function GET() {
   }
 
   try {
-    const { data, error } = await supabase.rpc("get_social_friend_stats");
+    // Get accepted friendships
+    const { data: friendships, error } = await supabase
+      .from("friendships")
+      .select("id, requester_id, addressee_id")
+      .eq("status", "accepted")
+      .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`);
 
     if (error) {
       console.error("Friends fetch error:", error);
@@ -44,22 +129,30 @@ export async function GET() {
       );
     }
 
-    const rows = socialStatsRowsSchema.parse(data ?? []);
-    const selfStats = rows.find((row) => row.is_self) ?? null;
-    const friends = rows
-      .filter((row) => !row.is_self && row.friendship_id)
-      .map((row) => ({
-        friendship_id: row.friendship_id,
-        id: row.id,
-        display_name: row.display_name,
-        avatar_url: row.avatar_url,
-        current_level: row.current_level,
-        total_xp: row.total_xp,
-        login_streak: row.login_streak,
-        total_sessions: row.total_sessions,
-        avg_scores: row.avg_scores,
-        selected_character: row.selected_character,
-        achievement_count: row.achievement_count,
+    // Collect friend IDs
+    const friendIds = (friendships ?? []).map((f) =>
+      f.requester_id === user.id ? f.addressee_id : f.requester_id
+    );
+
+    // Fetch stats for all friends and self in parallel
+    const [selfStats, ...friendStats] = await Promise.all([
+      getUserStats(supabase, user.id),
+      ...friendIds.map((id) => getUserStats(supabase, id)),
+    ]);
+
+    // Build friendship map for IDs
+    const friendshipMap: Record<string, string> = {};
+    for (const f of friendships ?? []) {
+      const friendId =
+        f.requester_id === user.id ? f.addressee_id : f.requester_id;
+      friendshipMap[friendId] = f.id;
+    }
+
+    const friends = friendStats
+      .filter((s): s is UserStats => s !== null)
+      .map((s) => ({
+        ...s,
+        friendship_id: friendshipMap[s.id],
       }));
 
     return NextResponse.json({

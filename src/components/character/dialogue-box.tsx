@@ -1,70 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 interface DialogueBoxProps {
   text: string;
   characterName: string;
+  /** Kept for call-site compatibility; text now always renders in full. */
   isTyping?: boolean;
+  /** Kept for call-site compatibility; text now always renders in full. */
   typingSpeed?: number;
 }
 
-export function DialogueBox({
-  text,
-  characterName,
-  isTyping = true,
-  typingSpeed = 30,
-}: DialogueBoxProps) {
-  const [displayedText, setDisplayedText] = useState("");
-  const [isComplete, setIsComplete] = useState(false);
-
-  useEffect(() => {
-    if (!isTyping) {
-      setDisplayedText(text);
-      setIsComplete(true);
-      return;
-    }
-
-    setDisplayedText("");
-    setIsComplete(false);
-    let i = 0;
-
-    const interval = setInterval(() => {
-      if (i < text.length) {
-        setDisplayedText(text.slice(0, i + 1));
-        i++;
-      } else {
-        setIsComplete(true);
-        clearInterval(interval);
-      }
-    }, typingSpeed);
-
-    return () => clearInterval(interval);
-  }, [text, isTyping, typingSpeed]);
-
-  function handleSkip() {
-    setDisplayedText(text);
-    setIsComplete(true);
-  }
-
+/**
+ * Companion speech bubble used across the practice components. The previous
+ * character-by-character typewriter effect left sentences looking truncated
+ * with a blinking underscore for several seconds on every message, so the full
+ * text now appears immediately with a short fade. aria-live announces new
+ * dialogue to screen readers.
+ */
+export function DialogueBox({ text, characterName }: DialogueBoxProps) {
   return (
     <div className="pixel-border bg-card p-3">
       <div className="flex items-center gap-1.5 mb-1">
         <span className="inline-block h-2 w-2 bg-pixel-green" />
         <p className="font-pixel text-sm text-primary">{characterName}</p>
       </div>
-      <p className="text-sm leading-relaxed">
-        {displayedText}
-        {!isComplete && <span className="animate-blink text-primary">_</span>}
+      {/* The live region stays mounted across messages (screen readers only
+          announce mutations inside an EXISTING live region); only the inner
+          span is keyed so the fade replays per message. */}
+      <p aria-live="polite" className="text-sm leading-relaxed">
+        <span key={text} className="block animate-fade-in-up">
+          {text}
+        </span>
       </p>
-      {!isComplete && (
-        <button
-          onClick={handleSkip}
-          className="mt-1 font-pixel text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-        >
-          Skip &gt;&gt;
-        </button>
-      )}
     </div>
   );
 }

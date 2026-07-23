@@ -237,22 +237,27 @@ describe("advanceBattle", () => {
     expect(result.state.phase).toBe("player_menu");
   });
 
-  it("advances to the next recording after the defense batch for a passed attack", () => {
+  it("enters MCQ defense on pass from player_attack, then advances the recording", () => {
     let state = createBattleState(2, false, WUKONG_ONLY);
     // Simulate a passed recording (score >= 80)
     state = processRecordingComplete(state, 85);
     state = { ...state, phase: "player_attack" };
 
-    let result = advanceBattle(state);
-    expect(result.outcome).toBe("continue");
-    expect(result.state.currentRecordingIndex).toBe(0);
-    expect(result.state.phase).toBe("boss_attack");
-    expect(result.state.isRetry).toBe(false);
+    // A pass still routes through the boss_attack MCQ batch (with isRetry
+    // false); the recording index advances once the batch completes.
+    const afterPass = advanceBattle(state);
+    expect(afterPass.outcome).toBe("continue");
+    expect(afterPass.state.phase).toBe("boss_attack");
+    expect(afterPass.state.isRetry).toBe(false);
+    expect(afterPass.state.currentRecordingIndex).toBe(0);
 
-    result = advanceBattle(result.state);
-    result = advanceBattle(result.state);
-    result = advanceBattle(result.state);
-
+    // Step through the MCQ batch until it completes
+    let batchState = afterPass.state;
+    let result = advanceBattle(batchState);
+    while (result.state.phase === "boss_attack") {
+      batchState = result.state;
+      result = advanceBattle(batchState);
+    }
     expect(result.outcome).toBe("continue");
     expect(result.state.currentRecordingIndex).toBe(1);
     expect(result.state.phase).toBe("player_menu");

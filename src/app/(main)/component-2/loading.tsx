@@ -1,15 +1,11 @@
+import { PracticeLoading } from "@/components/shared/practice-loading";
+
 export default function Component2Loading() {
   return (
-    <div className="space-y-4" role="status">
-      <div>
-        <p className="font-pixel text-sm text-primary">Preparing Multisyllabic Practice</p>
-        <p className="mt-2 text-sm text-muted-foreground">Loading words and your Study Buddy…</p>
-      </div>
-      <div className="pixel-border p-4 sm:p-6 space-y-4">
-        <div className="h-24 w-24 mx-auto rounded-full animate-shimmer" />
-        <div className="h-16 w-full rounded animate-shimmer" />
-        <div className="h-10 w-32 mx-auto rounded animate-shimmer" />
-      </div>
-    </div>
+    <PracticeLoading
+      title="Component 2: Multisyllabic Words"
+      chinese="读多音节词语"
+      description="Read multisyllabic words with correct pronunciation, tones, and natural flow."
+    />
   );
 }

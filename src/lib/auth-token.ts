@@ -39,7 +39,10 @@ async function fetchToken(): Promise<string | null> {
   const expMs = decodeExpMs(token);
   cache = {
     token,
-    refreshAfter: expMs ? expMs - REFRESH_SKEW_MS : Date.now() + 300_000,
+    // If the exp is unparseable, cache only briefly (30s) rather than trusting
+    // an unknown-lifetime token for minutes; a revoked/rotated token then gets
+    // refetched quickly instead of returning 401s for the full window.
+    refreshAfter: expMs ? expMs - REFRESH_SKEW_MS : Date.now() + 30_000,
   };
   return token;
 }

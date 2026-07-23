@@ -9,7 +9,31 @@ import { createRemoteJWKSet, jwtVerify } from "npm:jose";
  * The remote JWK set is created ONCE at module scope so `jose` can cache
  * and reuse the fetched keys across requests (per Deno isolate).
  */
-const jwksUrl = new URL(Deno.env.get("BETTER_AUTH_JWKS_URL")!);
+function requireJwksUrl(): URL {
+  const raw = Deno.env.get("BETTER_AUTH_JWKS_URL");
+  if (!raw) {
+    throw new Error(
+      "BETTER_AUTH_JWKS_URL is not set. Configure it in the edge function " +
+        "secrets (e.g. https://<app-origin>/api/auth/jwks).",
+    );
+  }
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error(`BETTER_AUTH_JWKS_URL is not a valid URL: ${raw}`);
+  }
+  // The JWKS must never be fetched over plaintext: a MITM could substitute
+  // signing keys and forge tokens this verifier would accept.
+  if (url.protocol !== "https:") {
+    throw new Error(
+      `BETTER_AUTH_JWKS_URL must use https (got ${url.protocol}).`,
+    );
+  }
+  return url;
+}
+
+const jwksUrl = requireJwksUrl();
 const jwks = createRemoteJWKSet(jwksUrl);
 
 // Better Auth signs with iss = aud = its baseURL, which is the origin of the

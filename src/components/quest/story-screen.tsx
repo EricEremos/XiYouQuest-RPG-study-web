@@ -61,8 +61,12 @@ export function StoryScreen({ stage, onContinue, onBack }: StoryScreenProps) {
           </p>
         </div>
 
-        {/* Story paragraphs */}
-        <div className="space-y-4 w-full max-h-[60vh] sm:max-h-[50vh] overflow-y-auto px-1">
+        {/* Story paragraphs. aria-live announces each newly revealed
+            paragraph to screen readers as the reader advances. */}
+        <div
+          aria-live="polite"
+          className="space-y-4 w-full max-h-[60vh] sm:max-h-[50vh] overflow-y-auto px-1"
+        >
           {story.intro.slice(0, visibleParagraphs).map((text, i) => (
             <p
               key={i}
@@ -84,22 +88,23 @@ export function StoryScreen({ stage, onContinue, onBack }: StoryScreenProps) {
               }}
               size="lg"
               className="font-pixel text-sm"
+              autoFocus
             >
               Enter Battle 进入战斗
             </Button>
           </div>
         ) : (
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            onClick={(event) => {
-              event.stopPropagation();
+            autoFocus
+            onClick={(e) => {
+              e.stopPropagation();
               advance();
             }}
-            className="mt-2 font-retro text-sm text-amber-300 hover:bg-amber-300/10 hover:text-amber-200"
+            className="font-retro text-sm text-amber-300/60 animate-blink mt-2 p-2 min-h-[44px] cursor-pointer hover:text-amber-300 focus-visible:text-amber-300 focus-visible:outline-2 focus-visible:outline-amber-300 focus-visible:outline-offset-2"
           >
-            Continue story
-          </Button>
+            Tap to continue...
+          </button>
         )}
       </div>
     </div>

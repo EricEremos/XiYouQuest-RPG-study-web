@@ -25,21 +25,21 @@ const EMPTY_RESULT: C5AssessmentResult = {
     score: 0,
     deduction: 20,
     level: 6,
-    label: "六档",
+    label: "å…­æ¡£",
     notes: "No speech detected",
   },
   vocabGrammar: {
     score: 0,
     deduction: 5,
     level: 3,
-    label: "三档",
+    label: "ä¸‰æ¡£",
     notes: "No speech detected",
   },
   fluency: {
     score: 0,
     deduction: 5,
     level: 3,
-    label: "三档",
+    label: "ä¸‰æ¡£",
     notes: "No speech detected",
   },
   timePenalty: 30,
@@ -214,7 +214,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!transcript) {
-      console.log("[C5] Empty transcript — returning zeroed result");
+      console.log("[C5] Empty transcript â€” returning zeroed result");
       return jsonResponse(EMPTY_RESULT);
     }
 

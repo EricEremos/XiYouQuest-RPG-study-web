@@ -1,8 +1,5 @@
 import { z } from "npm:zod";
-import {
-  corsResponse,
-  errorResponse,
-} from "../_shared/cors.ts";
+import { corsResponse, errorResponse } from "../_shared/cors.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
 import { synthesizeAcademic } from "../_shared/iflytek-tts.ts";
 
@@ -35,9 +32,8 @@ Deno.serve(async (req: Request) => {
     const { voiceId, text } = parsed.data;
 
     const audioData = await synthesizeAcademic({ voiceId, text });
-    const audioBuffer = Uint8Array.from(audioData).buffer;
 
-    return new Response(audioBuffer, {
+    return new Response(audioData, {
       headers: {
         "Content-Type": "audio/wav",
         "Cache-Control": "private, max-age=3600",

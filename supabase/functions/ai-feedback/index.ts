@@ -3,7 +3,7 @@ import {
   jsonResponse,
   errorResponse,
 } from "../_shared/cors.ts";
-import { createSupabaseClient } from "../_shared/supabase.ts";
+import { createRequestClient } from "../_shared/supabase.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
 import { generateFeedback } from "../_shared/ai-client.ts";
 import { buildPlayerMemory } from "../_shared/player-memory.ts";
@@ -12,9 +12,9 @@ import { aiFeedbackSchema } from "../_shared/validations.ts";
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return corsResponse();
 
-  const supabase = createSupabaseClient(req);
   const user = await verifyUser(req);
   if (!user) return errorResponse("Unauthorized", 401);
+  const supabase = createRequestClient(user);
 
   let body: Record<string, unknown> | undefined;
   try {

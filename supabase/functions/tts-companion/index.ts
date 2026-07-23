@@ -4,16 +4,10 @@ import {
   errorResponse,
 } from "../_shared/cors.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
-import {
-  synthesizeAcademic,
-  VALID_IFLYTEK_VOICES,
-} from "../_shared/iflytek-tts.ts";
+import { synthesizeAcademic } from "../_shared/iflytek-tts.ts";
 
 const schema = z.object({
-  voiceId: z.string().min(1).max(50).refine(
-    (v) => VALID_IFLYTEK_VOICES.has(v),
-    { message: "Invalid voice ID" },
-  ),
+  voiceId: z.string().min(1),
   text: z.string().min(1).max(500),
 });
 
@@ -32,9 +26,8 @@ Deno.serve(async (req: Request) => {
     const { voiceId, text } = parsed.data;
 
     const audioData = await synthesizeAcademic({ voiceId, text });
-    const audioBuffer = Uint8Array.from(audioData).buffer;
 
-    return new Response(audioBuffer, {
+    return new Response(audioData, {
       headers: {
         "Content-Type": "audio/wav",
         "Cache-Control": "no-cache",

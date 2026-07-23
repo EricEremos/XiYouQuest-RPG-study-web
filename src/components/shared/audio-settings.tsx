@@ -1,8 +1,6 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { authClient } from "@/lib/auth-client";
 
 interface AudioSettingsContextValue {
   /** Music/effects volume (0-1) */
@@ -67,11 +65,19 @@ export function AudioSettingsProvider({
   const saveToSupabase = useCallback((updates: { audio_volume?: number; tts_volume?: number; audio_muted?: boolean }) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
-      const session = await authClient.getSession();
-      const userId = session.data?.user?.id;
-      if (!userId) return;
-      const supabase = createClient();
-      await supabase.from("profiles").update(updates).eq("id", userId);
+      try {
+        const res = await fetch("/api/profile/settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
+        });
+        if (!res.ok) {
+          console.error("Failed to save audio settings:", res.status);
+        }
+      } catch (error) {
+        // Non-critical persistence: the in-memory setting still applies.
+        console.error("Failed to save audio settings:", error);
+      }
     }, 500);
   }, []);
 

@@ -490,26 +490,21 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
           <div className="flex-1 md:w-[70%]">
             <div className="grid gap-3 sm:grid-cols-2 max-h-[70vh] overflow-y-auto pr-2">
               {displayTopics.map((topic, index) => (
-                // A native <button> cannot contain the card's flow content
-                // (divs, paragraphs), so the card itself is the interactive
-                // element with full keyboard support.
                 <Card
                   key={`${topic}-${index}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleSelectTopic(topic)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      handleSelectTopic(topic);
-                    }
-                  }}
-                  aria-label={`Select speaking topic: ${topic}`}
-                  className="h-fit w-full cursor-pointer text-left transition-all hover:border-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="transition-all hover:border-primary hover:shadow-md focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/50 h-fit relative"
                 >
                   <CardContent className="flex items-center justify-center py-6">
-                    <p className="text-center font-chinese text-lg font-medium">{topic}</p>
+                    <p className="text-lg font-medium text-center font-chinese">{topic}</p>
                   </CardContent>
+                  {/* Native button covering the card: one Tab stop with a
+                      stable name and Enter/Space activation. */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTopic(topic)}
+                    aria-label={`Speak about: ${topic}`}
+                    className="absolute inset-0 z-10 cursor-pointer focus:outline-none"
+                  />
                 </Card>
               ))}
             </div>

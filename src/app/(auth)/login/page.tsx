@@ -1,29 +1,28 @@
 import { LoginForm } from "./login-form";
 import Image from "next/image";
 
-interface LoginPageProps {
-  searchParams: Promise<{ error?: string }>;
-}
+// Rendered per request so the proxy's CSP nonce reaches the page's inline
+// scripts; a statically cached copy would carry stale, mismatched nonces and
+// the strict production CSP would block hydration.
+export const dynamic = "force-dynamic";
 
-export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const { error } = await searchParams;
-
+export default function LoginPage() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center px-3 py-8 sm:p-4 sm:pb-24">
-      <div className="flex w-full min-w-0 max-w-md flex-col items-center">
+    <main className="relative flex min-h-screen items-center justify-center overflow-x-clip p-4 pb-24">
+      {/* w-full keeps the column sized by the viewport, not by the logo's
+          intrinsic 450px width, so nothing overflows a 320px screen. */}
+      <div className="flex w-full max-w-md flex-col items-center">
         <Image
           src="/img/background/Logo.webp"
-          alt="XiYouQuest emblem"
+          alt="XiYouQuest"
           width={450}
-          height={197}
+          height={150}
           priority
-          sizes="(max-width: 480px) 94vw, 450px"
-          className="h-auto w-full max-w-[450px] drop-shadow-lg"
+          fetchPriority="high"
+          sizes="(max-width: 480px) calc(100vw - 2rem), 448px"
+          className="w-full h-auto drop-shadow-lg"
         />
-        <h1 className="mb-4 text-center font-pixel text-base leading-relaxed text-primary pixel-glow">
-          XiYouQuest
-        </h1>
-        <LoginForm error={error} />
+        <LoginForm />
       </div>
     </main>
   );

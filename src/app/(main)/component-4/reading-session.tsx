@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { calculateXP } from "@/lib/gamification/xp";
 import { fetchWithRetry } from "@/lib/fetch-retry";
 import { getDialogue } from "@/lib/dialogue";
+import { ChineseText } from "@/components/shared/chinese-text";
 import { useAudioSettings } from "@/components/shared/audio-settings";
 import { useAchievementToast } from "@/components/shared/achievement-toast";
 import type { ExpressionName } from "@/types/character";
@@ -574,22 +575,9 @@ export function ReadingSession({ passages, character, characterId, component, lp
           <div className="flex-1 md:w-[70%]">
             <div className="grid gap-4 sm:grid-cols-2 max-h-[70vh] overflow-y-auto pr-2">
               {passages.map((passage) => (
-                // A native <button> cannot contain the card's flow content
-                // (divs, headings), so the card itself is the interactive
-                // element with full keyboard support.
                 <Card
                   key={passage.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleSelectPassage(passage)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      handleSelectPassage(passage);
-                    }
-                  }}
-                  aria-label={`Select passage: ${passage.title}`}
-                  className="relative h-fit w-full cursor-pointer overflow-hidden text-left transition-all hover:border-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="transition-all hover:border-primary hover:shadow-md focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/50 h-fit relative overflow-hidden"
                 >
                   {passage.passageNumber && (
                     <div
@@ -597,15 +585,23 @@ export function ReadingSession({ passages, character, characterId, component, lp
                       style={{ backgroundImage: `url(/img/passage/${passage.passageNumber}.webp)` }}
                     />
                   )}
-                  <CardContent className="relative pt-6">
-                    <h3 className="mb-2 font-chinese text-lg font-bold drop-shadow-md [text-shadow:_0_1px_3px_rgb(255_255_255_/_80%)]">{passage.title}</h3>
-                    <p className="line-clamp-3 font-chinese text-sm font-medium text-foreground/80 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
-                      {passage.content}
+                  <CardContent className="pt-6 relative">
+                    <h3 className="text-lg font-bold font-chinese mb-2 drop-shadow-md [text-shadow:_0_1px_3px_rgb(255_255_255_/_80%)]">{passage.title}</h3>
+                    <p className="text-sm font-medium text-foreground/80 font-chinese line-clamp-3 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
+                      <ChineseText text={passage.content} />
                     </p>
                     <p className="mt-2 text-sm font-medium text-foreground/70 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
                       {passage.content.length} characters
                     </p>
                   </CardContent>
+                  {/* Native button covering the card: one Tab stop with a
+                      stable name, Enter/Space activation, focus ring above. */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectPassage(passage)}
+                    aria-label={`Practice passage: ${passage.title}`}
+                    className="absolute inset-0 z-10 cursor-pointer focus:outline-none"
+                  />
                 </Card>
               ))}
             </div>
@@ -801,7 +797,7 @@ export function ReadingSession({ passages, character, characterId, component, lp
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
                   </svg>
-                  <span>Select any sentence to hear it read aloud</span>
+                  <span>Click any sentence to hear it read aloud</span>
                 </div>
                 {isPlayingAudio && playingSentenceIndex !== null && (
                   <Button
@@ -815,23 +811,26 @@ export function ReadingSession({ passages, character, characterId, component, lp
                 )}
               </div>
 
-              {/* Passage content with clickable sentences */}
+              {/* Passage content with per-sentence playback. Each sentence is
+                  a native button: one Tab stop, Enter/Space plays audio, and
+                  aria-pressed exposes which sentence is playing. */}
               <div className="rounded-lg border bg-muted/30 p-4 sm:p-6 leading-relaxed max-h-[60vh] overflow-y-auto">
                 {sentences.map((sentence, index) => (
                   <button
                     key={index}
                     type="button"
                     onClick={() => playSentence(sentence, index)}
+                    aria-label={`Play sentence ${index + 1}: ${sentence}`}
+                    aria-pressed={playingSentenceIndex === index}
                     className={`
-                      inline cursor-pointer rounded-md border-0 bg-transparent px-1 py-0.5 text-left transition-all duration-200
-                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
+                      inline cursor-pointer text-left transition-all duration-200 rounded-md px-1 py-0.5
+                      focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2
                       ${playingSentenceIndex === index
                         ? "bg-primary/30 text-primary font-medium shadow-sm scale-105"
                         : "hover:bg-primary/10 hover:shadow-sm hover:scale-[1.02]"
                       }
                     `}
-                    title="Play this sentence"
-                    aria-label={`Listen to sentence: ${sentence}`}
+                    title="🔊 Click to hear this sentence"
                   >
                     <span className="text-lg leading-loose font-chinese">{sentence}</span>
                   </button>
