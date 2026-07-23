@@ -49,7 +49,12 @@ export async function DELETE() {
     );
     await supabase.from("practice_sessions").delete().eq("user_id", userId);
     await supabase.from("user_progress").delete().eq("user_id", userId);
-    await supabase.from("user_characters").delete().eq("user_id", userId);
+    // user_characters is intentionally NOT deleted here. The deferred
+    // exactly-one-selected-companion trigger rejects a transaction that
+    // removes companion rows while the profile still exists, and every
+    // PostgREST call commits as its own transaction. Deleting the profile
+    // below cascades user_characters within one transaction, which the
+    // trigger accepts because the profile row is gone at commit time.
     await supabase.from("quest_progress").delete().eq("user_id", userId);
     await supabase
       .from("friendships")

@@ -16,7 +16,9 @@ function isPublic(pathname: string): boolean {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const nonce = Buffer.from(
+    crypto.getRandomValues(new Uint8Array(16)),
+  ).toString("base64");
   const contentSecurityPolicy = createContentSecurityPolicy(
     nonce,
     process.env.NODE_ENV === "development",
