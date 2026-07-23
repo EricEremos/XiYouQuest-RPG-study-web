@@ -1,5 +1,5 @@
 import { createClient, getSessionUser } from "@/lib/supabase/server";
-import { CHARACTER_IMAGES } from "@/lib/character-images";
+import { loadSelectedCharacter } from "@/lib/character-loader";
 import { DashboardClient } from "./dashboard-client";
 
 export default async function DashboardPage() {
@@ -8,19 +8,17 @@ export default async function DashboardPage() {
 
   const userId = user!.id;
 
-  const [{ data: profile }, { data: selectedCharacter }] =
+  const [{ data: profile }, selectedCharacter] =
     await Promise.all([
       supabase.from("profiles").select("display_name, total_xp, login_streak").eq("id", userId).single(),
-      supabase
-        .from("user_characters")
-        .select("*, characters(*)")
-        .eq("user_id", userId)
-        .eq("is_selected", true)
-        .single(),
+      loadSelectedCharacter(supabase, userId),
     ]);
 
-  const charName = selectedCharacter?.characters?.name ?? null;
-  const charImage = selectedCharacter?.characters?.image_url || (charName ? CHARACTER_IMAGES[charName] : null) || null;
+  const charName = selectedCharacter.name;
+  const charImage =
+    selectedCharacter.expressions.neutral ??
+    Object.values(selectedCharacter.expressions)[0] ??
+    null;
 
   return (
     <DashboardClient

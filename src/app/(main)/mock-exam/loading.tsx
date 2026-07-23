@@ -1,6 +1,7 @@
 export default function MockExamLoading() {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" role="status" aria-label="Loading mock exam">
+      <span className="sr-only">Loading mock exam</span>
       <div>
         <div className="h-7 w-48 rounded animate-shimmer" />
         <div className="h-4 w-full max-w-80 rounded animate-shimmer mt-2" />

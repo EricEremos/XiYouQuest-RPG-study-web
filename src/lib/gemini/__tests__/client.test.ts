@@ -75,7 +75,9 @@ describe("generateFeedback", () => {
     await vi.advanceTimersByTimeAsync(20000);
     const result = await promise;
     expect(result).toContain("做得好");
-    expect(mockFetch).toHaveBeenCalledTimes(4); // 1 initial + 3 retries
+    expect(mockFetch).toHaveBeenCalledTimes(5); // 4 primary attempts + 1 fallback model attempt
+    const fallbackRequest = JSON.parse(mockFetch.mock.calls[4][1].body);
+    expect(fallbackRequest.model).toBe("google/gemini-2.5-flash");
   });
 
   it("returns fallback message after all retries fail (incorrect)", async () => {
@@ -85,7 +87,9 @@ describe("generateFeedback", () => {
     await vi.advanceTimersByTimeAsync(20000);
     const result = await promise;
     expect(result).toContain("再试一次");
-    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(mockFetch).toHaveBeenCalledTimes(5);
+    const fallbackRequest = JSON.parse(mockFetch.mock.calls[4][1].body);
+    expect(fallbackRequest.model).toBe("google/gemini-2.5-flash");
   });
 
   it("includes pronunciation score in prompt when provided", async () => {

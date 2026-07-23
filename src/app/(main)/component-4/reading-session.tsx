@@ -574,27 +574,31 @@ export function ReadingSession({ passages, character, characterId, component, lp
           <div className="flex-1 md:w-[70%]">
             <div className="grid gap-4 sm:grid-cols-2 max-h-[70vh] overflow-y-auto pr-2">
               {passages.map((passage) => (
-                <Card
+                <button
                   key={passage.id}
-                  className="cursor-pointer transition-all hover:border-primary hover:shadow-md h-fit relative overflow-hidden"
+                  type="button"
                   onClick={() => handleSelectPassage(passage)}
+                  className="h-fit w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  aria-label={`Select passage: ${passage.title}`}
                 >
-                  {passage.passageNumber && (
-                    <div
-                      className="absolute inset-0 bg-cover bg-center opacity-25"
-                      style={{ backgroundImage: `url(/img/passage/${passage.passageNumber}.webp)` }}
-                    />
-                  )}
-                  <CardContent className="pt-6 relative">
-                    <h3 className="text-lg font-bold font-chinese mb-2 drop-shadow-md [text-shadow:_0_1px_3px_rgb(255_255_255_/_80%)]">{passage.title}</h3>
-                    <p className="text-sm font-medium text-foreground/80 font-chinese line-clamp-3 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
-                      {passage.content}
-                    </p>
-                    <p className="mt-2 text-sm font-medium text-foreground/70 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
-                      {passage.content.length} characters
-                    </p>
-                  </CardContent>
-                </Card>
+                  <Card className="relative h-fit overflow-hidden transition-all hover:border-primary hover:shadow-md">
+                    {passage.passageNumber && (
+                      <div
+                        className="absolute inset-0 bg-cover bg-center opacity-25"
+                        style={{ backgroundImage: `url(/img/passage/${passage.passageNumber}.webp)` }}
+                      />
+                    )}
+                    <CardContent className="relative pt-6">
+                      <h3 className="mb-2 font-chinese text-lg font-bold drop-shadow-md [text-shadow:_0_1px_3px_rgb(255_255_255_/_80%)]">{passage.title}</h3>
+                      <p className="line-clamp-3 font-chinese text-sm font-medium text-foreground/80 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
+                        {passage.content}
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-foreground/70 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
+                        {passage.content.length} characters
+                      </p>
+                    </CardContent>
+                  </Card>
+                </button>
               ))}
             </div>
           </div>
@@ -789,7 +793,7 @@ export function ReadingSession({ passages, character, characterId, component, lp
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
                   </svg>
-                  <span>Click any sentence to hear it read aloud</span>
+                  <span>Select any sentence to hear it read aloud</span>
                 </div>
                 {isPlayingAudio && playingSentenceIndex !== null && (
                   <Button
@@ -806,20 +810,23 @@ export function ReadingSession({ passages, character, characterId, component, lp
               {/* Passage content with clickable sentences */}
               <div className="rounded-lg border bg-muted/30 p-4 sm:p-6 leading-relaxed max-h-[60vh] overflow-y-auto">
                 {sentences.map((sentence, index) => (
-                  <span
+                  <button
                     key={index}
+                    type="button"
                     onClick={() => playSentence(sentence, index)}
                     className={`
-                      cursor-pointer transition-all duration-200 rounded-md px-1 py-0.5
+                      inline cursor-pointer rounded-md border-0 bg-transparent px-1 py-0.5 text-left transition-all duration-200
+                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
                       ${playingSentenceIndex === index
                         ? "bg-primary/30 text-primary font-medium shadow-sm scale-105"
                         : "hover:bg-primary/10 hover:shadow-sm hover:scale-[1.02]"
                       }
                     `}
-                    title="🔊 Click to hear this sentence"
+                    title="Play this sentence"
+                    aria-label={`Listen to sentence: ${sentence}`}
                   >
                     <span className="text-lg leading-loose font-chinese">{sentence}</span>
-                  </span>
+                  </button>
                 ))}
               </div>
 

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, getSessionUser } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { data: profile, error } = await supabase
+    const admin = createAdminClient();
+    const { data: profile, error } = await admin
       .from("profiles")
       .select("id, display_name, avatar_url, current_level, friend_code")
       .eq("friend_code", trimmedCode)

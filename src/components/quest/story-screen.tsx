@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import type { StageNumber } from "@/lib/quest/types";
 import { STAGE_STORIES } from "@/lib/quest/story-text";
@@ -23,18 +23,6 @@ export function StoryScreen({ stage, onContinue, onBack }: StoryScreenProps) {
     if (allShown) return;
     setVisibleParagraphs((prev) => Math.min(prev + 1, story.intro.length));
   }, [allShown, story.intro.length]);
-
-  // Keyboard to advance paragraphs
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Tab" || e.key === "Shift") return;
-      if (allShown) return;
-      advance();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [allShown, advance]);
 
   return (
     <div
@@ -101,9 +89,17 @@ export function StoryScreen({ stage, onContinue, onBack }: StoryScreenProps) {
             </Button>
           </div>
         ) : (
-          <p className="font-retro text-sm text-amber-300/60 animate-blink mt-2">
-            Tap to continue...
-          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={(event) => {
+              event.stopPropagation();
+              advance();
+            }}
+            className="mt-2 font-retro text-sm text-amber-300 hover:bg-amber-300/10 hover:text-amber-200"
+          >
+            Continue story
+          </Button>
         )}
       </div>
     </div>

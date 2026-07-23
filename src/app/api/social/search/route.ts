@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isValidUUID } from "@/lib/validations";
 
 export async function GET(request: NextRequest) {
@@ -18,6 +19,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const admin = createAdminClient();
+
     // Get IDs of users who have any existing friendship with the current user
     const { data: existingFriendships } = await supabase
       .from("friendships")
@@ -36,7 +39,7 @@ export async function GET(request: NextRequest) {
     const excludeArray = Array.from(excludeIds).filter(isValidUUID);
 
     // Search profiles by display_name using ILIKE, excluding self and existing friendships
-    let query = supabase
+    let query = admin
       .from("profiles")
       .select("id, display_name, avatar_url, current_level, friend_code")
       .ilike("display_name", `%${q.trim().replace(/[%_\\]/g, "\\$&")}%`)

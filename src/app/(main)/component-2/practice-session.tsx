@@ -703,16 +703,16 @@ export function PracticeSession({ questions, character, characterId, component, 
               </div>
 
               {/* 5-word grid display */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 w-full max-w-4xl">
+              <div className="grid w-full max-w-4xl grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-5">
                 {currentWords.map((word, idx) => (
-                  <div key={idx} className="space-y-2">
+                  <div key={idx} className="min-w-0 space-y-2">
                     <button
                       onClick={() => playWordAudio(word, idx)}
                       disabled={playingWordIndex !== null && playingWordIndex !== idx}
-                      className={`w-full flex items-center justify-center rounded-lg border-2 p-6 transition-colors cursor-pointer
+                      className={`flex w-full min-w-0 cursor-pointer items-center justify-center rounded-lg border-2 p-3 transition-colors sm:p-5
                         ${playingWordIndex === idx ? "border-primary bg-primary/10" : "border-muted hover:border-primary"}`}
                     >
-                      <p className="text-2xl sm:text-4xl font-bold font-chinese">{word}</p>
+                      <p className="whitespace-nowrap font-chinese text-xl font-bold sm:text-3xl">{word}</p>
                     </button>
                     {showPinyin && (
                       <p className="text-center text-base sm:text-2xl text-muted-foreground italic">

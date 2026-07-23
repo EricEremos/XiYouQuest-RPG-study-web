@@ -27,20 +27,23 @@ interface QuizSessionProps {
   };
   characterId?: string;
   component: ComponentNumber;
+  shuffleSeed: string;
   playerMemory?: string;
   lpNodeId?: string;
 }
 
 type SessionPhase = "answering" | "result" | "complete";
 
-export function QuizSession({ questions, character, characterId, component, lpNodeId }: QuizSessionProps) {
+export function QuizSession({ questions, character, characterId, component, shuffleSeed, lpNodeId }: QuizSessionProps) {
   const router = useRouter();
   const { showAchievementToasts } = useAchievementToast();
   const { setLearningActive } = useBGM();
   // Randomize answer positions on client side
   const randomizedQuestions = useMemo(() => {
-    return questions.map(randomizeAnswerPositions);
-  }, [questions]);
+    return questions.map((question) =>
+      randomizeAnswerPositions(question, `${shuffleSeed}:${question.id}`),
+    );
+  }, [questions, shuffleSeed]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [phase, setPhase] = useState<SessionPhase>("answering");

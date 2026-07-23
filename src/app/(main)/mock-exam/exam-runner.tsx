@@ -196,16 +196,27 @@ interface ExamRunnerProps {
   quizQuestions?: QuizQuestion[];
   passage?: { id: string; title: string; content: string };
   topics?: string[];
+  shuffleSeed: string;
 }
 
-export function ExamRunner({ character, characters, words, quizQuestions, passage, topics }: ExamRunnerProps) {
+export function ExamRunner({
+  character,
+  characters,
+  words,
+  quizQuestions,
+  passage,
+  topics,
+  shuffleSeed,
+}: ExamRunnerProps) {
   const { showAchievementToasts } = useAchievementToast();
 
-  // Randomize answer positions on client side
+  // Keep answer positions randomized per exam without changing across hydration.
   const activeQuizQuestions = useMemo(() => {
     const questions = quizQuestions ?? EXAM_QUIZ_QUESTIONS;
-    return questions.map(randomizeAnswerPositions);
-  }, [quizQuestions]);
+    return questions.map((question) =>
+      randomizeAnswerPositions(question, `${shuffleSeed}:${question.id}`),
+    );
+  }, [quizQuestions, shuffleSeed]);
 
   const activePassage = passage ?? EXAM_PASSAGE;
   const activeTopics = topics ?? EXAM_TOPICS;

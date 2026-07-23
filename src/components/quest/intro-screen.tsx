@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { QUEST_INTRO_TEXT } from "@/lib/quest/story-text";
 
@@ -16,19 +16,6 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
     if (allShown) return;
     setVisibleParagraphs((prev) => Math.min(prev + 1, QUEST_INTRO_TEXT.length));
   }, [allShown]);
-
-  // Keyboard / click to advance paragraphs
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't advance if user pressed Tab or similar navigation keys
-      if (e.key === "Tab" || e.key === "Shift") return;
-      if (allShown) return;
-      advance();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [allShown, advance]);
 
   return (
     <div
@@ -73,9 +60,17 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
             Begin Journey 开始旅程
           </Button>
         ) : (
-          <p className="font-retro text-sm text-amber-300/60 animate-blink mt-2">
-            Tap to continue...
-          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={(event) => {
+              event.stopPropagation();
+              advance();
+            }}
+            className="mt-2 font-retro text-sm text-amber-300 hover:bg-amber-300/10 hover:text-amber-200"
+          >
+            Continue story
+          </Button>
         )}
       </div>
     </div>

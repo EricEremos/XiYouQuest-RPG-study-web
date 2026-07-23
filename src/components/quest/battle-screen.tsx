@@ -80,8 +80,9 @@ export function BattleScreen({
 }: BattleScreenProps) {
   const [battleState, setBattleState] = useState<BattleState>(initialState);
   const battleStateRef = useRef(battleState);
-  battleStateRef.current = battleState;
-
+  useEffect(() => {
+    battleStateRef.current = battleState;
+  }, [battleState]);
 
   // Duck BGM during active play phases (recording + MCQ)
   const { setLearningActive } = useBGM();
@@ -210,7 +211,14 @@ export function BattleScreen({
       const img = new Image();
       img.src = src;
     });
-  }, [wukong.attackFrames, bossAttackFrames, bossHitFrame, wukong.defendFrame, wukong.gotHitFrame]);
+  }, [
+    wukong.attackFrames,
+    bossAttackFrames,
+    bossHitFrame,
+    config.bossProjectile,
+    wukong.defendFrame,
+    wukong.gotHitFrame,
+  ]);
 
   const sectionLabel = `Section ${battleState.currentRecordingIndex + 1}/${battleState.totalRecordings}`;
 
@@ -243,7 +251,9 @@ export function BattleScreen({
     },
     [onVictory, onDefeat, flashTurnBanner, stage]
   );
-  checkOutcomeRef.current = checkOutcomeAndAdvance;
+  useEffect(() => {
+    checkOutcomeRef.current = checkOutcomeAndAdvance;
+  }, [checkOutcomeAndAdvance]);
 
   // Attack animation hook
   const handleAttackAnimComplete = useCallback(

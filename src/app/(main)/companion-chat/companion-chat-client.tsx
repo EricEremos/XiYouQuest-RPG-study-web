@@ -510,7 +510,7 @@ export default function CompanionChatClient({
     } finally {
       setIsResuming(false);
     }
-  }, [characters, scenarios]);
+  }, [backgroundMap, characters, scenarios]);
 
   // ── View history detail ──
   const handleViewHistory = useCallback(async (session: HistorySession) => {

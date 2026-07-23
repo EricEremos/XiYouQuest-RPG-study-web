@@ -5,6 +5,7 @@ import { buildPlayerMemory } from "@/lib/gemini/player-memory";
 import { shuffle } from "@/lib/utils";
 import { QUIZ_SIZES } from "@/lib/constants";
 import type { QuizQuestion } from "@/types/practice";
+import { randomUUID } from "node:crypto";
 
 const QuizSession = dynamic(() => import("./quiz-session").then(m => m.QuizSession), {
   loading: () => (
@@ -126,7 +127,7 @@ export default async function Component3Page({
         </p>
       </div>
 
-      <QuizSession questions={questions} character={character} characterId={character.id} component={3} playerMemory={playerMemory} lpNodeId={lpNode} />
+      <QuizSession questions={questions} character={character} characterId={character.id} component={3} shuffleSeed={randomUUID()} playerMemory={playerMemory} lpNodeId={lpNode} />
     </div>
   );
 }

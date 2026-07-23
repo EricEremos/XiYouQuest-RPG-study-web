@@ -188,6 +188,7 @@ export default function ProfileClient({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={saving}
                 className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                aria-label="Change profile picture"
               >
                 <Camera className="h-6 w-6 text-white" />
               </button>
@@ -221,6 +222,7 @@ export default function ProfileClient({
                       variant="ghost"
                       onClick={handleSaveName}
                       disabled={saving}
+                      aria-label="Save display name"
                     >
                       <Check className="h-4 w-4" />
                     </Button>
@@ -228,6 +230,7 @@ export default function ProfileClient({
                       size="sm"
                       variant="ghost"
                       onClick={() => setEditingName(false)}
+                      aria-label="Cancel display name edit"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -244,6 +247,7 @@ export default function ProfileClient({
                         setNameValue(displayName);
                         setEditingName(true);
                       }}
+                      aria-label="Edit display name"
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -257,9 +261,12 @@ export default function ProfileClient({
                 <span className="font-pixel text-sm text-pixel-gold">
                   Lv.{level} {levelName}
                 </span>
-                <span className="text-sm sm:text-xl text-muted-foreground">
+                <time
+                  dateTime={profile?.created_at ?? undefined}
+                  className="text-sm text-muted-foreground sm:text-xl"
+                >
                   Member since {formatDate(profile?.created_at ?? null)}
-                </span>
+                </time>
               </div>
             </div>
           </div>

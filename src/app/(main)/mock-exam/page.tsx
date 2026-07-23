@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 import { loadSelectedCharacter } from "@/lib/character-loader";
 import { shuffle, sampleByTone } from "@/lib/utils";
 import type { QuizQuestion } from "@/types/practice";
+import { randomUUID } from "node:crypto";
 
 const ExamRunner = dynamic(() => import("./exam-runner").then(m => m.ExamRunner), {
   loading: () => (
@@ -130,6 +131,7 @@ export default async function MockExamPage() {
         quizQuestions={examQuizQuestions}
         passage={examPassage}
         topics={examTopics}
+        shuffleSeed={randomUUID()}
       />
     </div>
   );

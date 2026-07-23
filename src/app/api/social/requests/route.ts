@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET() {
   const supabase = await createClient();
@@ -9,6 +10,8 @@ export async function GET() {
   }
 
   try {
+    const admin = createAdminClient();
+
     // Fetch incoming and outgoing pending requests in parallel
     const [incomingResult, outgoingResult] = await Promise.all([
       supabase
@@ -63,7 +66,7 @@ export async function GET() {
     > = {};
 
     if (userIdArray.length > 0) {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await admin
         .from("profiles")
         .select("id, display_name, avatar_url, current_level")
         .in("id", userIdArray);

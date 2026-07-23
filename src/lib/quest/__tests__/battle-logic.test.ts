@@ -237,13 +237,22 @@ describe("advanceBattle", () => {
     expect(result.state.phase).toBe("player_menu");
   });
 
-  it("advances to next recording on pass from player_attack", () => {
+  it("advances to the next recording after the defense batch for a passed attack", () => {
     let state = createBattleState(2, false, WUKONG_ONLY);
     // Simulate a passed recording (score >= 80)
     state = processRecordingComplete(state, 85);
     state = { ...state, phase: "player_attack" };
 
-    const result = advanceBattle(state);
+    let result = advanceBattle(state);
+    expect(result.outcome).toBe("continue");
+    expect(result.state.currentRecordingIndex).toBe(0);
+    expect(result.state.phase).toBe("boss_attack");
+    expect(result.state.isRetry).toBe(false);
+
+    result = advanceBattle(result.state);
+    result = advanceBattle(result.state);
+    result = advanceBattle(result.state);
+
     expect(result.outcome).toBe("continue");
     expect(result.state.currentRecordingIndex).toBe(1);
     expect(result.state.phase).toBe("player_menu");

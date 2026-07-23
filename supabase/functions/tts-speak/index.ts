@@ -1,12 +1,10 @@
 import { z } from "npm:zod";
 import {
   corsResponse,
-  jsonResponse,
   errorResponse,
 } from "../_shared/cors.ts";
-import { createSupabaseClient } from "../_shared/supabase.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
-import { synthesizeAcademic, uint8ArrayToBase64 } from "../_shared/iflytek-tts.ts";
+import { synthesizeAcademic } from "../_shared/iflytek-tts.ts";
 
 const VALID_VOICE_IDS = new Set([
   "x_xiaoyan", "x_xiaoyuan", "x_xiaoxi", "x_xiaomei",
@@ -25,7 +23,6 @@ const schema = z.object({
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return corsResponse();
 
-  const supabase = createSupabaseClient(req);
   const user = await verifyUser(req);
   if (!user) return errorResponse("Unauthorized", 401);
 
@@ -38,8 +35,9 @@ Deno.serve(async (req: Request) => {
     const { voiceId, text } = parsed.data;
 
     const audioData = await synthesizeAcademic({ voiceId, text });
+    const audioBuffer = Uint8Array.from(audioData).buffer;
 
-    return new Response(audioData, {
+    return new Response(audioBuffer, {
       headers: {
         "Content-Type": "audio/wav",
         "Cache-Control": "private, max-age=3600",

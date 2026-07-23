@@ -29,9 +29,38 @@ export async function loadSelectedCharacter(
     `)
     .eq("user_id", userId)
     .eq("is_selected", true)
-    .single();
+    .order("unlocked_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  const characterData = userCharacter?.characters;
+  let characterData = userCharacter?.characters;
+  if (!characterData) {
+    const { data: defaultCharacter } = await supabase
+      .from("characters")
+      .select(`
+        *,
+        character_expressions (*)
+      `)
+      .eq("is_default", true)
+      .order("name", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    characterData = defaultCharacter;
+
+    if (defaultCharacter?.id) {
+      await supabase
+        .from("user_characters")
+        .upsert(
+          {
+            user_id: userId,
+            character_id: defaultCharacter.id,
+            is_selected: true,
+          },
+          { onConflict: "user_id,character_id" },
+        );
+    }
+  }
+
   const expressions: Record<string, string> = {};
 
   if (characterData?.character_expressions) {

@@ -86,12 +86,12 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
         {/* Left: Back + Logo */}
         <div className="flex items-center gap-2 sm:gap-3">
           {showBackToHub && (
-            <Link href={backHref}>
-              <Button variant="ghost" size="sm" className="gap-1.5">
+            <Button asChild variant="ghost" size="sm" className="gap-1.5">
+              <Link href={backHref}>
                 <ArrowLeft className="h-4 w-4" />
                 <span className="hidden sm:inline">{backLabel}</span>
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           )}
           <Link
             href="/dashboard"
@@ -108,24 +108,26 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
         </div>
 
         {/* Center: Desktop nav links */}
-        <div className="hidden md:flex items-center gap-1.5">
+        <div className="hidden xl:flex items-center gap-1.5">
           {NAV_LINKS.map((link) => {
             const isActive = pathname === link.href;
             return (
-              <Link key={link.href} href={link.href}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`gap-2 font-pixel text-sm px-3 py-2 transition-colors ${
-                    isActive
-                      ? "text-primary bg-primary/15 pixel-border"
-                      : "text-foreground/80 hover:text-primary hover:bg-primary/10"
-                  }`}
-                >
+              <Button
+                key={link.href}
+                asChild
+                variant="ghost"
+                size="sm"
+                className={`gap-2 font-pixel text-sm px-3 py-2 transition-colors ${
+                  isActive
+                    ? "text-primary bg-primary/15 pixel-border"
+                    : "text-foreground/80 hover:text-primary hover:bg-primary/10"
+                }`}
+              >
+                <Link href={link.href}>
                   <link.icon className="h-4 w-4" />
                   {link.label}
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             );
           })}
         </div>
@@ -138,7 +140,7 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
           <Button
             variant="ghost"
             size="sm"
-            className="md:hidden p-1.5"
+            className="xl:hidden p-1.5"
             onClick={() => setMobileMenuOpen(true)}
             aria-label="Open navigation menu"
           >
@@ -151,7 +153,7 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
               <Button
                 variant="ghost"
                 size="sm"
-                className="hidden md:flex items-center gap-1.5"
+                className="hidden xl:flex items-center gap-1.5"
               >
                 {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element

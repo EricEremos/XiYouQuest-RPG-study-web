@@ -15,6 +15,21 @@ export function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+function createSeededRandom(seed: string): () => number {
+  let state = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    state ^= seed.charCodeAt(i);
+    state = Math.imul(state, 16777619);
+  }
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /**
  * Extract the (first) tone from a tone-number pinyin string.
  * e.g. "zhe2" -> 2, "fu2 dian3" -> 2 (first syllable), "ma" / "r5" -> 0 (neutral/unknown).
@@ -70,10 +85,18 @@ export function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
-/** Randomize answer positions in a quiz question */
-export function randomizeAnswerPositions<T extends { options: string[]; correctIndex: number }>(question: T): T {
+/** Randomize answer positions in a quiz question, deterministically when a session seed is supplied. */
+export function randomizeAnswerPositions<T extends { options: string[]; correctIndex: number }>(
+  question: T,
+  sessionSeed?: string,
+): T {
   const indices = question.options.map((_, i) => i);
-  const shuffledIndices = shuffle(indices);
+  const random = sessionSeed ? createSeededRandom(sessionSeed) : Math.random;
+  const shuffledIndices = [...indices];
+  for (let i = shuffledIndices.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]];
+  }
   const shuffledOptions = shuffledIndices.map(i => question.options[i]);
   const newCorrectIndex = shuffledIndices.indexOf(question.correctIndex);
 

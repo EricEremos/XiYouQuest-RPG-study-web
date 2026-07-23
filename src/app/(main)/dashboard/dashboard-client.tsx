@@ -164,17 +164,19 @@ export function DashboardClient({
   return (
     <div className="mx-auto max-w-2xl space-y-2.5">
       {/* Mute button */}
-      <button
-        onClick={toggleMuted}
-        className="fixed bottom-4 right-4 z-50 pixel-border bg-card p-2 hover:pixel-border-primary transition-all"
-        aria-label={muted ? "Unmute music" : "Mute music"}
-      >
-        {muted ? (
-          <VolumeX className="h-5 w-5 text-muted-foreground" />
-        ) : (
-          <Volume2 className="h-5 w-5 text-primary" />
-        )}
-      </button>
+      <div className="flex justify-end">
+        <button
+          onClick={toggleMuted}
+          className="bg-card p-2 transition-all pixel-border hover:pixel-border-primary"
+          aria-label={muted ? "Unmute music" : "Mute music"}
+        >
+          {muted ? (
+            <VolumeX className="h-5 w-5 text-muted-foreground" />
+          ) : (
+            <Volume2 className="h-5 w-5 text-primary" />
+          )}
+        </button>
+      </div>
 
       {/* Greeting with character */}
       <div className="flex justify-center">

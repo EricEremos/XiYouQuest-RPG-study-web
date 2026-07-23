@@ -650,8 +650,13 @@ function MiniExamFlow({
   }, [phase, setLearningActive]);
 
   const randomizedQuiz = useMemo(() => {
-    return (assessmentData.quizQuestions ?? []).map(randomizeAnswerPositions);
-  }, [assessmentData.quizQuestions]);
+    return (assessmentData.quizQuestions ?? []).map((question) =>
+      randomizeAnswerPositions(
+        question,
+        `learning-assessment:${stepLabel}:${question.id}`,
+      ),
+    );
+  }, [assessmentData.quizQuestions, stepLabel]);
 
   const currentIndex = ASSESSMENT_PHASE_ORDER.indexOf(phase);
   const progressPercent = phase === "assessing" ? 100 : ((currentIndex) / ASSESSMENT_PHASE_ORDER.length) * 100;
@@ -865,14 +870,12 @@ function MiniExamPassage({
   onComplete: (data: AssessmentRawData) => void;
 }) {
   const [recording, setRecording] = useState(false);
-  const [isDone, setIsDone] = useState(false);
   const isDoneRef = useRef(false);
   const { audioContextRef, startCapture, stopAndEncode } = useRawRecording();
 
   const finishRecording = useCallback(() => {
     if (isDoneRef.current) return;
     isDoneRef.current = true;
-    setIsDone(true);
     const wavBlob = stopAndEncode();
     if (!wavBlob) {
       onComplete({ componentNumber: 4 });
@@ -889,7 +892,6 @@ function MiniExamPassage({
     if (audioContextRef.current) finishRecording();
     else if (!isDoneRef.current) {
       isDoneRef.current = true;
-      setIsDone(true);
       onComplete({ componentNumber: 4 });
     }
   }, [finishRecording, onComplete, audioContextRef]);
@@ -903,7 +905,6 @@ function MiniExamPassage({
       timer.start();
     } catch {
       isDoneRef.current = true;
-      setIsDone(true);
       onComplete({ componentNumber: 4 });
     }
   }, [timer, onComplete, startCapture]);
@@ -2075,6 +2076,9 @@ function ComponentRow({
 // 7. Node Session View
 // ============================================================
 
+// Retained for the legacy inline-session fallback while the active roadmap routes
+// directly to component pages.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function NodeSessionView({
   node,
   sessionData,
@@ -2169,11 +2173,21 @@ function NodeSessionView({
         correctIndex: q.metadata.correctIndex,
         explanation: q.metadata.explanation,
       }))
-      .map(randomizeAnswerPositions);
+      .map((question) =>
+        randomizeAnswerPositions(
+          question,
+          `learning-drill:${component}:${sessionData.focusArea}:${question.id}`,
+        ),
+      );
 
     if (quizQuestions.length === 0) {
       // Fallback: use assessment quiz questions if no drill questions
-      const fallback = (assessmentData.quizQuestions ?? []).map(randomizeAnswerPositions);
+      const fallback = (assessmentData.quizQuestions ?? []).map((question) =>
+        randomizeAnswerPositions(
+          question,
+          `learning-drill-fallback:${component}:${sessionData.focusArea}:${question.id}`,
+        ),
+      );
       return (
         <DrillQuizSession
           questions={fallback.length > 0 ? fallback : []}

@@ -1,4 +1,5 @@
 import { createClient, getSessionUser } from "@/lib/supabase/server";
+import { loadSelectedCharacter } from "@/lib/character-loader";
 import dynamic from "next/dynamic";
 
 const ProfileClient = dynamic(() => import("./profile-client"));
@@ -18,6 +19,7 @@ export default async function ProfilePage() {
   const user = await getSessionUser();
 
   const userId = user!.id;
+  await loadSelectedCharacter(supabase, userId);
 
   const [
     { data: profile },

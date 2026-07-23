@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 interface UserStats {
@@ -114,6 +115,8 @@ export async function GET() {
   }
 
   try {
+    const admin = createAdminClient();
+
     // Get accepted friendships
     const { data: friendships, error } = await supabase
       .from("friendships")
@@ -136,8 +139,8 @@ export async function GET() {
 
     // Fetch stats for all friends and self in parallel
     const [selfStats, ...friendStats] = await Promise.all([
-      getUserStats(supabase, user.id),
-      ...friendIds.map((id) => getUserStats(supabase, id)),
+      getUserStats(admin, user.id),
+      ...friendIds.map((id) => getUserStats(admin, id)),
     ]);
 
     // Build friendship map for IDs
