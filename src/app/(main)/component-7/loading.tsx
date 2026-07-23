@@ -1,7 +1,6 @@
 export default function Component7Loading() {
   return (
-    <div className="space-y-4" role="status" aria-label="Loading Component 7 practice">
-      <span className="sr-only">Loading Component 7 practice</span>
+    <div className="space-y-4" role="status">
       <div>
         <p className="font-pixel text-sm text-primary">Preparing Polyphonic Character Practice</p>
         <p className="mt-2 text-sm text-muted-foreground">Loading questions and answer choices…</p>

@@ -15,8 +15,7 @@ function CardSkeleton() {
 
 export default function PracticeLoading() {
   return (
-    <div className="space-y-8" role="status" aria-label="Loading practice menu">
-      <span className="sr-only">Loading practice menu</span>
+    <div className="space-y-8" role="status">
       <div className="h-5 w-32 rounded animate-shimmer" />
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 5 }).map((_, i) => (

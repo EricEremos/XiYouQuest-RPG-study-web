@@ -490,19 +490,27 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
           <div className="flex-1 md:w-[70%]">
             <div className="grid gap-3 sm:grid-cols-2 max-h-[70vh] overflow-y-auto pr-2">
               {displayTopics.map((topic, index) => (
-                <button
+                // A native <button> cannot contain the card's flow content
+                // (divs, paragraphs), so the card itself is the interactive
+                // element with full keyboard support.
+                <Card
                   key={`${topic}-${index}`}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleSelectTopic(topic)}
-                  className="h-fit w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleSelectTopic(topic);
+                    }
+                  }}
                   aria-label={`Select speaking topic: ${topic}`}
+                  className="h-fit w-full cursor-pointer text-left transition-all hover:border-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
-                  <Card className="h-fit transition-all hover:border-primary hover:shadow-md">
-                    <CardContent className="flex items-center justify-center py-6">
-                      <p className="text-center font-chinese text-lg font-medium">{topic}</p>
-                    </CardContent>
-                  </Card>
-                </button>
+                  <CardContent className="flex items-center justify-center py-6">
+                    <p className="text-center font-chinese text-lg font-medium">{topic}</p>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>

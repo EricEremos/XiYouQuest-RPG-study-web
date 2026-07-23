@@ -574,31 +574,39 @@ export function ReadingSession({ passages, character, characterId, component, lp
           <div className="flex-1 md:w-[70%]">
             <div className="grid gap-4 sm:grid-cols-2 max-h-[70vh] overflow-y-auto pr-2">
               {passages.map((passage) => (
-                <button
+                // A native <button> cannot contain the card's flow content
+                // (divs, headings), so the card itself is the interactive
+                // element with full keyboard support.
+                <Card
                   key={passage.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleSelectPassage(passage)}
-                  className="h-fit w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleSelectPassage(passage);
+                    }
+                  }}
                   aria-label={`Select passage: ${passage.title}`}
+                  className="relative h-fit w-full cursor-pointer overflow-hidden text-left transition-all hover:border-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
-                  <Card className="relative h-fit overflow-hidden transition-all hover:border-primary hover:shadow-md">
-                    {passage.passageNumber && (
-                      <div
-                        className="absolute inset-0 bg-cover bg-center opacity-25"
-                        style={{ backgroundImage: `url(/img/passage/${passage.passageNumber}.webp)` }}
-                      />
-                    )}
-                    <CardContent className="relative pt-6">
-                      <h3 className="mb-2 font-chinese text-lg font-bold drop-shadow-md [text-shadow:_0_1px_3px_rgb(255_255_255_/_80%)]">{passage.title}</h3>
-                      <p className="line-clamp-3 font-chinese text-sm font-medium text-foreground/80 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
-                        {passage.content}
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-foreground/70 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
-                        {passage.content.length} characters
-                      </p>
-                    </CardContent>
-                  </Card>
-                </button>
+                  {passage.passageNumber && (
+                    <div
+                      className="absolute inset-0 bg-cover bg-center opacity-25"
+                      style={{ backgroundImage: `url(/img/passage/${passage.passageNumber}.webp)` }}
+                    />
+                  )}
+                  <CardContent className="relative pt-6">
+                    <h3 className="mb-2 font-chinese text-lg font-bold drop-shadow-md [text-shadow:_0_1px_3px_rgb(255_255_255_/_80%)]">{passage.title}</h3>
+                    <p className="line-clamp-3 font-chinese text-sm font-medium text-foreground/80 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
+                      {passage.content}
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-foreground/70 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
+                      {passage.content.length} characters
+                    </p>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>

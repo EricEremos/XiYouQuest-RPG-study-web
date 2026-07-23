@@ -1,7 +1,6 @@
 export default function Component2Loading() {
   return (
-    <div className="space-y-4" role="status" aria-label="Loading Component 2 practice">
-      <span className="sr-only">Loading Component 2 practice</span>
+    <div className="space-y-4" role="status">
       <div>
         <p className="font-pixel text-sm text-primary">Preparing Multisyllabic Practice</p>
         <p className="mt-2 text-sm text-muted-foreground">Loading words and your Study Buddy…</p>

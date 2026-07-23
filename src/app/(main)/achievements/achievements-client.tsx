@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Trophy, User } from "lucide-react";
 import type { Achievement } from "@/types/database";
 import { TIER_COLORS, type AchievementTier } from "@/lib/achievements/types";
+import { TOTAL_ACHIEVEMENTS } from "@/lib/achievements/definitions";
 import { timeAgo } from "@/lib/utils";
 
 interface AchievementsClientProps {
@@ -42,7 +43,10 @@ export function AchievementsClient({
     userAchievements.map((ua) => [ua.achievement_id, ua.unlocked_at])
   );
   const unlockedCount = unlockedMap.size;
-  const catalogTotal = achievements.length;
+  // The DB catalog is the source of truth; the static count only keeps the
+  // header meaningful if the catalog query ever returns empty.
+  const catalogTotal =
+    achievements.length > 0 ? achievements.length : TOTAL_ACHIEVEMENTS;
   const percentage = catalogTotal > 0
     ? Math.round((unlockedCount / catalogTotal) * 100)
     : 0;
