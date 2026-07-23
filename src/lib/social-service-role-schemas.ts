@@ -51,6 +51,6 @@ export const socialAchievementSchema = z.object({
 export const socialAchievementFeedRowSchema = z.object({
   unlocked_at: z.string(),
   user_id: z.string().uuid(),
-  achievements: socialAchievementSchema.nullable(),
+  achievements: socialAchievementSchema,
   profiles: socialAchievementFeedProfileSchema.nullable(),
 });

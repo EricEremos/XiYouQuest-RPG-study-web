@@ -34,6 +34,31 @@ const second = new pg.Client({
 });
 const profileId = crypto.randomUUID();
 let fixtureCreated = false;
+let verificationError = null;
+let cleanupError = null;
+
+async function waitForLock(client, processId, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastObservedState = null;
+
+  while (Date.now() < deadline) {
+    const { rows } = await client.query(
+      `SELECT wait_event_type, wait_event
+       FROM pg_stat_activity
+       WHERE pid = $1`,
+      [processId],
+    );
+    lastObservedState = rows[0] ?? null;
+    if (lastObservedState?.wait_event_type === "Lock") {
+      return lastObservedState;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+
+  assert.fail(
+    `second selection did not enter a lock wait within ${timeoutMs}ms; last state: ${JSON.stringify(lastObservedState)}`,
+  );
+}
 
 console.log(
   `XiYouQuest DB concurrency target: ${safeTarget} (temporary committed fixture with verified cleanup)`,
@@ -90,12 +115,14 @@ try {
   );
   await setup.query("COMMIT");
   fixtureCreated = true;
+  console.log(`Concurrency fixture profile: ${profileId}`);
 
   await Promise.all([first.query("BEGIN"), second.query("BEGIN")]);
   await Promise.all([
     setAuthContext(first, "authenticated", profileId),
     setAuthContext(second, "authenticated", profileId),
   ]);
+  await second.query("SET LOCAL statement_timeout = '5s'");
 
   await first.query("SELECT public.select_user_character($1::UUID)", [
     firstTargetId,
@@ -105,14 +132,7 @@ try {
     [secondTargetId],
   );
 
-  await new Promise((resolve) => setTimeout(resolve, 250));
-  const { rows: waitingRows } = await setup.query(
-    `SELECT wait_event_type, wait_event
-     FROM pg_stat_activity
-     WHERE pid = $1`,
-    [second.processID],
-  );
-  assert.equal(waitingRows[0]?.wait_event_type, "Lock");
+  await waitForLock(setup, second.processID);
 
   await first.query("COMMIT");
   await secondSelection;
@@ -142,6 +162,8 @@ try {
       2,
     ),
   );
+} catch (error) {
+  verificationError = error;
 } finally {
   await Promise.allSettled([
     first.query("ROLLBACK"),
@@ -152,12 +174,23 @@ try {
       await setup.query("DELETE FROM public.profiles WHERE id = $1", [
         profileId,
       ]);
-    } catch (cleanupError) {
+    } catch (error) {
+      cleanupError = error;
       console.error(
-        "Concurrency fixture cleanup failed; remove the logged contract profile by its generated UUID.",
+        `Concurrency fixture cleanup failed for profile ${profileId}; remove that exact synthetic profile before re-running.`,
       );
-      throw cleanupError;
     }
   }
   await Promise.allSettled([setup.end(), first.end(), second.end()]);
+}
+
+if (verificationError) {
+  if (cleanupError) {
+    console.error("Cleanup also failed after the verification error.", cleanupError);
+  }
+  throw verificationError;
+}
+
+if (cleanupError) {
+  throw cleanupError;
 }

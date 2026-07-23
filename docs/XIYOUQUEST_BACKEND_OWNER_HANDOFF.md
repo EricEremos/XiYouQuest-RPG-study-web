@@ -7,6 +7,21 @@ This note separates application changes that can be reviewed in Git from
 database and deployment actions that require the actual project owner's
 authorization.
 
+## Responsibility boundary
+
+| Responsibility | Owner |
+| --- | --- |
+| Review application, API, schema-validation, migration, and test changes | Pull-request reviewers |
+| Identify the authoritative Supabase project and staging clone | Existing backend owner |
+| Back up data and choose an approved migration window | Existing backend owner |
+| Apply migrations and confirm environment variables | Existing backend owner |
+| Deploy an owner-controlled preview | Existing backend/Vercel owner |
+| Re-run end-to-end acceptance checks and decide whether to promote | Owner and QA together |
+
+The repair does **not** require moving XiYouQuest to a different Supabase
+account. The existing owner should apply the reviewed migrations to the
+authoritative project through the team's normal release process.
+
 ## Why owner action is required
 
 The repaired application expects one selected companion per profile and narrow
@@ -29,6 +44,21 @@ project identifier.
 | Malformed database values can silently become zero | `z.coerce.number()` accepts `null` and empty strings | Strict PostgreSQL wire-number schemas |
 | Social/achievement server routes trusted service-role rows | Database response shapes were asserted rather than parsed | Runtime Zod validation on lookup, search, requests, friends, leaderboard, and achievement feed paths |
 | Better Auth can exhaust serverless database connections | The Supabase session pooler has a low session-client ceiling | Transaction pooler port `6543`, bounded app pool, and corrected environment guidance |
+
+## Owner action matrix
+
+| User-visible defect | Owner action | Evidence required before release |
+| --- | --- | --- |
+| Study Buddy is blank or Companion Chat offers no companion | Apply the default-companion repair and exact-one selection migration | Query/result showing every profile has exactly one selected companion; new-account and existing-account screenshots |
+| Character selection does not persist or conflicts under rapid updates | Apply the serialized `select_user_character(uuid)` RPC and run the staging concurrency check | Passing owner-controlled concurrency log plus refresh proof in the preview |
+| Social panels fail, Retry cannot recover, or friend totals are incomplete | Apply both bounded social-projection migrations and confirm service-role configuration belongs to the same project | Preview requests for search, incoming/outgoing requests, friends, removal, and Retry; no 4xx/5xx in first-party calls |
+| Achievement count/catalog mismatch or feed errors | Apply the catalog repair and social feed projection; retain the PR's runtime response validation | All/Common/Uncommon/Rare/Epic counts agree with the returned catalog and the feed renders or shows a truthful empty state |
+| Login intermittently returns 500 or sessions disappear | Confirm the Better Auth database URL uses the authorized transaction pooler on port `6543` and that all auth/Supabase variables use one project | Successful repeated sign-in/session checks with no pool-exhaustion errors in Vercel or database logs |
+
+If the owner finds that the production schema or environment differs from the
+assumptions above, stop the rollout and return the schema diff and sanitized
+error/log excerpt to the pull request. Do not patch production manually around
+the migration history.
 
 ## Migration files and order
 

@@ -10,14 +10,12 @@ import { Lock, Heart, Sparkles, Swords } from "lucide-react";
 import { STAGE_CONFIGS } from "@/lib/quest/stage-config";
 
 import { CHARACTER_IMAGES } from "@/lib/character-images";
-import { loadSelectedCharacter } from "@/lib/character-loader";
 
 export default async function CharactersPage() {
   const supabase = await createClient();
   const user = await getSessionUser();
 
   const userId = user!.id;
-  await loadSelectedCharacter(supabase, userId);
 
   // Fetch all data in parallel
   const [{ data: characters }, { data: userCharacters }, , { data: questProgress }] =

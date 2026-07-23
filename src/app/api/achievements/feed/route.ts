@@ -65,10 +65,10 @@ export async function GET() {
         user_id: entry.user_id,
         display_name: profiles?.display_name ?? "Unknown",
         avatar_url: profiles?.avatar_url ?? null,
-        achievement_key: achievements?.key,
-        achievement_name: achievements?.name,
-        achievement_emoji: achievements?.emoji,
-        achievement_tier: achievements?.tier,
+        achievement_key: achievements.key,
+        achievement_name: achievements.name,
+        achievement_emoji: achievements.emoji,
+        achievement_tier: achievements.tier,
         is_self: entry.user_id === user.id,
       };
     });

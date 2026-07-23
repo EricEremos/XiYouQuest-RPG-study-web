@@ -245,4 +245,57 @@ describe("GET /api/achievements/feed", () => {
     });
     consoleError.mockRestore();
   });
+
+  it.each([
+    ["null", { achievements: null }],
+    ["missing", {}],
+  ])(
+    "rejects a %s achievement relation from the service-role join",
+    async (_caseName, relation) => {
+      const friendshipQuery = query({
+        data: [
+          {
+            requester_id: currentUser.id,
+            addressee_id: "22222222-2222-4222-8222-222222222222",
+          },
+        ],
+        error: null,
+      });
+      const userClient = {
+        from: vi.fn(() => friendshipQuery),
+      };
+      const feedQuery = query({
+        data: [
+          {
+            unlocked_at: "2026-07-23T09:00:00Z",
+            user_id: "22222222-2222-4222-8222-222222222222",
+            ...relation,
+            profiles: {
+              display_name: "Study Partner",
+              avatar_url: null,
+            },
+          },
+        ],
+        error: null,
+      });
+      const adminClient = {
+        from: vi.fn(() => feedQuery),
+      };
+
+      mocks.createClient.mockResolvedValue(userClient);
+      mocks.createAdminClient.mockReturnValue(adminClient);
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      const { GET } = await import("./route");
+      const response = await GET();
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        error: "Failed to fetch feed",
+      });
+      consoleError.mockRestore();
+    },
+  );
 });

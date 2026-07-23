@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { X509Certificate } from "node:crypto";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
-import { loadDatabaseUrl } from "./db-contract-test-helpers.mjs";
+import {
+  loadDatabaseUrl,
+  readMigration,
+} from "./db-contract-test-helpers.mjs";
 
 test("remote database connections require verified TLS", () => {
   const previous = process.env.XIYOUQUEST_DATABASE_URL;
@@ -88,4 +92,15 @@ test("explicit connection targets must match an independently supplied identifie
       process.env.XIYOUQUEST_DB_TARGET_ID = previousTarget;
     }
   }
+});
+
+test("migration reader resolves files from an explicit repository root", () => {
+  const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+  const migration = readMigration(
+    repoRoot,
+    "20260723180000_enforce_single_selected_companion.sql",
+  );
+
+  assert.match(migration, /select_user_character/);
+  assert.match(migration, /LOCK TABLE public\.profiles/);
 });
