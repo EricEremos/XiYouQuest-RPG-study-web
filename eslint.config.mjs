@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Stale git worktree checkouts (contain their own .next build output).
+    ".worktrees/**",
   ]),
 ]);
 

@@ -39,6 +39,15 @@ All clients live in `src/lib/`. Env vars in `.env.local`:
 
 | Gemini 3.1 Flash (via OpenRouter) | `image-gen/client.ts` | `OPENROUTER_API_KEY` |
 
+### iFlytek credentials (debugging gotcha)
+
+iFlytek uses the **international Singapore endpoints** (`ise-api-sg.xf-yun.com`, `tts-api-sg.xf-yun.com`, `iat-api-sg.xf-yun.com`). Two traps that produce hard-to-read failures:
+
+1. **`IFLYTEK_API_KEY` ↔ `IFLYTEK_API_SECRET` are easy to swap** — both are 32-char hex. If swapped, **every** iFlytek service (ISE/ASR/TTS) fails at the WebSocket handshake with HTTP `401 {"message":"HMAC signature cannot be verified: fail to retrieve credential"}`. Correct mapping: `api_key` is the lookup identifier sent in the `authorization` header; `api_secret` is the HMAC-SHA256 signing key. (`IFLYTEK_APP_ID` is the short ~8-char id, sent in the SSB frame after the socket opens.) To verify a credential set fast, replicate `buildIflytekWsUrl()` in a throwaway script and check whether the WS opens.
+2. **All iFlytek + AI routes run as Supabase Edge Functions, so they read Supabase Edge secrets — NOT `.env.local`.** Even in local `npm run dev`, `/api/speech/*`, `/api/tts/*`, and `/api/chat/*` are rewritten to the deployed edge function by `fetchWithRetry` → `resolveEdgeRoute()`. So editing `.env.local` does **not** affect these routes anywhere; update the deployed secrets instead: `supabase secrets set IFLYTEK_API_KEY=… IFLYTEK_API_SECRET=… --project-ref <ref>`. No redeploy needed (env is read lazily per request via `Deno.env.get`), though a redeploy forces a cold start if a warm worker serves stale values.
+
+**Client symptom:** the C2/C-series practice page logs `[Cn] Assessment API error: 500 {}` (empty body, because the edge function's non-2xx body isn't always JSON and `fetchWithRetry` retries 500s). Diagnose server-side via Supabase edge-function logs (`get_logs`), not the browser console.
+
 ## Edge Function Architecture
 
 8 long-running API routes are deployed as Supabase Edge Functions (Deno runtime, 150s timeout) to avoid Vercel's 10s free-tier limit. Client-side routing is transparent via `fetchWithRetry` → `resolveEdgeRoute()`.
@@ -64,6 +73,7 @@ All clients live in `src/lib/`. Env vars in `.env.local`:
 
 - **Path alias:** `@/*` maps to `./src/*`
 - **`next.config.ts`** externalizes `ws` — required for iFlytek WebSocket clients (TTS, ISE, ASR) running server-side
+- **iFlytek auth:** key/secret are swappable and the live routes use Supabase Edge secrets, not `.env.local` — see [iFlytek credentials gotcha](#iflytek-credentials-debugging-gotcha) above before touching speech/TTS env
 - **Component pages** are server components that fetch data via `Promise.all`, then render heavy client components via `next/dynamic`
 - **`fetchWithRetry`** wrapper: all 24+ client-side API calls use automatic retry for transient failures. Automatically routes migrated endpoints to Supabase Edge Functions via `resolveEdgeRoute()`.
 - **AI retry logic:** 3 retries with exponential backoff (1s, 2s, 4s + jitter), falls back to canned Chinese/English messages on total failure
