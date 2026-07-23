@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:db-contracts": "node scripts/verify-database-contracts.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {

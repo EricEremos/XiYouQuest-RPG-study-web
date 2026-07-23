@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { leaderboardQuerySchema } from "@/lib/validations";
@@ -12,14 +13,18 @@ interface RankingEntry {
   value: number;
 }
 
-interface ProjectionRow {
-  rank: number | string;
-  id: string;
-  display_name: string | null;
-  avatar_url: string | null;
-  current_level: number;
-  value: number | string;
-}
+const projectionRowsSchema = z.array(
+  z.object({
+    rank: z.coerce.number().int().positive(),
+    id: z.string().uuid(),
+    display_name: z.string().nullable(),
+    avatar_url: z.string().nullable(),
+    current_level: z.coerce.number().int(),
+    value: z.coerce.number().finite(),
+  }),
+);
+
+type ProjectionRow = z.infer<typeof projectionRowsSchema>[number];
 
 const LEADERBOARD_LIMIT = 20;
 
@@ -65,7 +70,7 @@ export async function GET(request: NextRequest) {
       throw error;
     }
 
-    const projected = ((data ?? []) as ProjectionRow[]).map(normalizeRow);
+    const projected = projectionRowsSchema.parse(data ?? []).map(normalizeRow);
     const currentUser = projected.find((entry) => entry.id === user.id);
 
     return NextResponse.json({

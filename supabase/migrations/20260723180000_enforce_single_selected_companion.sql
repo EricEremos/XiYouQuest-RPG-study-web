@@ -2,6 +2,13 @@
 -- with zero or multiple active companions. First normalize historical rows,
 -- then enforce the exact-one invariant at transaction boundaries.
 
+-- Supabase applies each migration in one transaction. Take both tables in the
+-- same order used by profile provisioning and selection so no profile insert,
+-- companion insert, selection update, or delete can commit between the repair
+-- pass and installation of the invariant.
+LOCK TABLE public.profiles, public.user_characters
+IN SHARE ROW EXCLUSIVE MODE;
+
 WITH ranked_selections AS (
   SELECT
     uc.user_id,
@@ -58,24 +65,6 @@ SET is_selected = true
 FROM default_character dc, profiles_without_selection p
 WHERE uc.user_id = p.id
   AND uc.character_id = dc.id;
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM public.profiles p
-    WHERE (
-      SELECT count(*)
-      FROM public.user_characters uc
-      WHERE uc.user_id = p.id
-        AND uc.is_selected = true
-    ) <> 1
-  ) THEN
-    RAISE EXCEPTION
-      'Cannot enforce companion invariant: every profile needs exactly one selected character';
-  END IF;
-END
-$$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS user_characters_one_selected_per_user_idx
   ON public.user_characters (user_id)
@@ -176,3 +165,24 @@ AFTER INSERT OR UPDATE OR DELETE ON public.user_characters
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW
 EXECUTE FUNCTION public.enforce_exactly_one_selected_character();
+
+-- Validate only after the index and deferred trigger exist. The table locks
+-- remain held until the migration transaction commits, so this assertion and
+-- the installed constraints cover one continuous write-free boundary.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.profiles p
+    WHERE (
+      SELECT count(*)
+      FROM public.user_characters uc
+      WHERE uc.user_id = p.id
+        AND uc.is_selected = true
+    ) <> 1
+  ) THEN
+    RAISE EXCEPTION
+      'Cannot enforce companion invariant: every profile needs exactly one selected character';
+  END IF;
+END
+$$;

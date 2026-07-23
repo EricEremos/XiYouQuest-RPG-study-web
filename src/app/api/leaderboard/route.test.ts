@@ -157,6 +157,36 @@ describe("GET /api/leaderboard", () => {
     consoleError.mockRestore();
   });
 
+  it("rejects malformed projection rows instead of trusting an unchecked cast", async () => {
+    mocks.createClient.mockResolvedValue({
+      rpc: vi.fn(async () => ({
+        data: [
+          {
+            rank: "first",
+            id: "not-a-uuid",
+            display_name: "Invalid",
+            avatar_url: null,
+            current_level: 1,
+            value: "many",
+          },
+        ],
+        error: null,
+      })),
+    });
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const { GET } = await import("./route");
+    const response = await GET(request("xp", "global"));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "Failed to fetch leaderboard",
+    });
+    consoleError.mockRestore();
+  });
+
   it("does not create a data client for an unauthenticated request", async () => {
     mocks.getSessionUser.mockResolvedValue(null);
 

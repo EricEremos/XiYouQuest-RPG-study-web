@@ -74,7 +74,7 @@ describe("social route data access", () => {
           achievement_count: 2,
         },
         {
-          friendship_id: "friendship-1",
+          friendship_id: "33333333-3333-4333-8333-333333333333",
           is_self: false,
           id: "22222222-2222-4222-8222-222222222222",
           display_name: "Friend",
@@ -106,7 +106,7 @@ describe("social route data access", () => {
     expect(body.self.id).toBe("11111111-1111-4111-8111-111111111111");
     expect(body.friends).toEqual([
       {
-        friendship_id: "friendship-1",
+        friendship_id: "33333333-3333-4333-8333-333333333333",
         id: "22222222-2222-4222-8222-222222222222",
         display_name: "Friend",
         avatar_url: null,
@@ -126,6 +126,33 @@ describe("social route data access", () => {
       rpc: vi.fn(async () => ({
         data: null,
         error: new Error("projection unavailable"),
+      })),
+    });
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const { GET } = await import("./friends/route");
+    const response = await GET();
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "Failed to fetch friends",
+    });
+    consoleError.mockRestore();
+  });
+
+  it("rejects malformed projection rows instead of trusting an unchecked cast", async () => {
+    mocks.createClient.mockResolvedValue({
+      rpc: vi.fn(async () => ({
+        data: [
+          {
+            friendship_id: "not-a-uuid",
+            is_self: false,
+            id: "also-not-a-uuid",
+          },
+        ],
+        error: null,
       })),
     });
     const consoleError = vi

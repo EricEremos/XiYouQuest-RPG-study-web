@@ -1,26 +1,29 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+
 import { createClient, getSessionUser } from "@/lib/supabase/server";
 
-interface UserStats {
-  id: string;
-  display_name: string | null;
-  avatar_url: string | null;
-  current_level: number;
-  total_xp: number;
-  login_streak: number;
-  total_sessions: number;
-  avg_scores: Record<number, number | null>;
-  selected_character: {
-    name: string;
-    image_url: string | null;
-  } | null;
-  achievement_count: number;
-}
-
-interface SocialStatsRow extends UserStats {
-  friendship_id: string | null;
-  is_self: boolean;
-}
+const socialStatsRowsSchema = z.array(
+  z.object({
+    friendship_id: z.string().uuid().nullable(),
+    is_self: z.boolean(),
+    id: z.string().uuid(),
+    display_name: z.string().nullable(),
+    avatar_url: z.string().nullable(),
+    current_level: z.coerce.number().int(),
+    total_xp: z.coerce.number().int(),
+    login_streak: z.coerce.number().int(),
+    total_sessions: z.coerce.number().int().nonnegative(),
+    avg_scores: z.record(z.string(), z.number().nullable()),
+    selected_character: z
+      .object({
+        name: z.string(),
+        image_url: z.string().nullable(),
+      })
+      .nullable(),
+    achievement_count: z.coerce.number().int().nonnegative(),
+  }),
+);
 
 export async function GET() {
   const supabase = await createClient();
@@ -40,7 +43,7 @@ export async function GET() {
       );
     }
 
-    const rows = (data ?? []) as SocialStatsRow[];
+    const rows = socialStatsRowsSchema.parse(data ?? []);
     const selfStats = rows.find((row) => row.is_self) ?? null;
     const friends = rows
       .filter((row) => !row.is_self && row.friendship_id)
