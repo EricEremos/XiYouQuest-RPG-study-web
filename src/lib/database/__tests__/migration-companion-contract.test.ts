@@ -145,6 +145,48 @@ describe.sequential("default companion migration contract", () => {
     ).rejects.toThrow();
   });
 
+  it("requires exactly one default while allowing an atomic replacement", async () => {
+    await applyRepairChain(database);
+
+    await expect(
+      database.transaction(async (transaction) => {
+        await transaction.exec(`
+          UPDATE public.characters
+          SET is_default = false
+          WHERE id = '${STARTER_CHARACTER}'
+        `);
+      }),
+    ).rejects.toThrow(/exactly one default character/);
+
+    await expect(
+      database.transaction(async (transaction) => {
+        await transaction.exec(`
+          DELETE FROM public.characters
+          WHERE id = '${STARTER_CHARACTER}'
+        `);
+      }),
+    ).rejects.toThrow(/exactly one default character/);
+
+    await database.transaction(async (transaction) => {
+      await transaction.exec(`
+        UPDATE public.characters
+        SET is_default = false
+        WHERE id = '${STARTER_CHARACTER}';
+
+        UPDATE public.characters
+        SET is_default = true
+        WHERE id = '${UNLOCKED_CHARACTER}';
+      `);
+    });
+
+    const defaultCharacters = await database.query<{ id: string }>(`
+      SELECT id
+      FROM public.characters
+      WHERE is_default = true
+    `);
+    expect(defaultCharacters.rows).toEqual([{ id: UNLOCKED_CHARACTER }]);
+  });
+
   it("backfills missing unlocks without replacing an existing selection", async () => {
     await applyRepairChain(database);
 

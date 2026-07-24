@@ -39,7 +39,9 @@ GRANT ALL ON public.user_achievements TO service_role;
 
 DROP POLICY IF EXISTS "Anyone can read achievements catalog"
   ON public.achievements;
-CREATE POLICY "Anyone can read achievements catalog"
+DROP POLICY IF EXISTS "Authenticated users can read achievements catalog"
+  ON public.achievements;
+CREATE POLICY "Authenticated users can read achievements catalog"
   ON public.achievements
   FOR SELECT TO authenticated
   USING (true);
@@ -145,9 +147,59 @@ AND NOT EXISTS (
   WHERE existing_default.is_default = true
 );
 
+DO $$
+DECLARE
+  default_count INTEGER;
+BEGIN
+  SELECT count(*)::INTEGER
+  INTO default_count
+  FROM public.characters
+  WHERE is_default = true;
+
+  IF default_count <> 1 THEN
+    RAISE EXCEPTION
+      'characters must contain exactly one default character (found %)',
+      default_count
+      USING ERRCODE = '23514';
+  END IF;
+END;
+$$;
+
 CREATE UNIQUE INDEX IF NOT EXISTS characters_single_default_idx
   ON public.characters ((is_default))
   WHERE is_default = true;
+
+CREATE OR REPLACE FUNCTION public.enforce_exactly_one_default_character()
+RETURNS TRIGGER AS $$
+DECLARE
+  default_count INTEGER;
+BEGIN
+  SELECT count(*)::INTEGER
+  INTO default_count
+  FROM public.characters
+  WHERE is_default = true;
+
+  IF default_count <> 1 THEN
+    RAISE EXCEPTION
+      'characters must contain exactly one default character (found %)',
+      default_count
+      USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = '';
+
+REVOKE EXECUTE ON FUNCTION public.enforce_exactly_one_default_character()
+FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS characters_exactly_one_default
+ON public.characters;
+CREATE CONSTRAINT TRIGGER characters_exactly_one_default
+  AFTER INSERT OR UPDATE OR DELETE ON public.characters
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_exactly_one_default_character();
 
 -- A selected companion is a per-profile singleton. Preserve an existing
 -- non-default choice when cleaning historical duplicates, then keep the most
