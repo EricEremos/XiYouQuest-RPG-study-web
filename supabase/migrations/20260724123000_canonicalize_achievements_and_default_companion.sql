@@ -34,7 +34,7 @@ REVOKE ALL ON public.achievements FROM anon, authenticated;
 GRANT SELECT ON public.achievements TO authenticated;
 GRANT ALL ON public.achievements TO service_role;
 REVOKE ALL ON public.user_achievements FROM anon, authenticated;
-GRANT SELECT, INSERT, DELETE ON public.user_achievements TO authenticated;
+GRANT SELECT, INSERT ON public.user_achievements TO authenticated;
 GRANT ALL ON public.user_achievements TO service_role;
 
 DROP POLICY IF EXISTS "Anyone can read achievements catalog"
@@ -46,10 +46,12 @@ CREATE POLICY "Anyone can read achievements catalog"
 
 DROP POLICY IF EXISTS "Authenticated users can view all user_achievements"
   ON public.user_achievements;
-CREATE POLICY "Authenticated users can view all user_achievements"
+DROP POLICY IF EXISTS "Users can read own achievements"
+  ON public.user_achievements;
+CREATE POLICY "Users can read own achievements"
   ON public.user_achievements
   FOR SELECT TO authenticated
-  USING (true);
+  USING (user_id = (SELECT auth.uid()));
 
 DROP POLICY IF EXISTS "Users can insert own achievements"
   ON public.user_achievements;
@@ -60,10 +62,6 @@ CREATE POLICY "Users can insert own achievements"
 
 DROP POLICY IF EXISTS "Users can delete own achievements"
   ON public.user_achievements;
-CREATE POLICY "Users can delete own achievements"
-  ON public.user_achievements
-  FOR DELETE
-  USING (user_id = (SELECT auth.uid()));
 
 INSERT INTO public.achievements
   (key, name, description, emoji, tier, sort_order)
@@ -118,9 +116,67 @@ SET
 
 -- The product has one free starter companion. Encode that rule in the schema
 -- instead of picking a character through mutable display text.
+WITH ranked_defaults AS (
+  SELECT
+    c.id,
+    ROW_NUMBER() OVER (
+      ORDER BY c.unlock_cost_xp ASC, c.id
+    ) AS default_rank
+  FROM public.characters c
+  WHERE c.is_default = true
+)
+UPDATE public.characters c
+SET is_default = false
+FROM ranked_defaults ranked
+WHERE c.id = ranked.id
+  AND ranked.default_rank > 1;
+
+UPDATE public.characters c
+SET is_default = true
+WHERE c.id = (
+  SELECT candidate.id
+  FROM public.characters candidate
+  ORDER BY candidate.unlock_cost_xp ASC, candidate.id
+  LIMIT 1
+)
+AND NOT EXISTS (
+  SELECT 1
+  FROM public.characters existing_default
+  WHERE existing_default.is_default = true
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS characters_single_default_idx
   ON public.characters ((is_default))
   WHERE is_default = true;
+
+-- A selected companion is a per-profile singleton. Preserve an existing
+-- non-default choice when cleaning historical duplicates, then keep the most
+-- recently unlocked row as the deterministic fallback.
+WITH ranked_selections AS (
+  SELECT
+    uc.user_id,
+    uc.character_id,
+    ROW_NUMBER() OVER (
+      PARTITION BY uc.user_id
+      ORDER BY
+        c.is_default ASC,
+        uc.unlocked_at DESC,
+        uc.character_id
+    ) AS selection_rank
+  FROM public.user_characters uc
+  JOIN public.characters c ON c.id = uc.character_id
+  WHERE uc.is_selected = true
+)
+UPDATE public.user_characters uc
+SET is_selected = false
+FROM ranked_selections ranked
+WHERE uc.user_id = ranked.user_id
+  AND uc.character_id = ranked.character_id
+  AND ranked.selection_rank > 1;
+
+CREATE UNIQUE INDEX IF NOT EXISTS user_characters_single_selected_idx
+  ON public.user_characters (user_id)
+  WHERE is_selected = true;
 
 CREATE OR REPLACE FUNCTION public.handle_unlock_defaults()
 RETURNS TRIGGER AS $$
