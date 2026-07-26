@@ -7,9 +7,27 @@ const ASR_HOST = "ist-api-sg.xf-yun.com";
 const ASR_PATH = "/v2/ist";
 const ASR_FRAME_SIZE = 1_280;
 const ASR_FRAME_INTERVAL_MS = 40;
+const ASR_FINAL_RESPONSE_GRACE_MS = 30_000;
+export const ASR_MAX_PCM_BYTES = 200 * 32_000;
 
 export interface AsrTranscriptionResult {
   transcript: string;
+}
+
+export function calculateAsrTimeoutMs(pcmByteLength: number): number {
+  if (pcmByteLength <= 0) {
+    throw new Error("iFlytek ASR: empty PCM audio");
+  }
+  if (pcmByteLength > ASR_MAX_PCM_BYTES) {
+    throw new Error("iFlytek ASR: audio exceeds 200-second limit");
+  }
+
+  const audioFrameCount = Math.ceil(pcmByteLength / ASR_FRAME_SIZE);
+  const streamingDurationMs = audioFrameCount * ASR_FRAME_INTERVAL_MS;
+  return Math.max(
+    ASR_TIMEOUT_MS,
+    streamingDurationMs + ASR_FINAL_RESPONSE_GRACE_MS,
+  );
 }
 
 // ---------- Auth ----------
@@ -39,18 +57,19 @@ function buildAsrWsUrl(): string {
  * Handles dynamic correction: `pgs: "rpl"` replaces segment, `pgs: "apd"` appends.
  */
 export async function transcribeAudio(audioBuffer: Buffer): Promise<AsrTranscriptionResult> {
-  const wsUrl = buildAsrWsUrl();
-
   // Strip WAV header if present (44-byte RIFF header)
   let pcmData: Buffer;
   if (
-    audioBuffer.length > 44 &&
+    audioBuffer.length >= 44 &&
     audioBuffer.toString("ascii", 0, 4) === "RIFF"
   ) {
     pcmData = audioBuffer.subarray(44);
   } else {
     pcmData = audioBuffer;
   }
+
+  const timeoutMs = calculateAsrTimeoutMs(pcmData.length);
+  const wsUrl = buildAsrWsUrl();
 
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -82,8 +101,8 @@ export async function transcribeAudio(audioBuffer: Buffer): Promise<AsrTranscrip
 
     const timer = setTimeout(() => {
       ws.close();
-      fail(new Error(`iFlytek ASR timeout (${ASR_TIMEOUT_MS / 1000}s)`));
-    }, ASR_TIMEOUT_MS);
+      fail(new Error(`iFlytek ASR timeout (${timeoutMs / 1000}s)`));
+    }, timeoutMs);
 
     ws.on("open", () => {
       const BUFFER_HIGH_WATER = 65536;

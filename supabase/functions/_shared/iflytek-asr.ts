@@ -2,13 +2,12 @@ import { IFLYTEK_APP_ID } from "./env.ts";
 import { buildIflytekWsUrl } from "./iflytek-auth.ts";
 import {
   ASR_FRAME_INTERVAL_MS,
+  calculateAsrTimeoutMs,
   createAsrAudioFrames,
 } from "./iflytek-asr-frames.ts";
 
 const ASR_HOST = "ist-api-sg.xf-yun.com";
 const ASR_PATH = "/v2/ist";
-
-const ASR_TIMEOUT_MS = 120_000;
 
 export interface AsrTranscriptionResult {
   transcript: string;
@@ -32,18 +31,19 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 export async function transcribeAudio(
   audioData: Uint8Array,
 ): Promise<AsrTranscriptionResult> {
-  const wsUrl = await buildIflytekWsUrl(ASR_HOST, ASR_PATH);
-
   // Strip WAV header if present (44-byte RIFF header)
   let pcmData: Uint8Array;
   if (
-    audioData.length > 44 &&
+    audioData.length >= 44 &&
     new TextDecoder().decode(audioData.subarray(0, 4)) === "RIFF"
   ) {
     pcmData = audioData.subarray(44);
   } else {
     pcmData = audioData;
   }
+
+  const timeoutMs = calculateAsrTimeoutMs(pcmData.length);
+  const wsUrl = await buildIflytekWsUrl(ASR_HOST, ASR_PATH);
 
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -77,15 +77,21 @@ export async function transcribeAudio(
 
     const timer = setTimeout(() => {
       ws.close();
-      fail(new Error(`iFlytek ASR timeout (${ASR_TIMEOUT_MS / 1000}s)`));
-    }, ASR_TIMEOUT_MS);
+      fail(new Error(`iFlytek ASR timeout (${timeoutMs / 1000}s)`));
+    }, timeoutMs);
 
     ws.onopen = () => {
+      const BUFFER_HIGH_WATER = 65_536;
       const frames = createAsrAudioFrames(pcmData);
       let frameIndex = 0;
 
       const sendNextFrame = () => {
         if (settled || ws.readyState !== WebSocket.OPEN) return;
+
+        if (ws.bufferedAmount > BUFFER_HIGH_WATER) {
+          setTimeout(sendNextFrame, 5);
+          return;
+        }
 
         const audioFrame = frames[frameIndex];
         if (audioFrame.status === 2) {
