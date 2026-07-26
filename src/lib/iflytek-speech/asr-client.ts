@@ -5,6 +5,8 @@ import { ASR_TIMEOUT_MS } from "@/lib/constants";
 
 const ASR_HOST = "ist-api-sg.xf-yun.com";
 const ASR_PATH = "/v2/ist";
+const ASR_FRAME_SIZE = 1_280;
+const ASR_FRAME_INTERVAL_MS = 40;
 
 export interface AsrTranscriptionResult {
   transcript: string;
@@ -31,7 +33,7 @@ function buildAsrWsUrl(): string {
  * Protocol:
  *   1. First frame: business params + first audio chunk (status=0)
  *   2. Continuation frames: audio chunks (status=1)
- *   3. Last frame: final audio chunk (status=2)
+ *   3. Final frame: no audio payload (status=2)
  *   4. Server sends JSON results with word segments; status=2 = final result
  *
  * Handles dynamic correction: `pgs: "rpl"` replaces segment, `pgs: "apd"` appends.
@@ -84,54 +86,55 @@ export async function transcribeAudio(audioBuffer: Buffer): Promise<AsrTranscrip
     }, ASR_TIMEOUT_MS);
 
     ws.on("open", () => {
-      // Send audio in 10KB chunks with backpressure
-      const CHUNK_SIZE = 10240;
       const BUFFER_HIGH_WATER = 65536;
       let offset = 0;
 
-      const sendChunks = () => {
+      const sendNextFrame = () => {
         if (settled || ws.readyState !== WebSocket.OPEN) return;
 
-        while (offset < pcmData.length) {
-          if (ws.bufferedAmount > BUFFER_HIGH_WATER) {
-            if (ws.readyState === WebSocket.OPEN) {
-              setTimeout(sendChunks, 5);
-            }
-            return;
+        if (ws.bufferedAmount > BUFFER_HIGH_WATER) {
+          if (ws.readyState === WebSocket.OPEN) {
+            setTimeout(sendNextFrame, 5);
           }
-
-          const end = Math.min(offset + CHUNK_SIZE, pcmData.length);
-          const chunk = pcmData.subarray(offset, end);
-          const isFirst = offset === 0;
-          const isLast = end >= pcmData.length;
-
-          const frame: Record<string, unknown> = {
-            data: {
-              status: isFirst ? 0 : isLast ? 2 : 1,
-              format: "audio/L16;rate=16000",
-              encoding: "raw",
-              audio: chunk.toString("base64"),
-            },
-          };
-
-          // First frame includes common + business params
-          if (isFirst) {
-            frame.common = { app_id: IFLYTEK_APP_ID() };
-            frame.business = {
-              language: "zh_cn",
-              domain: "ist_open",
-              accent: "mandarin",
-              dwa: "wpgs",
-              punc: 1,
-            };
-          }
-
-          ws.send(JSON.stringify(frame));
-          offset = end;
+          return;
         }
+
+        if (offset >= pcmData.length) {
+          ws.send(JSON.stringify({ data: { status: 2 } }));
+          return;
+        }
+
+        const end = Math.min(offset + ASR_FRAME_SIZE, pcmData.length);
+        const chunk = pcmData.subarray(offset, end);
+        const isFirst = offset === 0;
+
+        const frame: Record<string, unknown> = {
+          data: {
+            status: isFirst ? 0 : 1,
+            format: "audio/L16;rate=16000",
+            encoding: "raw",
+            audio: chunk.toString("base64"),
+          },
+        };
+
+        // First frame includes common + business params
+        if (isFirst) {
+          frame.common = { app_id: IFLYTEK_APP_ID() };
+          frame.business = {
+            language: "zh_cn",
+            domain: "ist_open",
+            accent: "mandarin",
+            dwa: "wpgs",
+            punc: 1,
+          };
+        }
+
+        ws.send(JSON.stringify(frame));
+        offset = end;
+        setTimeout(sendNextFrame, ASR_FRAME_INTERVAL_MS);
       };
 
-      sendChunks();
+      sendNextFrame();
     });
 
     ws.on("message", (data: WebSocket.Data) => {

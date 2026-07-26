@@ -1,5 +1,9 @@
 import { IFLYTEK_APP_ID } from "./env.ts";
 import { buildIflytekWsUrl } from "./iflytek-auth.ts";
+import {
+  ASR_FRAME_INTERVAL_MS,
+  createAsrAudioFrames,
+} from "./iflytek-asr-frames.ts";
 
 const ASR_HOST = "ist-api-sg.xf-yun.com";
 const ASR_PATH = "/v2/ist";
@@ -77,46 +81,47 @@ export async function transcribeAudio(
     }, ASR_TIMEOUT_MS);
 
     ws.onopen = () => {
-      // Send audio in 10KB chunks
-      const CHUNK_SIZE = 10240;
-      let offset = 0;
+      const frames = createAsrAudioFrames(pcmData);
+      let frameIndex = 0;
 
-      const sendChunks = () => {
+      const sendNextFrame = () => {
         if (settled || ws.readyState !== WebSocket.OPEN) return;
 
-        while (offset < pcmData.length) {
-          const end = Math.min(offset + CHUNK_SIZE, pcmData.length);
-          const chunk = pcmData.subarray(offset, end);
-          const isFirst = offset === 0;
-          const isLast = end >= pcmData.length;
-
-          const frame: Record<string, unknown> = {
-            data: {
-              status: isFirst ? 0 : isLast ? 2 : 1,
-              format: "audio/L16;rate=16000",
-              encoding: "raw",
-              audio: uint8ArrayToBase64(chunk),
-            },
-          };
-
-          // First frame includes common + business params
-          if (isFirst) {
-            frame.common = { app_id: IFLYTEK_APP_ID() };
-            frame.business = {
-              language: "zh_cn",
-              domain: "ist_open",
-              accent: "mandarin",
-              dwa: "wpgs",
-              punc: 1,
-            };
-          }
-
-          ws.send(JSON.stringify(frame));
-          offset = end;
+        const audioFrame = frames[frameIndex];
+        if (audioFrame.status === 2) {
+          ws.send(JSON.stringify({ data: { status: 2 } }));
+          return;
         }
+
+        const isFirst = audioFrame.status === 0;
+
+        const frame: Record<string, unknown> = {
+          data: {
+            status: audioFrame.status,
+            format: "audio/L16;rate=16000",
+            encoding: "raw",
+            audio: uint8ArrayToBase64(audioFrame.audio),
+          },
+        };
+
+        // First frame includes common + business params
+        if (isFirst) {
+          frame.common = { app_id: IFLYTEK_APP_ID() };
+          frame.business = {
+            language: "zh_cn",
+            domain: "ist_open",
+            accent: "mandarin",
+            dwa: "wpgs",
+            punc: 1,
+          };
+        }
+
+        ws.send(JSON.stringify(frame));
+        frameIndex += 1;
+        setTimeout(sendNextFrame, ASR_FRAME_INTERVAL_MS);
       };
 
-      sendChunks();
+      sendNextFrame();
     };
 
     ws.onmessage = (ev: MessageEvent) => {
