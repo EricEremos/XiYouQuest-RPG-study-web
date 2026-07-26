@@ -1,8 +1,7 @@
 import { IFLYTEK_APP_ID } from "./env.ts";
 import { buildIflytekWsUrl } from "./iflytek-auth.ts";
-
-const ASR_HOST = "ist-api-sg.xf-yun.com";
-const ASR_PATH = "/v2/ist";
+import { getAsrProviderConfig } from "./iflytek-asr-config.ts";
+import { segmentPcm, stripWavHeader } from "./iflytek-asr-segments.ts";
 
 const ASR_TIMEOUT_MS = 120_000;
 
@@ -14,32 +13,24 @@ export interface AsrTranscriptionResult {
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
   let binary = "";
-  for (let i = 0; i < bytes.length; i++)
-    binary += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
 }
 
-// ---------- Main transcription ----------
+// ---------- Single session ----------
 
 /**
- * Transcribe audio using iFlytek Real-time ASR (IST) via WebSocket.
+ * Transcribe one segment over a single WebSocket session.
  * Uses native WebSocket (Deno) and Uint8Array instead of Node.js Buffer/ws.
+ *
+ * The terminal status=2 frame is always sent separately rather than piggybacked
+ * on the last audio chunk. A segment small enough to fit one chunk is both first
+ * and last, and a combined frame would have to pick one status, leaving the
+ * session unterminated until the timeout.
  */
-export async function transcribeAudio(
-  audioData: Uint8Array,
-): Promise<AsrTranscriptionResult> {
-  const wsUrl = await buildIflytekWsUrl(ASR_HOST, ASR_PATH);
-
-  // Strip WAV header if present (44-byte RIFF header)
-  let pcmData: Uint8Array;
-  if (
-    audioData.length > 44 &&
-    new TextDecoder().decode(audioData.subarray(0, 4)) === "RIFF"
-  ) {
-    pcmData = audioData.subarray(44);
-  } else {
-    pcmData = audioData;
-  }
+async function transcribeSegment(pcmData: Uint8Array): Promise<string> {
+  const { host, path, business } = getAsrProviderConfig();
+  const wsUrl = await buildIflytekWsUrl(host, path);
 
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -48,9 +39,11 @@ export async function transcribeAudio(
     // Track segments by sequence number for dynamic correction
     const segments: Map<number, string> = new Map();
 
-    console.log(
-      `[ASR] pcm=${pcmData.length} bytes (${Math.round(pcmData.length / 32000)}s audio)`,
-    );
+    const buildTranscript = (): string =>
+      Array.from(segments.keys())
+        .sort((a, b) => a - b)
+        .map((k) => segments.get(k)!)
+        .join("");
 
     const ws = new WebSocket(wsUrl);
 
@@ -58,10 +51,7 @@ export async function transcribeAudio(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      console.log(
-        `[ASR] completed in ${((Date.now() - startTime) / 1000).toFixed(1)}s, transcript length=${transcript.length}`,
-      );
-      resolve({ transcript });
+      resolve(transcript);
     };
 
     const fail = (err: Error) => {
@@ -77,50 +67,68 @@ export async function transcribeAudio(
     }, ASR_TIMEOUT_MS);
 
     ws.onopen = () => {
-      // Send audio in 10KB chunks
+      // Burst upload in 10KB chunks with backpressure. Bursting is ~7x faster
+      // than the docs' 40ms real-time pacing and iFlytek accepts it.
       const CHUNK_SIZE = 10240;
+      const BUFFER_HIGH_WATER = 65536;
       let offset = 0;
+
+      const sendTerminalFrame = () => {
+        if (settled || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(
+          JSON.stringify({
+            data: {
+              status: 2,
+              format: "audio/L16;rate=16000",
+              encoding: "raw",
+              audio: "",
+            },
+          }),
+        );
+      };
 
       const sendChunks = () => {
         if (settled || ws.readyState !== WebSocket.OPEN) return;
 
         while (offset < pcmData.length) {
+          if (ws.bufferedAmount > BUFFER_HIGH_WATER) {
+            setTimeout(sendChunks, 5);
+            return;
+          }
+
           const end = Math.min(offset + CHUNK_SIZE, pcmData.length);
-          const chunk = pcmData.subarray(offset, end);
           const isFirst = offset === 0;
-          const isLast = end >= pcmData.length;
 
           const frame: Record<string, unknown> = {
             data: {
-              status: isFirst ? 0 : isLast ? 2 : 1,
+              status: isFirst ? 0 : 1,
               format: "audio/L16;rate=16000",
               encoding: "raw",
-              audio: uint8ArrayToBase64(chunk),
+              audio: uint8ArrayToBase64(pcmData.subarray(offset, end)),
             },
           };
 
-          // First frame includes common + business params
           if (isFirst) {
             frame.common = { app_id: IFLYTEK_APP_ID() };
-            frame.business = {
-              language: "zh_cn",
-              domain: "ist_open",
-              accent: "mandarin",
-              dwa: "wpgs",
-              punc: 1,
-            };
+            frame.business = business;
           }
 
           ws.send(JSON.stringify(frame));
           offset = end;
         }
+
+        sendTerminalFrame();
       };
 
       sendChunks();
     };
 
     ws.onmessage = (ev: MessageEvent) => {
-      let msg;
+      let msg: Record<string, unknown> & {
+        code?: number;
+        message?: string;
+        data?: { status?: number; result?: Record<string, unknown> };
+      };
       try {
         msg = JSON.parse(typeof ev.data === "string" ? ev.data : "");
       } catch {
@@ -129,9 +137,7 @@ export async function transcribeAudio(
 
       if (msg.code !== 0) {
         ws.close();
-        fail(
-          new Error(`iFlytek ASR error ${msg.code}: ${msg.message || ""}`),
-        );
+        fail(new Error(`iFlytek ASR error ${msg.code}: ${msg.message || ""}`));
         return;
       }
 
@@ -149,29 +155,24 @@ export async function transcribeAudio(
             .join("");
 
           if (pgs === "rpl") {
-            // Replace: clear segments in the replace range, then set new
             const rg = result.rg as [number, number] | undefined;
             if (rg) {
               for (let i = rg[0]; i <= rg[1]; i++) {
                 segments.delete(i);
               }
             }
-            segments.set(sn, text);
-          } else {
-            // Append (confirmed segment)
-            segments.set(sn, text);
           }
+          segments.set(sn, text);
         }
       }
 
       // status=2 means final result
       if (msg.data?.status === 2) {
         ws.close();
-        const sortedKeys = Array.from(segments.keys()).sort((a, b) => a - b);
-        const transcript = sortedKeys
-          .map((k) => segments.get(k)!)
-          .join("");
-        finish(transcript);
+        console.log(
+          `[ASR] segment done in ${((Date.now() - startTime) / 1000).toFixed(1)}s`,
+        );
+        finish(buildTranscript());
       }
     };
 
@@ -180,19 +181,55 @@ export async function transcribeAudio(
     };
 
     ws.onclose = () => {
+      // Salvage a partial transcript rather than failing the whole request.
       if (!settled) {
         if (segments.size > 0) {
-          const sortedKeys = Array.from(segments.keys()).sort(
-            (a, b) => a - b,
-          );
-          const transcript = sortedKeys
-            .map((k) => segments.get(k)!)
-            .join("");
-          finish(transcript);
+          finish(buildTranscript());
         } else {
           fail(new Error("iFlytek ASR: closed without result"));
         }
       }
     };
   });
+}
+
+// ---------- Main transcription ----------
+
+/**
+ * Transcribe audio using iFlytek ASR, splitting long recordings across sessions.
+ *
+ * See `iflytek-asr-config.ts` for why this targets IAT rather than IST, and for
+ * the silent-truncation behaviour that makes segmentation necessary.
+ */
+export async function transcribeAudio(
+  audioData: Uint8Array,
+): Promise<AsrTranscriptionResult> {
+  const pcmData = stripWavHeader(audioData);
+
+  if (pcmData.length === 0) {
+    throw new Error("iFlytek ASR: empty PCM audio");
+  }
+
+  const { maxSegmentBytes } = getAsrProviderConfig();
+  const chunks = segmentPcm(pcmData, maxSegmentBytes);
+
+  console.log(
+    `[ASR] pcm=${pcmData.length} bytes (${Math.round(pcmData.length / 32000)}s audio), ${chunks.length} session(s)`,
+  );
+
+  const startTime = Date.now();
+  const transcripts: string[] = [];
+
+  // Sequential: iFlytek bills and rate-limits per concurrent session, and
+  // ordering matters for the stitched transcript.
+  for (const chunk of chunks) {
+    transcripts.push(await transcribeSegment(chunk));
+  }
+
+  const transcript = transcripts.join("");
+  console.log(
+    `[ASR] completed in ${((Date.now() - startTime) / 1000).toFixed(1)}s, transcript length=${transcript.length}`,
+  );
+
+  return { transcript };
 }
