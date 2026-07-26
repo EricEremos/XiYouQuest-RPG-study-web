@@ -141,7 +141,7 @@ Record -> WAV Encode -> iFlytek ISE -> XML Parse -> Gemini Feedback -> XP Award 
    +-----------+  +---------------+   +------------+
 ```
 
-**Dual-deployment model:** Lightweight routes (CRUD, auth, social) run on Vercel. Long-running routes (AI, speech, TTS) run as Supabase Edge Functions (Deno, 150s timeout). Client-side `fetchWithRetry` transparently routes via `resolveEdgeRoute()`.
+**Dual-deployment model:** Lightweight routes (CRUD, auth, social) run on Vercel. Most AI, speech, and TTS routes run as Supabase Edge Functions. Supabase currently requires a response to start within 150 seconds and limits total worker wall-clock time to 400 seconds ([official limits](https://supabase.com/docs/guides/troubleshooting/edge-function-504-error-response)). The 180-second C5 assessment therefore stays on its 300-second Next route. Client-side `fetchWithRetry` transparently routes eligible requests via `resolveEdgeRoute()`.
 
 ---
 
@@ -671,7 +671,7 @@ Request -> Layer 1: Middleware (src/proxy.ts)
 
 ## Edge Function Architecture
 
-11 long-running API routes are deployed as **Supabase Edge Functions** (Deno runtime, 150s timeout) to bypass Vercel's 10s free-tier limit. Client-side routing is transparent.
+10 API routes are deployed as **Supabase Edge Functions**. The Edge gateway requires a response to start within 150 seconds, while the worker wall-clock limit is 400 seconds. The 180-second C5 assessment remains on the 300-second Next route because its real-time ASR stream cannot satisfy the Edge response-init limit. Client-side routing is otherwise transparent.
 
 ### Route Mapping
 
@@ -685,7 +685,6 @@ Request -> Layer 1: Middleware (src/proxy.ts)
 | `/api/chat/respond` | `chat-respond` | iFlytek ASR + ISE + DeepSeek V4 Flash |
 | `/api/learning/generate-plan` | `learning-generate-plan` | DeepSeek V4 Flash + DB |
 | `/api/speech/assess` | `speech-assess` | iFlytek ISE |
-| `/api/speech/c5-assess` | `speech-c5-assess` | iFlytek ASR + ISE + DeepSeek V4 Flash |
 | `/api/tts/speak` | `tts-speak` | iFlytek TTS |
 | `/api/tts/companion` | `tts-companion` | iFlytek TTS |
 
@@ -729,7 +728,7 @@ All 24+ internal API fetch calls across all practice components, companion chat,
 | **UI Library** | React 19.2.3 | Component architecture |
 | **Language** | TypeScript 5 (strict mode) | Type safety |
 | **Database** | Supabase (PostgreSQL + RLS + Storage) | Data persistence, auth, file storage |
-| **Edge Runtime** | Supabase Edge Functions (Deno) | Long-running AI/speech routes (150s timeout) |
+| **Edge Runtime** | Supabase Edge Functions (Deno) | AI/speech routes (150s response-init, 400s worker wall clock) |
 | **Auth** | Supabase Auth | Email, Google OAuth, Discord OAuth |
 | **AI (All)** | DeepSeek V4 Flash (via OpenRouter) | Feedback, chat, insights, curriculum, C5 analysis (fallback: Gemini 2.5 Flash) |
 | **AI Image Generation** | Gemini 2.5 Flash Image (via OpenRouter) | Context-aware pixel-art scene images every 3 chat turns |

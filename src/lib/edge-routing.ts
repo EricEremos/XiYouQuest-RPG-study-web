@@ -7,7 +7,9 @@ const EDGE_ROUTES: Record<string, string> = {
   "/api/chat/generate-image": "chat-generate-image",
   "/api/chat/start": "chat-start",
   "/api/chat/respond": "chat-respond",
-  "/api/speech/c5-assess": "speech-c5-assess",
+  // C5 records for 180 seconds. Its real-time ASR stream cannot initiate an
+  // Edge response within Supabase's 150-second gateway limit, so it must use
+  // the 300-second Next route instead.
   "/api/speech/assess": "speech-assess",
   "/api/learning/generate-plan": "learning-generate-plan",
   "/api/tts/speak": "tts-speak",
