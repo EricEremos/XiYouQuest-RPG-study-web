@@ -1,7 +1,6 @@
 import { IFLYTEK_APP_ID } from "./env.ts";
 import { buildIflytekWsUrl } from "./iflytek-auth.ts";
 import {
-  ASR_FRAME_INTERVAL_MS,
   calculateAsrTimeoutMs,
   createAsrAudioFrames,
   getPcmByteLength,
@@ -80,49 +79,55 @@ export async function transcribeAudio(
       const frames = createAsrAudioFrames(pcmData);
       let frameIndex = 0;
 
-      const sendNextFrame = () => {
+      const sendFrames = () => {
         if (settled || ws.readyState !== WebSocket.OPEN) return;
 
-        if (ws.bufferedAmount > BUFFER_HIGH_WATER) {
-          setTimeout(sendNextFrame, 5);
-          return;
+        while (frameIndex < frames.length - 1) {
+          if (ws.bufferedAmount > BUFFER_HIGH_WATER) {
+            setTimeout(sendFrames, 5);
+            return;
+          }
+
+          const audioFrame = frames[frameIndex];
+          if (audioFrame.status === 2) return;
+          const isFirst = audioFrame.status === 0;
+
+          const frame: Record<string, unknown> = {
+            data: {
+              status: audioFrame.status,
+              format: "audio/L16;rate=16000",
+              encoding: "raw",
+              audio: uint8ArrayToBase64(audioFrame.audio),
+            },
+          };
+
+          // First frame includes common + business params
+          if (isFirst) {
+            frame.common = { app_id: IFLYTEK_APP_ID() };
+            frame.business = {
+              language: "zh_cn",
+              domain: "ist_open",
+              accent: "mandarin",
+              dwa: "wpgs",
+              punc: 1,
+            };
+          }
+
+          ws.send(JSON.stringify(frame));
+          frameIndex += 1;
         }
 
-        const audioFrame = frames[frameIndex];
-        if (audioFrame.status === 2) {
-          ws.send(JSON.stringify({ data: { status: 2 } }));
-          return;
-        }
-
-        const isFirst = audioFrame.status === 0;
-
-        const frame: Record<string, unknown> = {
+        ws.send(JSON.stringify({
           data: {
-            status: audioFrame.status,
+            status: 2,
             format: "audio/L16;rate=16000",
             encoding: "raw",
-            audio: uint8ArrayToBase64(audioFrame.audio),
+            audio: "",
           },
-        };
-
-        // First frame includes common + business params
-        if (isFirst) {
-          frame.common = { app_id: IFLYTEK_APP_ID() };
-          frame.business = {
-            language: "zh_cn",
-            domain: "ist_open",
-            accent: "mandarin",
-            dwa: "wpgs",
-            punc: 1,
-          };
-        }
-
-        ws.send(JSON.stringify(frame));
-        frameIndex += 1;
-        setTimeout(sendNextFrame, ASR_FRAME_INTERVAL_MS);
+        }));
       };
 
-      sendNextFrame();
+      sendFrames();
     };
 
     ws.onmessage = (ev: MessageEvent) => {

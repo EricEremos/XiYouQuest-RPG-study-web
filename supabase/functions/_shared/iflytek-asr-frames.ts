@@ -1,7 +1,5 @@
-export const ASR_FRAME_INTERVAL_MS = 40;
-const ASR_FRAME_SIZE = 1_280;
+const ASR_FRAME_SIZE = 10_240;
 const ASR_MIN_TIMEOUT_MS = 120_000;
-const ASR_FINAL_RESPONSE_GRACE_MS = 30_000;
 export const ASR_PCM_BYTES_PER_SECOND = 32_000;
 export const ASR_MAX_PCM_BYTES = 200 * ASR_PCM_BYTES_PER_SECOND;
 export const COMPANION_MAX_PCM_BYTES =
@@ -36,12 +34,7 @@ export function calculateAsrTimeoutMs(pcmByteLength: number): number {
     throw new Error("iFlytek ASR: audio exceeds 200-second limit");
   }
 
-  const audioFrameCount = Math.ceil(pcmByteLength / ASR_FRAME_SIZE);
-  const streamingDurationMs = audioFrameCount * ASR_FRAME_INTERVAL_MS;
-  return Math.max(
-    ASR_MIN_TIMEOUT_MS,
-    streamingDurationMs + ASR_FINAL_RESPONSE_GRACE_MS,
-  );
+  return ASR_MIN_TIMEOUT_MS;
 }
 
 export function createAsrAudioFrames(

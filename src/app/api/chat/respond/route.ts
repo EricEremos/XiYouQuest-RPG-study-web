@@ -14,7 +14,7 @@ import { XP_VALUES } from "@/types/gamification";
 
 const AFFECTION_PER_TURN = 3;
 
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
