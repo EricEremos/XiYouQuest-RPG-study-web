@@ -4,6 +4,7 @@ import {
   ASR_FRAME_INTERVAL_MS,
   calculateAsrTimeoutMs,
   createAsrAudioFrames,
+  getPcmByteLength,
 } from "./iflytek-asr-frames.ts";
 
 const ASR_HOST = "ist-api-sg.xf-yun.com";
@@ -32,15 +33,9 @@ export async function transcribeAudio(
   audioData: Uint8Array,
 ): Promise<AsrTranscriptionResult> {
   // Strip WAV header if present (44-byte RIFF header)
-  let pcmData: Uint8Array;
-  if (
-    audioData.length >= 44 &&
-    new TextDecoder().decode(audioData.subarray(0, 4)) === "RIFF"
-  ) {
-    pcmData = audioData.subarray(44);
-  } else {
-    pcmData = audioData;
-  }
+  const pcmData = audioData.subarray(
+    audioData.length - getPcmByteLength(audioData),
+  );
 
   const timeoutMs = calculateAsrTimeoutMs(pcmData.length);
   const wsUrl = await buildIflytekWsUrl(ASR_HOST, ASR_PATH);

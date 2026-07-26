@@ -8,10 +8,30 @@ const ASR_PATH = "/v2/ist";
 const ASR_FRAME_SIZE = 1_280;
 const ASR_FRAME_INTERVAL_MS = 40;
 const ASR_FINAL_RESPONSE_GRACE_MS = 30_000;
-export const ASR_MAX_PCM_BYTES = 200 * 32_000;
+export const ASR_PCM_BYTES_PER_SECOND = 32_000;
+export const ASR_MAX_PCM_BYTES = 200 * ASR_PCM_BYTES_PER_SECOND;
+export const COMPANION_MAX_PCM_BYTES =
+  60 * ASR_PCM_BYTES_PER_SECOND;
 
 export interface AsrTranscriptionResult {
   transcript: string;
+}
+
+export function getPcmByteLength(audioBuffer: Uint8Array): number {
+  const hasWavHeader =
+    audioBuffer.length >= 44 &&
+    audioBuffer[0] === 0x52 &&
+    audioBuffer[1] === 0x49 &&
+    audioBuffer[2] === 0x46 &&
+    audioBuffer[3] === 0x46;
+  return audioBuffer.length - (hasWavHeader ? 44 : 0);
+}
+
+export function isCompanionAudioWithinLimit(
+  audioBuffer: Uint8Array,
+): boolean {
+  const pcmByteLength = getPcmByteLength(audioBuffer);
+  return pcmByteLength > 0 && pcmByteLength <= COMPANION_MAX_PCM_BYTES;
 }
 
 export function calculateAsrTimeoutMs(pcmByteLength: number): number {
@@ -58,15 +78,9 @@ function buildAsrWsUrl(): string {
  */
 export async function transcribeAudio(audioBuffer: Buffer): Promise<AsrTranscriptionResult> {
   // Strip WAV header if present (44-byte RIFF header)
-  let pcmData: Buffer;
-  if (
-    audioBuffer.length >= 44 &&
-    audioBuffer.toString("ascii", 0, 4) === "RIFF"
-  ) {
-    pcmData = audioBuffer.subarray(44);
-  } else {
-    pcmData = audioBuffer;
-  }
+  const pcmData = audioBuffer.subarray(
+    audioBuffer.length - getPcmByteLength(audioBuffer),
+  );
 
   const timeoutMs = calculateAsrTimeoutMs(pcmData.length);
   const wsUrl = buildAsrWsUrl();

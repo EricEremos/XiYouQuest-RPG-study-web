@@ -61,14 +61,18 @@ vi.mock("ws", () => {
 
 import {
   ASR_MAX_PCM_BYTES as NODE_ASR_MAX_PCM_BYTES,
+  COMPANION_MAX_PCM_BYTES as NODE_COMPANION_MAX_PCM_BYTES,
   calculateAsrTimeoutMs as calculateNodeAsrTimeoutMs,
+  isCompanionAudioWithinLimit as isNodeCompanionAudioWithinLimit,
   transcribeAudio as transcribeNodeAudio,
 } from "./asr-client";
 import {
   ASR_FRAME_INTERVAL_MS,
   ASR_MAX_PCM_BYTES as EDGE_ASR_MAX_PCM_BYTES,
+  COMPANION_MAX_PCM_BYTES as EDGE_COMPANION_MAX_PCM_BYTES,
   calculateAsrTimeoutMs as calculateEdgeAsrTimeoutMs,
   createAsrAudioFrames,
+  isCompanionAudioWithinLimit as isEdgeCompanionAudioWithinLimit,
 } from "../../../supabase/functions/_shared/iflytek-asr-frames";
 
 describe("iFLYTEK ASR streaming protocol", () => {
@@ -132,6 +136,24 @@ describe("iFLYTEK ASR streaming protocol", () => {
     expect(() =>
       calculateEdgeAsrTimeoutMs(EDGE_ASR_MAX_PCM_BYTES + 1),
     ).toThrow("200-second limit");
+  });
+
+  it("enforces the 60-second Companion limit in both runtimes", () => {
+    const wavHeader = Buffer.alloc(44);
+    wavHeader.write("RIFF");
+    const atLimit = Buffer.concat([
+      wavHeader,
+      Buffer.alloc(NODE_COMPANION_MAX_PCM_BYTES),
+    ]);
+    const overLimit = Buffer.concat([atLimit, Buffer.alloc(1)]);
+
+    expect(EDGE_COMPANION_MAX_PCM_BYTES).toBe(
+      NODE_COMPANION_MAX_PCM_BYTES,
+    );
+    expect(isNodeCompanionAudioWithinLimit(atLimit)).toBe(true);
+    expect(isEdgeCompanionAudioWithinLimit(atLimit)).toBe(true);
+    expect(isNodeCompanionAudioWithinLimit(overLimit)).toBe(false);
+    expect(isEdgeCompanionAudioWithinLimit(overLimit)).toBe(false);
   });
 
   it("rejects a header-only WAV before opening a WebSocket", async () => {
