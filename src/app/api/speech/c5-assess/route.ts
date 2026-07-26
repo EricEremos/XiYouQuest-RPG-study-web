@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/supabase/server";
-import { transcribeAudio } from "@/lib/iflytek-speech/asr-client";
+import {
+  ASR_MAX_PCM_BYTES,
+  transcribeAudio,
+} from "@/lib/iflytek-speech/asr-client";
 import {
   assessPronunciation,
   type PronunciationAssessmentResult,
@@ -133,10 +136,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing audio or topic" }, { status: 400 });
     }
 
-    // Validate file size (25MB max)
-    const MAX_FILE_SIZE = 25 * 1024 * 1024;
-    if (audio.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: "Audio file too large (max 25MB)" }, { status: 400 });
+    const MAX_WAV_FILE_BYTES = ASR_MAX_PCM_BYTES + 44;
+    if (audio.size > MAX_WAV_FILE_BYTES) {
+      return NextResponse.json(
+        { error: "Audio exceeds the 200-second transcription limit" },
+        { status: 413 },
+      );
     }
 
     const spokenDurationSeconds = parseFloat(spokenDurationStr) || 0;

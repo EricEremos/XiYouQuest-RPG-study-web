@@ -122,9 +122,9 @@ Record -> WAV Encode -> iFlytek ISE -> XML Parse -> Gemini Feedback -> XP Award 
 |                              |                                      |
 |  +-------------+ +---------+|  +-------------+ +-----------------+ |
 |  | /progress/* | | /social/*||  | ai-feedback | | speech-assess   | |
-|  | /quest/*    | | /leader- ||  | ai-insights | | speech-c5-assess| |
-|  | /mock-exam/*| |  board   ||  | ai-mock-exam| | tts-speak       | |
-|  | /learning/* | | /achieve-||  | chat-start  | | tts-companion   | |
+|  | /quest/*    | | /speech- ||  | ai-insights | | tts-speak       | |
+|  | /mock-exam/*| |  c5      ||  | ai-mock-exam| | tts-companion   | |
+|  | /learning/* | | /achieve-||  | chat-start  | |                 | |
 |  | /auth/*     | |  ments/* ||  | chat-respond| | learning-gen-   | |
 |  | /chat/*     | |          ||  | chat-gen-img|   plan            | |
 |  +------+------+ +----+----+|  +------+------+ +--------+--------+ |
@@ -141,7 +141,7 @@ Record -> WAV Encode -> iFlytek ISE -> XML Parse -> Gemini Feedback -> XP Award 
    +-----------+  +---------------+   +------------+
 ```
 
-**Dual-deployment model:** Lightweight routes (CRUD, auth, social) run on Vercel. Most AI, speech, and TTS routes run as Supabase Edge Functions. Supabase currently requires a response to start within 150 seconds and limits total worker wall-clock time to 400 seconds ([official limits](https://supabase.com/docs/guides/troubleshooting/edge-function-504-error-response)). The 180-second C5 assessment therefore stays on its 300-second Next route. Client-side `fetchWithRetry` transparently routes eligible requests via `resolveEdgeRoute()`.
+**Dual-deployment model:** Lightweight routes (CRUD, auth, social) run on Vercel. Most AI, speech, and TTS routes run as Supabase Edge Functions. Supabase currently has a [150-second response-start limit](https://supabase.com/docs/guides/troubleshooting/edge-function-504-error-response) and a [400-second worker wall-clock limit](https://supabase.com/docs/guides/troubleshooting/edge-function-wall-clock-time-limit-reached-Nk38bW). The 180-second C5 assessment therefore stays on its 300-second Next route. Client-side `fetchWithRetry` transparently routes eligible requests via `resolveEdgeRoute()`.
 
 ---
 
@@ -815,10 +815,12 @@ Apply migrations to your Supabase project. The schema creates tables with RLS po
 
 Database triggers auto-create a `profiles` row on signup and unlock default characters.
 
-### 4. Deploy Edge Functions
+### 4. Deploy the Web App and Edge Functions
+
+Deploy the Next app through the repository's Vercel project so the C5 assessment stays on its 300-second route. Confirm that the project's configured function duration supports 300 seconds ([Vercel duration documentation](https://vercel.com/docs/functions/configuring-functions/duration)). Then deploy the 10 client-routed Edge Functions:
 
 ```bash
-# Deploy all 11 edge functions to Supabase
+# Deploy all 10 client-routed edge functions to Supabase
 supabase functions deploy ai-feedback --no-verify-jwt
 supabase functions deploy ai-insights --no-verify-jwt
 supabase functions deploy ai-mock-exam-feedback --no-verify-jwt
@@ -827,7 +829,6 @@ supabase functions deploy chat-start --no-verify-jwt
 supabase functions deploy chat-respond --no-verify-jwt
 supabase functions deploy learning-generate-plan --no-verify-jwt
 supabase functions deploy speech-assess --no-verify-jwt
-supabase functions deploy speech-c5-assess --no-verify-jwt
 supabase functions deploy tts-speak --no-verify-jwt
 supabase functions deploy tts-companion --no-verify-jwt
 ```
@@ -916,7 +917,7 @@ src/
 +-- data/                                 # Question bank source files
 
 supabase/
-+-- functions/                            # 11 Deno edge functions
++-- functions/                            # 11 source functions (10 client-routed)
 |   +-- _shared/                          # 13 shared Deno modules (AI, iFlytek, scoring, etc.)
 |   +-- ai-feedback/                      # Practice session AI feedback
 |   +-- ai-insights/                      # Progress analysis and study strategy
@@ -926,7 +927,7 @@ supabase/
 |   +-- chat-respond/                     # Voice input -> ASR -> ISE -> LLM reply
 |   +-- learning-generate-plan/           # AI curriculum generation
 |   +-- speech-assess/                    # Generic speech assessment (C1-C4, C6)
-|   +-- speech-c5-assess/                 # Specialized C5 prompted speaking evaluation
+|   +-- speech-c5-assess/                 # Retained source; the client uses the Next route
 |   +-- tts-speak/                        # Text-to-speech for practice
 |   +-- tts-companion/                    # Text-to-speech for companion voice
 +-- migrations/                           # SQL schema + seed data

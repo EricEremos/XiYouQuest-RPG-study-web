@@ -92,6 +92,8 @@ const CATEGORY_LABELS: Record<string, { zh: string; en: string }> = {
   psc_exam: { zh: "PSC考试练习", en: "PSC Exam Practice" },
 };
 
+const COMPANION_RECORDING_LIMIT_SECONDS = 60;
+
 // ── Component ──
 
 export default function CompanionChatClient({
@@ -1338,6 +1340,7 @@ export default function CompanionChatClient({
           <AudioRecorder
             onRecordingComplete={handleRecordingComplete}
             disabled={isProcessing}
+            maxDurationSeconds={COMPANION_RECORDING_LIMIT_SECONDS}
           />
           {isProcessing && (
             <p className="text-center text-sm text-muted-foreground mt-2 font-pixel animate-pulse">

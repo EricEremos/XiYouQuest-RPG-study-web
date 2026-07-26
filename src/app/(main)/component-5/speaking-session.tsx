@@ -22,6 +22,7 @@ import type { ComponentNumber } from "@/types/practice";
 
 // 3 minutes in seconds
 const TOTAL_TIME = 180;
+const C5_MAX_RECORDING_SECONDS = 195;
 
 // Number of topic choices offered (real CBT PSC offers 2)
 const TOPIC_CHOICES = 2;
@@ -355,6 +356,16 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
     setLearningActive(false);
     handleRecordingCompleteRef.current(wavBlob);
   }, [isRecording, setLearningActive]);
+
+  useEffect(() => {
+    if (!isRecording) return;
+
+    const recordingLimitTimer = setTimeout(
+      stopRecording,
+      C5_MAX_RECORDING_SECONDS * 1000,
+    );
+    return () => clearTimeout(recordingLimitTimer);
+  }, [isRecording, stopRecording]);
 
   // Handle completed recording
   const handleRecordingComplete = useCallback(async (audioBlob: Blob) => {
@@ -743,7 +754,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                 elapsedTime >= TOTAL_TIME ? "text-green-600" : "text-orange-500"
               }`}>
                 {elapsedTime >= TOTAL_TIME
-                  ? "3 minutes reached! You can stop when ready."
+                  ? `3 minutes reached! Recording stops automatically in ${formatTime(Math.max(C5_MAX_RECORDING_SECONDS - elapsedTime, 0))}.`
                   : `Speak for at least ${formatTime(TOTAL_TIME - elapsedTime)} more`}
               </p>
             </div>

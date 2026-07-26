@@ -16,19 +16,28 @@ interface AudioRecorderProps {
   onRecordingComplete: (audioBlob: Blob) => void;
   onRecordingStart?: () => void;
   disabled?: boolean;
+  maxDurationSeconds?: number;
 }
 
-export const AudioRecorder = forwardRef<AudioRecorderHandle, AudioRecorderProps>(function AudioRecorder({ onRecordingComplete, onRecordingStart, disabled }, ref) {
+export const AudioRecorder = forwardRef<AudioRecorderHandle, AudioRecorderProps>(function AudioRecorder({
+  onRecordingComplete,
+  onRecordingStart,
+  disabled,
+  maxDurationSeconds,
+}, ref) {
   const { setLearningActive } = useBGM();
   const [isRecording, setIsRecording] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [volume, setVolume] = useState(0);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Float32Array[]>([]);
   const animFrameRef = useRef<number>(0);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const autoStopTimeoutRef = useRef<number | null>(null);
+  const recordingTimerRef = useRef<number | null>(null);
 
   // Expose imperative stop() to parent via ref
   const stopRecordingRef = useRef<() => void>(() => {});
@@ -88,6 +97,12 @@ export const AudioRecorder = forwardRef<AudioRecorderHandle, AudioRecorderProps>
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       analyserRef.current = null;
+      if (autoStopTimeoutRef.current !== null) {
+        window.clearTimeout(autoStopTimeoutRef.current);
+      }
+      if (recordingTimerRef.current !== null) {
+        window.clearInterval(recordingTimerRef.current);
+      }
       setLearningActive(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,21 +150,38 @@ export const AudioRecorder = forwardRef<AudioRecorderHandle, AudioRecorderProps>
       setIsRecording(true);
       setPermissionDenied(false);
       setLearningActive(true);
+      setRecordingSeconds(0);
       onRecordingStart?.();
 
-      // Start volume animation
       animFrameRef.current = requestAnimationFrame(updateVolume);
+      if (maxDurationSeconds) {
+        autoStopTimeoutRef.current = window.setTimeout(
+          () => stopRecordingRef.current(),
+          maxDurationSeconds * 1000,
+        );
+        recordingTimerRef.current = window.setInterval(
+          () => setRecordingSeconds((seconds) => seconds + 1),
+          1000,
+        );
+      }
     } catch {
       setPermissionDenied(true);
     }
-  }, [updateVolume, onRecordingStart, setLearningActive]);
+  }, [maxDurationSeconds, onRecordingStart, setLearningActive, updateVolume]);
 
   const stopRecording = useCallback(() => {
     if (!isRecording) return;
 
-    // Stop volume animation
     cancelAnimationFrame(animFrameRef.current);
     setVolume(0);
+    if (autoStopTimeoutRef.current !== null) {
+      window.clearTimeout(autoStopTimeoutRef.current);
+      autoStopTimeoutRef.current = null;
+    }
+    if (recordingTimerRef.current !== null) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
 
     // Close audio context (stops processor)
     if (audioContextRef.current?.state !== "closed") {
@@ -229,6 +261,11 @@ export const AudioRecorder = forwardRef<AudioRecorderHandle, AudioRecorderProps>
       {/* Audio waveform visualizer */}
       {isRecording && (
         <AudioVisualizer bars={barsRef.current} volume={volume} />
+      )}
+      {isRecording && maxDurationSeconds && (
+        <p className="text-xs text-muted-foreground" role="status">
+          {Math.max(0, maxDurationSeconds - recordingSeconds)} seconds remaining
+        </p>
       )}
     </div>
   );
