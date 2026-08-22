@@ -177,7 +177,7 @@ describe("iFLYTEK ASR streaming protocol", () => {
       common: { app_id: "test-app-id" },
       business: {
         language: "zh_cn",
-        domain: "ist_open",
+        domain: "iat",
         accent: "mandarin",
       },
       data: {
