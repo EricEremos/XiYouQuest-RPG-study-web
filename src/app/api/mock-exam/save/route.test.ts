@@ -11,10 +11,10 @@ vi.mock("@/lib/supabase/server", () => ({ createClient, getSessionUser }));
 import { POST } from "./route";
 
 const currentComponentScores = [
-  { componentNumber: 1, score: 100, points: 0 },
-  { componentNumber: 2, score: 80, points: 0 },
-  { componentNumber: 3, score: 60, points: 0 },
-  { componentNumber: 4, score: 40, points: 0 },
+  { componentNumber: 1, score: 100, points: 0, scoreVersion: "psc-2021-v1" },
+  { componentNumber: 2, score: 80, points: 0, scoreVersion: "psc-2021-v1" },
+  { componentNumber: 3, score: 60, points: 0, scoreVersion: "psc-2021-v1" },
+  { componentNumber: 4, score: 40, points: 0, scoreVersion: "psc-2021-v1" },
 ];
 
 function request(body: object) {
@@ -34,7 +34,29 @@ describe("mock exam result persistence", () => {
       totalScore: 60,
       practiceBand: "Mastery",
       scoreVersion: "psc-2021-v1",
-      componentScores: [...currentComponentScores.slice(0, 3), { componentNumber: 5, score: 40, points: 0 }],
+      componentScores: [...currentComponentScores.slice(0, 3), { componentNumber: 5, score: 40, points: 0, scoreVersion: "psc-2021-v1" }],
+      durationSeconds: 600,
+      totalXp: 10,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("rejects a result whose component version conflicts with the declared PSC version", async () => {
+    const insert = vi.fn();
+    createClient.mockResolvedValue({ from: vi.fn(() => ({ insert })) });
+    getSessionUser.mockResolvedValue({ id: "verified-user" });
+
+    const response = await POST(request({
+      totalScore: 60,
+      practiceBand: "Foundation",
+      scoreVersion: "psc-2021-v1",
+      componentScores: currentComponentScores.map((score) => (
+        score.componentNumber === 3
+          ? { ...score, scoreVersion: "legacy-five-component-v1" }
+          : score
+      )),
       durationSeconds: 600,
       totalXp: 10,
     }));

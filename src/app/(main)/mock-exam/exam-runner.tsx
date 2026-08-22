@@ -523,6 +523,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           componentResults: componentResults.map((cr) => ({
             componentNumber: cr.componentNumber,
             score: cr.score,
+            scoreVersion,
             wordScores: cr.wordScores?.slice(0, 20)?.map((w) => ({ word: w.word, score: w.score })),
             quizResults: cr.quizResults?.map((q) => ({ question: q.question.prompt, isCorrect: q.isCorrect })),
             sentenceScores: cr.sentenceScores?.slice(0, 10),

@@ -3,6 +3,7 @@ export type MockExamScoreVersion = "psc-2021-v1" | "legacy-five-component-v1";
 export interface MockExamComponentScore {
   componentNumber: number;
   score: number;
+  scoreVersion: MockExamScoreVersion;
 }
 
 interface MockExamComponent {
@@ -47,6 +48,7 @@ export function normalizeMockExamResult(
       !Number.isFinite(componentScore.score)
       || componentScore.score < 0
       || componentScore.score > 100
+      || componentScore.scoreVersion !== scoreVersion
       || submittedByNumber.has(componentScore.componentNumber)
     ) {
       return null;

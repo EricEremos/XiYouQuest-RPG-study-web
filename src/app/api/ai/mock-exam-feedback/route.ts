@@ -12,6 +12,7 @@ const schema = z.object({
   componentResults: z.array(z.object({
     componentNumber: z.number().int().min(1).max(5),
     score: z.number().min(0).max(100),
+    scoreVersion: z.enum(["psc-2021-v1", "legacy-five-component-v1"]),
     wordScores: z.array(z.object({
       word: z.string(),
       score: z.number().nullable(),

@@ -21,6 +21,10 @@ export interface MockExamComponentScore {
   score: number;
 }
 
+export interface SubmittedMockExamComponentScore extends MockExamComponentScore {
+  scoreVersion: MockExamScoreVersion;
+}
+
 export interface PersistedMockExamComponentScore extends MockExamComponentScore {
   points: number;
   scoreVersion: MockExamScoreVersion;
@@ -94,7 +98,7 @@ function roundToSingleDecimal(value: number): number {
 
 export function normalizeMockExamResult(
   scoreVersion: MockExamScoreVersion,
-  componentScores: readonly MockExamComponentScore[],
+  componentScores: readonly SubmittedMockExamComponentScore[],
 ): NormalizedMockExamResult | null {
   const expectedComponents = getMockExamComponents(scoreVersion);
   if (componentScores.length !== expectedComponents.length) return null;
@@ -105,6 +109,7 @@ export function normalizeMockExamResult(
       !Number.isFinite(componentScore.score)
       || componentScore.score < 0
       || componentScore.score > 100
+      || componentScore.scoreVersion !== scoreVersion
       || submittedByNumber.has(componentScore.componentNumber)
     ) {
       return null;

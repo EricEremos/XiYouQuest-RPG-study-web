@@ -12,10 +12,10 @@ vi.mock("@/lib/gemini/client", () => ({ quickCompletion }));
 import { POST } from "./route";
 
 const currentComponentResults = [
-  { componentNumber: 1, score: 100 },
-  { componentNumber: 2, score: 80 },
-  { componentNumber: 3, score: 60 },
-  { componentNumber: 4, score: 40 },
+  { componentNumber: 1, score: 100, scoreVersion: "psc-2021-v1" },
+  { componentNumber: 2, score: 80, scoreVersion: "psc-2021-v1" },
+  { componentNumber: 3, score: 60, scoreVersion: "psc-2021-v1" },
+  { componentNumber: 4, score: 40, scoreVersion: "psc-2021-v1" },
 ];
 
 function request(body: object) {
@@ -30,9 +30,27 @@ describe("mock exam feedback contract", () => {
     getSessionUser.mockResolvedValue({ id: "verified-user" });
 
     const response = await POST(request({
-      componentResults: [...currentComponentResults.slice(0, 3), { componentNumber: 5, score: 40 }],
+      componentResults: [...currentComponentResults.slice(0, 3), { componentNumber: 5, score: 40, scoreVersion: "psc-2021-v1" }],
       totalScore: 60,
       practiceBand: "Mastery",
+      scoreVersion: "psc-2021-v1",
+    }));
+
+    expect(response.status).toBe(400);
+    expect(quickCompletion).not.toHaveBeenCalled();
+  });
+
+  it("rejects mixed component score versions before generating feedback", async () => {
+    getSessionUser.mockResolvedValue({ id: "verified-user" });
+
+    const response = await POST(request({
+      componentResults: currentComponentResults.map((result) => (
+        result.componentNumber === 3
+          ? { ...result, scoreVersion: "legacy-five-component-v1" }
+          : result
+      )),
+      totalScore: 60,
+      practiceBand: "Foundation",
       scoreVersion: "psc-2021-v1",
     }));
 

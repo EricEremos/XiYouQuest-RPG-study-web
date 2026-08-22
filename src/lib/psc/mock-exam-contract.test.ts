@@ -33,25 +33,31 @@ describe("current PSC mock-exam contract", () => {
 
   it("rejects a duplicate, missing, or legacy-only component from a current PSC result", () => {
     expect(normalizeMockExamResult(CURRENT_PSC_MOCK_SCORE_VERSION, [
-      { componentNumber: 1, score: 100 },
-      { componentNumber: 2, score: 100 },
-      { componentNumber: 3, score: 100 },
-      { componentNumber: 3, score: 50 },
+      { componentNumber: 1, score: 100, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
+      { componentNumber: 2, score: 100, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
+      { componentNumber: 3, score: 100, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
+      { componentNumber: 3, score: 50, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
     ])).toBeNull();
     expect(normalizeMockExamResult(CURRENT_PSC_MOCK_SCORE_VERSION, [
-      { componentNumber: 1, score: 100 },
-      { componentNumber: 2, score: 100 },
-      { componentNumber: 3, score: 100 },
-      { componentNumber: 5, score: 50 },
+      { componentNumber: 1, score: 100, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
+      { componentNumber: 2, score: 100, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
+      { componentNumber: 3, score: 100, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
+      { componentNumber: 5, score: 50, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
+    ])).toBeNull();
+    expect(normalizeMockExamResult(CURRENT_PSC_MOCK_SCORE_VERSION, [
+      { componentNumber: 1, score: 100, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
+      { componentNumber: 2, score: 100, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
+      { componentNumber: 3, score: 100, scoreVersion: "legacy-five-component-v1" },
+      { componentNumber: 4, score: 50, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
     ])).toBeNull();
   });
 
   it("derives current PSC points and total instead of trusting client allocations", () => {
     const normalized = normalizeMockExamResult(CURRENT_PSC_MOCK_SCORE_VERSION, [
-      { componentNumber: 1, score: 100 },
-      { componentNumber: 2, score: 80 },
-      { componentNumber: 3, score: 60 },
-      { componentNumber: 4, score: 40 },
+      { componentNumber: 1, score: 100, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
+      { componentNumber: 2, score: 80, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
+      { componentNumber: 3, score: 60, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
+      { componentNumber: 4, score: 40, scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION },
     ]);
 
     expect(normalized).toEqual({
