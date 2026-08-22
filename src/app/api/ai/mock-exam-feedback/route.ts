@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/supabase/server";
 import { quickCompletion } from "@/lib/gemini/client";
+import {
+  hasConsistentMockExamTotal,
+  normalizeMockExamResult,
+} from "@/lib/psc/mock-exam-contract";
+import { getXiYouQuestPracticeBand } from "@/lib/psc/practice-band";
 import { z } from "zod";
 
 const schema = z.object({
@@ -46,7 +51,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
 
-    const { componentResults, totalScore, practiceBand, scoreVersion } = parsed.data;
+    const { componentResults, totalScore, scoreVersion } = parsed.data;
+    const normalizedResult = normalizeMockExamResult(scoreVersion, componentResults);
+    if (!normalizedResult || !hasConsistentMockExamTotal(totalScore, normalizedResult)) {
+      return NextResponse.json({ error: "Invalid scoring contract" }, { status: 400 });
+    }
+    const practiceBand = getXiYouQuestPracticeBand(normalizedResult.totalScore).label;
     const componentNames = scoreVersion === "psc-2021-v1"
       ? "C1=Monosyllabic Characters, C2=Multisyllabic Words, C3=Passage Reading, C4=Prompted Speaking"
       : "C1=Monosyllabic Characters, C2=Multisyllabic Words, C3=Vocabulary & Grammar, C4=Passage Reading, C5=Prompted Speaking";
@@ -99,7 +109,7 @@ Rules:
       return parts.join(" | ");
     });
 
-    const userPrompt = `XiYouQuest mock-practice results — Total: ${totalScore}/100, Practice band: ${practiceBand}\n${summary.join("\n")}`;
+    const userPrompt = `XiYouQuest mock-practice results — Total: ${normalizedResult.totalScore}/100, Practice band: ${practiceBand}\n${summary.join("\n")}`;
 
     const feedback = await quickCompletion(systemPrompt, userPrompt, 500);
 

@@ -17,8 +17,28 @@ export interface MockExamComponent {
 }
 
 export interface MockExamComponentScore {
-  componentNumber: PracticeComponentNumber;
+  componentNumber: number;
   score: number;
+}
+
+export interface PersistedMockExamComponentScore extends MockExamComponentScore {
+  points: number;
+  scoreVersion: MockExamScoreVersion;
+}
+
+export interface NormalizedMockExamResult {
+  totalScore: number;
+  componentScores: PersistedMockExamComponentScore[];
+}
+
+export interface HistoricalMockExamComponentScore {
+  componentNumber: number;
+  scoreVersion?: MockExamScoreVersion;
+}
+
+export interface HistoricalMockExamContract {
+  scoreVersion: MockExamScoreVersion;
+  storedNumbersAreSourceNumbers: boolean;
 }
 
 export const CURRENT_PSC_MOCK_COMPONENTS: readonly MockExamComponent[] = [
@@ -51,7 +71,7 @@ export function getMockExamComponent(
 
 export function getMockExamComponentBySource(
   scoreVersion: MockExamScoreVersion,
-  sourceComponentNumber: PracticeComponentNumber,
+  sourceComponentNumber: number,
 ): MockExamComponent | undefined {
   return getMockExamComponents(scoreVersion).find(
     (component) => component.sourceComponentNumber === sourceComponentNumber,
@@ -66,4 +86,81 @@ export function calculateMockExamWeightedTotal(
     const component = getMockExamComponent(scoreVersion, componentScore.componentNumber);
     return total + componentScore.score * ((component?.points ?? 0) / 100);
   }, 0);
+}
+
+function roundToSingleDecimal(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+export function normalizeMockExamResult(
+  scoreVersion: MockExamScoreVersion,
+  componentScores: readonly MockExamComponentScore[],
+): NormalizedMockExamResult | null {
+  const expectedComponents = getMockExamComponents(scoreVersion);
+  if (componentScores.length !== expectedComponents.length) return null;
+
+  const submittedByNumber = new Map<number, MockExamComponentScore>();
+  for (const componentScore of componentScores) {
+    if (
+      !Number.isFinite(componentScore.score)
+      || componentScore.score < 0
+      || componentScore.score > 100
+      || submittedByNumber.has(componentScore.componentNumber)
+    ) {
+      return null;
+    }
+    submittedByNumber.set(componentScore.componentNumber, componentScore);
+  }
+
+  const normalizedScores: PersistedMockExamComponentScore[] = [];
+  for (const component of expectedComponents) {
+    const submitted = submittedByNumber.get(component.number);
+    if (!submitted) return null;
+    normalizedScores.push({
+      componentNumber: component.number,
+      score: submitted.score,
+      points: roundToSingleDecimal(submitted.score * (component.points / 100)),
+      scoreVersion,
+    });
+  }
+
+  return {
+    totalScore: roundToSingleDecimal(calculateMockExamWeightedTotal(scoreVersion, normalizedScores)),
+    componentScores: normalizedScores,
+  };
+}
+
+export function hasConsistentMockExamTotal(
+  submittedTotal: number,
+  normalizedResult: NormalizedMockExamResult,
+): boolean {
+  return Number.isFinite(submittedTotal)
+    && Math.abs(submittedTotal - normalizedResult.totalScore) < 0.05;
+}
+
+export function inferHistoricalMockExamContract(
+  componentScores: readonly HistoricalMockExamComponentScore[],
+): HistoricalMockExamContract {
+  const versions = new Set(componentScores.map((score) => score.scoreVersion).filter(Boolean));
+  if (versions.size === 1) {
+    return {
+      scoreVersion: [...versions][0] as MockExamScoreVersion,
+      storedNumbersAreSourceNumbers: false,
+    };
+  }
+
+  const componentNumbers = [...new Set(componentScores.map((score) => score.componentNumber))]
+    .sort((left, right) => left - right)
+    .join(",");
+  if (componentNumbers === "1,2,4,5") {
+    return {
+      scoreVersion: CURRENT_PSC_MOCK_SCORE_VERSION,
+      storedNumbersAreSourceNumbers: true,
+    };
+  }
+
+  return {
+    scoreVersion: LEGACY_FIVE_COMPONENT_SCORE_VERSION,
+    storedNumbersAreSourceNumbers: false,
+  };
 }

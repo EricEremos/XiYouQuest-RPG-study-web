@@ -6,6 +6,10 @@ import {
 } from "../_shared/cors.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
 import { quickCompletion } from "../_shared/ai-client.ts";
+import {
+  hasConsistentMockExamTotal,
+  normalizeMockExamResult,
+} from "../_shared/mock-exam-contract.ts";
 
 const schema = z.object({
   componentResults: z
@@ -74,7 +78,12 @@ Deno.serve(async (req: Request) => {
       return errorResponse("Invalid input", 400);
     }
 
-    const { componentResults, totalScore, practiceBand, scoreVersion } = parsed.data;
+    const { componentResults, totalScore, scoreVersion } = parsed.data;
+    const normalizedResult = normalizeMockExamResult(scoreVersion, componentResults);
+    if (!normalizedResult || !hasConsistentMockExamTotal(totalScore, normalizedResult)) {
+      return errorResponse("Invalid scoring contract", 400);
+    }
+    const practiceBand = getPracticeBand(normalizedResult.totalScore);
     const componentNames = scoreVersion === "psc-2021-v1"
       ? "C1=Monosyllabic Characters, C2=Multisyllabic Words, C3=Passage Reading, C4=Prompted Speaking"
       : "C1=Monosyllabic Characters, C2=Multisyllabic Words, C3=Vocabulary & Grammar, C4=Passage Reading, C5=Prompted Speaking";
@@ -130,7 +139,7 @@ Rules:
       return parts.join(" | ");
     });
 
-    const userPrompt = `XiYouQuest mock-practice results â€” Total: ${totalScore}/100, Practice band: ${practiceBand}\n${summary.join("\n")}`;
+    const userPrompt = `XiYouQuest mock-practice results â€” Total: ${normalizedResult.totalScore}/100, Practice band: ${practiceBand}\n${summary.join("\n")}`;
 
     const feedback = await quickCompletion(systemPrompt, userPrompt, 500);
 
@@ -143,3 +152,13 @@ Rules:
     return jsonResponse({ feedback: null });
   }
 });
+
+function getPracticeBand(score: number): string {
+  if (score >= 97) return "Mastery";
+  if (score >= 92) return "Advanced";
+  if (score >= 87) return "Strong";
+  if (score >= 80) return "Proficient";
+  if (score >= 70) return "Developing";
+  if (score >= 60) return "Foundation";
+  return "Starting point";
+}

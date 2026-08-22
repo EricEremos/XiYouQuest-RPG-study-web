@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
+import {
+  hasConsistentMockExamTotal,
+  normalizeMockExamResult,
+} from "@/lib/psc/mock-exam-contract";
+import { getXiYouQuestPracticeBand } from "@/lib/psc/practice-band";
 import { z } from "zod";
 
 const insertSchema = z.object({
   totalScore: z.number().min(0).max(100),
   practiceBand: z.string().max(20),
+  scoreVersion: z.enum(["psc-2021-v1", "legacy-five-component-v1"]),
   componentScores: z.array(z.object({
     componentNumber: z.number().int().min(1).max(5),
     score: z.number().min(0).max(100),
@@ -29,15 +35,19 @@ export async function POST(request: NextRequest) {
   const parsed = insertSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const { totalScore, practiceBand, componentScores, durationSeconds, totalXp } = parsed.data;
+  const { totalScore, componentScores, durationSeconds, totalXp, scoreVersion } = parsed.data;
+  const normalizedResult = normalizeMockExamResult(scoreVersion, componentScores);
+  if (!normalizedResult || !hasConsistentMockExamTotal(totalScore, normalizedResult)) {
+    return NextResponse.json({ error: "Invalid scoring contract" }, { status: 400 });
+  }
 
   const { data, error } = await supabase
     .from("mock_exam_results")
     .insert({
       user_id: user.id,
-      total_score: totalScore,
-      grade: practiceBand,
-      component_scores: componentScores,
+      total_score: normalizedResult.totalScore,
+      grade: getXiYouQuestPracticeBand(normalizedResult.totalScore).label,
+      component_scores: normalizedResult.componentScores,
       duration_seconds: durationSeconds,
       total_xp: totalXp,
     })

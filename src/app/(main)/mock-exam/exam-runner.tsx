@@ -30,6 +30,7 @@ import {
   calculateMockExamWeightedTotal,
   getMockExamComponent,
   getMockExamComponentBySource,
+  inferHistoricalMockExamContract,
   type MockExamComponent,
   type MockExamScoreVersion,
   type PracticeComponentNumber,
@@ -502,6 +503,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           totalScore: Math.round(weightedTotal * 10) / 10,
           practiceBand,
           componentScores,
+          scoreVersion,
           durationSeconds: totalDuration,
           totalXp: totalXP,
         }),
@@ -643,6 +645,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
               {history.map((exam) => {
                 const date = new Date(exam.created_at);
                 const isExpanded = expandedHistoryId === exam.id;
+                const historicalContract = inferHistoricalMockExamContract(exam.component_scores);
                 const mins = Math.floor(exam.duration_seconds / 60);
                 const secs = exam.duration_seconds % 60;
                 return (
@@ -670,13 +673,12 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
                     {isExpanded && (
                       <div className="border-t px-3 pb-3 pt-2 space-y-2">
                         {exam.component_scores.map((cs) => {
-                          const config = getMockExamComponent(
-                            cs.scoreVersion ?? LEGACY_FIVE_COMPONENT_SCORE_VERSION,
-                            cs.componentNumber,
-                          );
+                          const config = historicalContract.storedNumbersAreSourceNumbers
+                            ? getMockExamComponentBySource(historicalContract.scoreVersion, cs.componentNumber)
+                            : getMockExamComponent(historicalContract.scoreVersion, cs.componentNumber);
                           return (
-                            <div key={cs.componentNumber} className="flex justify-between text-sm">
-                              <span>C{cs.componentNumber}: {config?.name}</span>
+                            <div key={`${cs.componentNumber}-${config?.number ?? "unknown"}`} className="flex justify-between text-sm">
+                              <span>C{config?.number ?? cs.componentNumber}: {config?.name ?? "Unknown component"}</span>
                               <span className={cs.score >= 90 ? "text-green-600" : cs.score >= 60 ? "text-yellow-600" : "text-red-600"}>
                                 {cs.points}/{config?.points} pts
                               </span>
