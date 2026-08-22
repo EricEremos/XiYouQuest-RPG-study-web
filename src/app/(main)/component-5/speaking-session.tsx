@@ -153,6 +153,8 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
 
   // Save progress when speaking assessment completes
   const hasSavedProgress = useRef(false);
+  const hasRecordedProgress = useRef(false);
+  const progressAttemptId = useRef<string | null>(null);
   const isSavingProgress = useRef(false);
   useEffect(() => {
     if (
@@ -169,24 +171,29 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
       const spokenTime = elapsedTimeRef.current;
 
       try {
-        const res = await fetchWithRetry("/api/progress/update", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            characterId,
-            component,
-            score: analysis.normalizedScore,
-            xpEarned: totalXPEarned,
-            durationSeconds: spokenTime,
-            questionsAttempted: 1,
-            questionsCorrect: analysis.normalizedScore >= 60 ? 1 : 0,
-            bestStreak: analysis.normalizedScore >= 60 ? 1 : 0,
-          }),
-        });
-        if (!res.ok) throw new Error(`Practice-progress update failed (${res.status})`);
-        const data = await res.json();
-        if (data.newAchievements?.length > 0) {
-          showAchievementToasts(data.newAchievements);
+        if (!hasRecordedProgress.current) {
+          progressAttemptId.current ??= crypto.randomUUID();
+          const res = await fetchWithRetry("/api/progress/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              characterId,
+              attemptId: progressAttemptId.current,
+              component,
+              score: analysis.normalizedScore,
+              xpEarned: totalXPEarned,
+              durationSeconds: spokenTime,
+              questionsAttempted: 1,
+              questionsCorrect: analysis.normalizedScore >= 60 ? 1 : 0,
+              bestStreak: analysis.normalizedScore >= 60 ? 1 : 0,
+            }),
+          }, { maxRetries: 0 });
+          if (!res.ok) throw new Error(`Practice-progress update failed (${res.status})`);
+          const data = await res.json();
+          hasRecordedProgress.current = true;
+          if (data.newAchievements?.length > 0) {
+            showAchievementToasts(data.newAchievements);
+          }
         }
 
         if (lpNodeId) {
@@ -525,6 +532,8 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
     setExpression("neutral");
     setDialogue(getDialogue(character.name, "c5_initial"));
     hasSavedProgress.current = false;
+    hasRecordedProgress.current = false;
+    progressAttemptId.current = null;
     const shuffled = shuffle(topics);
     setDisplayTopics(shuffled.slice(0, TOPIC_CHOICES));
   }, [topics, character.name]);
@@ -609,6 +618,8 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                     setTotalXPEarned(0);
                     setShowTranscript(false);
                     hasSavedProgress.current = false;
+                    hasRecordedProgress.current = false;
+                    progressAttemptId.current = null;
                     setProgressSaveError(null);
                     setProgressSaveAttempt(0);
                     setExpression("encouraging");

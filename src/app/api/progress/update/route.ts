@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     }
     const {
       characterId,
+      attemptId,
       component,
       score,
       xpEarned,
@@ -40,18 +41,34 @@ export async function POST(request: NextRequest) {
     const perQuestionCap = questionsAttempted > 0 ? questionsAttempted * 20 : MAX_XP_NO_QUESTIONS;
     const clampedXpEarned = Math.max(0, Math.min(Math.floor(xpEarned), perQuestionCap, MAX_XP_PER_SESSION));
 
-    // Anti-replay: reject duplicate submissions from same user+component within 10 seconds
-    const { data: recentSession } = await supabase
-      .from("practice_sessions")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("component", component)
-      .gte("created_at", new Date(Date.now() - 10_000).toISOString())
-      .limit(1)
-      .single();
+    if (attemptId) {
+      const { data: existingAttempt, error: existingAttemptError } = await supabase
+        .from("practice_sessions")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("client_attempt_id", attemptId)
+        .maybeSingle();
 
-    if (recentSession) {
-      return NextResponse.json({ error: "Duplicate submission" }, { status: 429 });
+      if (existingAttemptError) {
+        console.error("Attempt lookup error:", existingAttemptError);
+        return NextResponse.json({ error: "Failed to check practice attempt" }, { status: 500 });
+      }
+      if (existingAttempt) {
+        return NextResponse.json({ alreadyRecorded: true, newAchievements: [] });
+      }
+    } else {
+      const { data: recentSession } = await supabase
+        .from("practice_sessions")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("component", component)
+        .gte("created_at", new Date(Date.now() - 10_000).toISOString())
+        .limit(1)
+        .single();
+
+      if (recentSession) {
+        return NextResponse.json({ error: "Duplicate submission" }, { status: 429 });
+      }
     }
 
     // 1. Insert practice session
@@ -61,12 +78,16 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         character_id: characterId,
         component,
+        client_attempt_id: attemptId ?? null,
         score,
         xp_earned: clampedXpEarned,
         duration_seconds: durationSeconds ?? 0,
       });
 
     if (sessionError) {
+      if (attemptId && sessionError.code === "23505") {
+        return NextResponse.json({ alreadyRecorded: true, newAchievements: [] });
+      }
       console.error("Session insert error:", sessionError);
       return NextResponse.json({ error: "Failed to save session" }, { status: 500 });
     }

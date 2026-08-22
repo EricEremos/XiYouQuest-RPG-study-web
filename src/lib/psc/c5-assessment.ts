@@ -71,12 +71,34 @@ export function parseC5AssessmentResponse(value: unknown): C5AssessmentResponse 
     throw new Error("Invalid C5 assessment response");
   }
 
+  const pronunciation = parseScoreCategory(result.pronunciation, 20, 12, 6);
+  const vocabGrammar = parseScoreCategory(result.vocabGrammar, 5, 5, 3);
+  const fluency = parseScoreCategory(result.fluency, 5, 5, 3);
+  if (
+    pronunciation.score !== 20 - pronunciation.deduction ||
+    vocabGrammar.score !== 5 - vocabGrammar.deduction ||
+    fluency.score !== 5 - fluency.deduction
+  ) {
+    throw new Error("Invalid C5 assessment response");
+  }
+  const expectedTotalScore = Math.round(Math.max(0, Math.min(
+    30,
+    (20 - pronunciation.deduction) +
+      (5 - vocabGrammar.deduction) +
+      (5 - fluency.deduction) -
+      result.timePenalty,
+  )) * 10) / 10;
+  const expectedNormalizedScore = Math.round((expectedTotalScore / 30) * 100);
+  if (result.totalScore !== expectedTotalScore || result.normalizedScore !== expectedNormalizedScore) {
+    throw new Error("Invalid C5 assessment response");
+  }
+
   return {
     assessmentType: C5_ASSESSMENT_TYPE,
     assessmentVersion: C5_ASSESSMENT_VERSION,
-    pronunciation: parseScoreCategory(result.pronunciation, 20, 12, 6),
-    vocabGrammar: parseScoreCategory(result.vocabGrammar, 5, 5, 3),
-    fluency: parseScoreCategory(result.fluency, 5, 5, 3),
+    pronunciation,
+    vocabGrammar,
+    fluency,
     timePenalty: result.timePenalty,
     totalScore: result.totalScore,
     normalizedScore: result.normalizedScore,
@@ -90,6 +112,9 @@ export async function requestC5Assessment(
   topic: string,
   ownerSignal?: AbortSignal,
 ): Promise<C5AssessmentResponse> {
+  if (ownerSignal?.aborted) {
+    throw new DOMException("C5 assessment cancelled", "AbortError");
+  }
   const controller = new AbortController();
   const abortForOwner = () => controller.abort();
   ownerSignal?.addEventListener("abort", abortForOwner, { once: true });

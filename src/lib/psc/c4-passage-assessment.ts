@@ -6,9 +6,15 @@ export interface C4AssessmentWord {
   errorType: string;
 }
 
+export interface C4AssessmentSentence {
+  content: string;
+  score: number;
+}
+
 export interface C4AssessmentResponse {
   pronunciationScore: number;
   words: C4AssessmentWord[];
+  sentences: C4AssessmentSentence[];
 }
 
 export interface C4PassageAssessment {
@@ -55,7 +61,25 @@ export function parseC4AssessmentResponse(value: unknown): C4AssessmentResponse 
       errorType: candidate.errorType,
     };
   });
-  return { pronunciationScore: result.pronunciationScore, words };
+  if (result.sentences !== undefined && !Array.isArray(result.sentences)) {
+    throw new Error("Invalid C4 assessment sentence");
+  }
+  const sentences = (result.sentences ?? []).map((sentence) => {
+    if (!sentence || typeof sentence !== "object") throw new Error("Invalid C4 assessment sentence");
+    const candidate = sentence as Record<string, unknown>;
+    if (
+      typeof candidate.content !== "string" ||
+      candidate.content.length === 0 ||
+      typeof candidate.score !== "number" ||
+      !Number.isFinite(candidate.score) ||
+      candidate.score < 0 ||
+      candidate.score > 100
+    ) {
+      throw new Error("Invalid C4 assessment sentence");
+    }
+    return { content: candidate.content, score: candidate.score };
+  });
+  return { pronunciationScore: result.pronunciationScore, words, sentences };
 }
 
 export function splitIntoC4Sentences(content: string): string[] {
@@ -65,8 +89,16 @@ export function splitIntoC4Sentences(content: string): string[] {
 export function computeC4SentenceScores(
   passageContent: string,
   words: C4AssessmentWord[],
+  authoritativeSentences: C4AssessmentSentence[],
+  overallScore: number,
 ): { sentence: string; score: number }[] {
   const sentences = splitIntoC4Sentences(passageContent);
+  if (authoritativeSentences.length === sentences.length) {
+    return sentences.map((sentence, index) => ({ sentence, score: authoritativeSentences[index].score }));
+  }
+  if (words.length === 0) {
+    return sentences.map((sentence) => ({ sentence, score: overallScore }));
+  }
   let wordIndex = 0;
 
   return sentences.map((sentence) => {
@@ -109,6 +141,11 @@ export async function assessC4Passage(
   return {
     score,
     xpEarned: xpResult.totalXP,
-    sentenceScores: computeC4SentenceScores(referenceText, apiResult.words),
+    sentenceScores: computeC4SentenceScores(
+      referenceText,
+      apiResult.words,
+      apiResult.sentences,
+      score,
+    ),
   };
 }

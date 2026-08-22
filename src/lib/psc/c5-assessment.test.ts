@@ -18,8 +18,8 @@ const validResponse = {
   vocabGrammar: { score: 4, deduction: 1, level: 2, label: "Developing", notes: "Accurate" },
   fluency: { score: 4, deduction: 1, level: 2, label: "Developing", notes: "Steady" },
   timePenalty: 1,
-  totalScore: 24,
-  normalizedScore: 80,
+  totalScore: 23,
+  normalizedScore: 77,
   transcript: "我喜欢学习中文。",
   errorCount: 1,
 };
@@ -38,6 +38,15 @@ describe("C5 assessment contract", () => {
       .toThrow("Invalid C5 assessment response");
   });
 
+  it("rejects internally inconsistent category and aggregate scores", () => {
+    expect(() => parseC5AssessmentResponse({ ...validResponse, totalScore: 24, normalizedScore: 80 }))
+      .toThrow("Invalid C5 assessment response");
+    expect(() => parseC5AssessmentResponse({
+      ...validResponse,
+      pronunciation: { ...validResponse.pronunciation, score: 17 },
+    })).toThrow("Invalid C5 assessment response");
+  });
+
   it("posts audio once through the shared no-retry contract", async () => {
     fetchWithRetry.mockResolvedValue(new Response(JSON.stringify(validResponse), { status: 200 }));
 
@@ -49,5 +58,15 @@ describe("C5 assessment contract", () => {
       expect.objectContaining({ method: "POST", body: expect.any(FormData), signal: expect.any(AbortSignal) }),
       { maxRetries: 0 },
     );
+  });
+
+  it("does not start a request when its owner has already cancelled", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(requestC5Assessment(new Blob(["audio"]), "旅行", controller.signal))
+      .rejects.toMatchObject({ name: "AbortError" });
+
+    expect(fetchWithRetry).not.toHaveBeenCalled();
   });
 });

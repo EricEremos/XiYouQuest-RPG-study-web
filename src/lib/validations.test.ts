@@ -16,6 +16,7 @@ describe("chat image generation validation", () => {
 });
 
 describe("practice-progress validation", () => {
+  const attemptId = "7f00df0d-3790-4c5a-995e-68f63f3d7de8";
   const payload = {
     characterId: "6f00df0d-3790-4c5a-995e-68f63f3d7de8",
     component: 5,
@@ -29,6 +30,7 @@ describe("practice-progress validation", () => {
 
   it("accepts the aggregate C5 progress payload", () => {
     expect(progressUpdateSchema.safeParse(payload).success).toBe(true);
+    expect(progressUpdateSchema.safeParse({ ...payload, attemptId }).success).toBe(true);
   });
 
   it("rejects raw transcript or audio fields rather than silently stripping them", () => {

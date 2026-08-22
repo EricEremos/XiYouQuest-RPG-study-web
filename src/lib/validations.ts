@@ -32,6 +32,7 @@ export const profileSettingsSchema = z
 
 export const progressUpdateSchema = z.object({
   characterId: uuid,
+  attemptId: uuid.optional(),
   component: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7)]),
   score: z.number().min(0).max(100),
   xpEarned: z.number().min(0),

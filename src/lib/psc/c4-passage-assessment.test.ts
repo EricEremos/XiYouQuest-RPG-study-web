@@ -32,6 +32,35 @@ describe("assessC4Passage", () => {
     });
   });
 
+  it("uses authoritative sentence scores and never renders zeroes for an empty word list", async () => {
+    const withAuthoritativeSentences = await assessC4Passage(
+      new Blob(["audio"]),
+      "你好。再见。",
+      vi.fn().mockResolvedValue({
+        pronunciationScore: 80,
+        words: [],
+        sentences: [
+          { content: "你好。", score: 91 },
+          { content: "再见。", score: 69 },
+        ],
+      }),
+    );
+    const withoutSentenceDetails = await assessC4Passage(
+      new Blob(["audio"]),
+      "你好。再见。",
+      vi.fn().mockResolvedValue({ pronunciationScore: 80, words: [] }),
+    );
+
+    expect(withAuthoritativeSentences.sentenceScores).toEqual([
+      { sentence: "你好。", score: 91 },
+      { sentence: "再见。", score: 69 },
+    ]);
+    expect(withoutSentenceDetails.sentenceScores).toEqual([
+      { sentence: "你好。", score: 80 },
+      { sentence: "再见。", score: 80 },
+    ]);
+  });
+
   it("rejects a malformed successful response instead of recording an untrusted score", async () => {
     await expect(
       assessC4Passage(

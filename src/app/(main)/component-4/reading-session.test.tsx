@@ -58,7 +58,10 @@ const character = {
   expressions: {},
 };
 
-function renderReadingSession(source: { label: string; isSchoolProvided: boolean }) {
+function renderReadingSession(
+  source: { label: string; isSchoolProvided: boolean },
+  options: { characterId?: string; lpNodeId?: string } = {},
+) {
   return render(
     <ReadingSession
       passages={[
@@ -72,7 +75,9 @@ function renderReadingSession(source: { label: string; isSchoolProvided: boolean
         },
       ]}
       character={character}
+      characterId={options.characterId}
       component={4}
+      lpNodeId={options.lpNodeId}
     />,
   );
 }
@@ -90,10 +95,13 @@ describe("ReadingSession provenance label", () => {
   it("keeps a complete school-provided source label visible after a learner selects the passage", () => {
     vi.stubGlobal("speechSynthesis", { cancel: vi.fn() });
 
-    renderReadingSession({
-      label: "School-provided practice source: PSC reading collection (2026-08)",
-      isSchoolProvided: true,
-    });
+    renderReadingSession(
+      {
+        label: "School-provided practice source: PSC reading collection (2026-08)",
+        isSchoolProvided: true,
+      },
+      { characterId: "6f00df0d-3790-4c5a-995e-68f63f3d7de8" },
+    );
 
     const sourceLabel = "School-provided practice source: PSC reading collection (2026-08)";
     expect(screen.getAllByText(sourceLabel)).toHaveLength(1);
@@ -135,5 +143,47 @@ describe("ReadingSession provenance label", () => {
       "/api/progress/update",
       expect.anything(),
     );
+  });
+
+  it("retries only Learning Path completion after C4 progress has been recorded", async () => {
+    vi.stubGlobal("speechSynthesis", { cancel: vi.fn() });
+    vi.stubGlobal("crypto", { randomUUID: vi.fn(() => "6f00df0d-3790-4c5a-995e-68f63f3d7de8") });
+    fetchWithRetry
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        pronunciationScore: 80,
+        words: [{ word: "这是练习内容", accuracyScore: 80, errorType: "none" }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ feedback: "Good reading." }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ newAchievements: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response("Learning Path unavailable", { status: 500 }))
+      .mockResolvedValueOnce(new Response("", { status: 200 }));
+
+    renderReadingSession(
+      {
+        label: "School-provided practice source: PSC reading collection (2026-08)",
+        isSchoolProvided: true,
+      },
+      {
+        characterId: "7f00df0d-3790-4c5a-995e-68f63f3d7de8",
+        lpNodeId: "8f00df0d-3790-4c5a-995e-68f63f3d7de8",
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Practice passage: Test passage" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit C4 recording" }));
+
+    await screen.findByRole("alert");
+    expect(fetchWithRetry.mock.calls.filter(([url]) => url === "/api/progress/update")).toHaveLength(1);
+    const progressRequest = fetchWithRetry.mock.calls.find(([url]) => url === "/api/progress/update");
+    expect(progressRequest).toBeDefined();
+    expect(JSON.parse(progressRequest![1].body as string)).toMatchObject({
+      attemptId: "6f00df0d-3790-4c5a-995e-68f63f3d7de8",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry Saving Progress" }));
+
+    await waitFor(() => {
+      expect(fetchWithRetry.mock.calls.filter(([url]) => url === "/api/learning/node/complete")).toHaveLength(2);
+    });
+    expect(fetchWithRetry.mock.calls.filter(([url]) => url === "/api/progress/update")).toHaveLength(1);
   });
 });

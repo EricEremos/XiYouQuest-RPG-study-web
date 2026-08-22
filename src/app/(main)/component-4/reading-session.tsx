@@ -161,6 +161,8 @@ export function ReadingSession({ passages, character, characterId, component, lp
 
   // Save progress when reading assessment completes
   const hasSavedProgress = useRef(false);
+  const hasRecordedProgress = useRef(false);
+  const progressAttemptId = useRef<string | null>(null);
   const isSavingProgress = useRef(false);
   useEffect(() => {
     if (
@@ -175,24 +177,29 @@ export function ReadingSession({ passages, character, characterId, component, lp
 
     const saveProgress = async () => {
       try {
-        const res = await fetchWithRetry("/api/progress/update", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            characterId,
-            component,
-            score: overallScore,
-            xpEarned: totalXPEarned,
-            durationSeconds: 0,
-            questionsAttempted: 1,
-            questionsCorrect: overallScore >= 60 ? 1 : 0,
-            bestStreak: overallScore >= 60 ? 1 : 0,
-          }),
-        });
-        if (!res.ok) throw new Error(`Progress update failed (${res.status})`);
-        const data = await res.json();
-        if (data.newAchievements?.length > 0) {
-          showAchievementToasts(data.newAchievements);
+        if (!hasRecordedProgress.current) {
+          progressAttemptId.current ??= crypto.randomUUID();
+          const res = await fetchWithRetry("/api/progress/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              characterId,
+              attemptId: progressAttemptId.current,
+              component,
+              score: overallScore,
+              xpEarned: totalXPEarned,
+              durationSeconds: 0,
+              questionsAttempted: 1,
+              questionsCorrect: overallScore >= 60 ? 1 : 0,
+              bestStreak: overallScore >= 60 ? 1 : 0,
+            }),
+          }, { maxRetries: 0 });
+          if (!res.ok) throw new Error(`Progress update failed (${res.status})`);
+          const data = await res.json();
+          hasRecordedProgress.current = true;
+          if (data.newAchievements?.length > 0) {
+            showAchievementToasts(data.newAchievements);
+          }
         }
 
         if (lpNodeId) {
@@ -514,6 +521,8 @@ export function ReadingSession({ passages, character, characterId, component, lp
     setFeedbackText("");
     setProgressSaveError(null);
     hasSavedProgress.current = false;
+    hasRecordedProgress.current = false;
+    progressAttemptId.current = null;
 
     setExpression("neutral");
     setDialogue(getDialogue(character.name, "c4_initial"));
@@ -641,6 +650,8 @@ export function ReadingSession({ passages, character, characterId, component, lp
                     setFeedbackText("");
                     setProgressSaveError(null);
                     hasSavedProgress.current = false;
+                    hasRecordedProgress.current = false;
+                    progressAttemptId.current = null;
                     setExpression("neutral");
                     setDialogue(getDialogue(character.name, "c4_retry"));
                   }} className="w-full">

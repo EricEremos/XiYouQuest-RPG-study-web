@@ -71,6 +71,7 @@ export interface PracticeSession {
   score: number;
   xp_earned: number;
   duration_seconds: number;
+  client_attempt_id: string | null;
   created_at: string;
 }
 
