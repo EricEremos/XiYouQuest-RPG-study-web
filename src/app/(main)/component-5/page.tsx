@@ -3,6 +3,13 @@ import dynamic from "next/dynamic";
 import { loadSelectedCharacter } from "@/lib/character-loader";
 import { buildPlayerMemory } from "@/lib/gemini/player-memory";
 import { shuffle } from "@/lib/utils";
+import Link from "next/link";
+import {
+  getSupplementarySpeakingTopics,
+  OFFICIAL_PSC_SPEAKING_TOPICS,
+  OFFICIAL_PSC_SPEAKING_TOPICS_METADATA,
+} from "@/lib/psc/official-speaking-topics";
+import { Button } from "@/components/ui/button";
 
 const SpeakingSession = dynamic(() => import("./speaking-session").then(m => m.SpeakingSession), {
   loading: () => (
@@ -14,23 +21,12 @@ const SpeakingSession = dynamic(() => import("./speaking-session").then(m => m.S
   ),
 });
 
-// Default speaking topics for Component 5
-const FALLBACK_TOPICS = [
-  "我的家庭", "我的一位朋友", "我尊敬的人", "我最喜欢的季节",
-  "我最喜欢的运动", "我的一次难忘旅行", "我的一次失败经历",
-  "我学习普通话的体会", "我的一天", "我的家乡",
-  "我现在住的城市", "我喜欢的美食", "我喜欢的电影",
-  "我喜欢的一本书", "我的兴趣爱好", "我对时间管理的看法",
-  "我对网络生活的看法", "我对环保的看法", "我理想的工作",
-  "我最喜欢的节日",
-];
-
 export default async function Component5Page({
   searchParams,
 }: {
-  searchParams: Promise<{ lpNode?: string }>;
+  searchParams: Promise<{ lpNode?: string; bank?: string }>;
 }) {
-  const { lpNode } = await searchParams;
+  const { lpNode, bank } = await searchParams;
   const supabase = await createClient();
   const user = await getSessionUser();
 
@@ -46,12 +42,14 @@ export default async function Component5Page({
 
   const playerMemory = await buildPlayerMemory(supabase, user!.id, character.id ?? "").catch(() => "");
 
-  // Use DB topics with shuffle, or fallback
-  const topics: string[] = shuffle(
-    dbTopics && dbTopics.length > 0
-      ? dbTopics.map((q: { content: string }) => q.content)
-      : FALLBACK_TOPICS
+  const supplementaryTopics = getSupplementarySpeakingTopics(
+    (dbTopics ?? []).map((question: { content: string }) => question.content)
   );
+  const usesSupplementaryBank = bank === "supplementary" && supplementaryTopics.length > 0;
+  const topics = shuffle(
+    usesSupplementaryBank ? supplementaryTopics : [...OFFICIAL_PSC_SPEAKING_TOPICS]
+  );
+  const lpQuery = lpNode ? `&lpNode=${encodeURIComponent(lpNode)}` : "";
 
   return (
     <div className="space-y-4">
@@ -62,6 +60,26 @@ export default async function Component5Page({
         <p className="text-muted-foreground">
           <span className="font-chinese">命题说话</span> — Speak on a given topic for 3 minutes with natural fluency and structure.
         </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {usesSupplementaryBank
+            ? "Supplementary practice bank · not used in the mock exam"
+            : "Official PSC bank · 50 topics · two choices per session"}
+        </p>
+        {!usesSupplementaryBank && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Source collection: {OFFICIAL_PSC_SPEAKING_TOPICS_METADATA.version} · effective {OFFICIAL_PSC_SPEAKING_TOPICS_METADATA.effectiveFrom}
+          </p>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2" aria-label="Speaking topic bank">
+          <Button asChild size="sm" variant={usesSupplementaryBank ? "outline" : "default"}>
+            <Link href={`/component-5?bank=official${lpQuery}`}>Official topics</Link>
+          </Button>
+          {supplementaryTopics.length > 0 && (
+            <Button asChild size="sm" variant={usesSupplementaryBank ? "default" : "outline"}>
+              <Link href={`/component-5?bank=supplementary${lpQuery}`}>Supplementary practice</Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       <SpeakingSession topics={topics} character={character} characterId={character.id} component={5} playerMemory={playerMemory} lpNodeId={lpNode} />

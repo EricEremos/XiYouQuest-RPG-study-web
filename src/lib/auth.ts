@@ -90,8 +90,7 @@ function isAllowedEmail(email: string): boolean {
 
 // HKUST OIDC (Entra ID, staff tenant — students authenticate there too once
 // ITSO assigns them). providerId "hkust" MUST match the redirect URI
-// registered on the Entra app: {origin}/api/auth/oauth2/callback/hkust
-// (same pattern as the sibling Meli app; see docs/oidc-redirect-uris.md).
+// registered on the Entra app: {origin}/api/auth/oauth2/callback/hkust.
 // The slot is dormant until all three env vars exist, so builds and dev
 // without credentials keep working.
 // HKUST uses the MULTI-TENANT `/organizations/` endpoint (ITSO direction,
@@ -150,7 +149,7 @@ const hkustProviders = [
     providerId: "hkust",
     clientId: process.env.HKUST_XYQ_CLIENT_ID ?? "",
     // Public-client (PKCE) flow: HKUST's Entra apps authenticate with PKCE and
-    // no client secret (same as the sibling Meli app). Better Auth only puts a
+    // no client secret. Better Auth only puts a
     // client_secret on the token request when this is non-empty
     // (@better-auth/core validate-authorization-code.mjs), so leaving it empty
     // performs a clean public-client exchange.

@@ -945,7 +945,7 @@ public/img/                               # Sprites, backgrounds, boss art
 | Method | Endpoint | Input | Output |
 |--------|----------|-------|--------|
 | POST | `/api/speech/assess` | FormData: `audio`, `referenceText`, `category` | Per-word scores + aggregates |
-| POST | `/api/speech/c5-assess` | FormData: `audio`, `topic`, `spokenDurationSeconds` | C5 score breakdown (pronunciation, vocab, fluency, time) |
+| POST | `/api/speech/c5-assess` | FormData: canonical PCM WAV `audio`, `topic` | C5 practice-estimate breakdown; the server derives duration from the WAV payload |
 | POST | `/api/tts/speak` | JSON: `{ voiceId, text }` | `audio/wav` (LRU cached) |
 | POST | `/api/tts/companion` | JSON: `{ voiceId, text }` | `audio/wav` |
 

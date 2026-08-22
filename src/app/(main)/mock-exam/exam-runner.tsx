@@ -17,6 +17,14 @@ import { useAchievementToast } from "@/components/shared/achievement-toast";
 import { useExamTimer } from "@/hooks/use-exam-timer";
 import type { QuizQuestion } from "@/types/practice";
 import type { UnlockedAchievement } from "@/lib/achievements/types";
+import { OFFICIAL_PSC_SPEAKING_TOPICS } from "@/lib/psc/official-speaking-topics";
+import { scopeOfficialReadingPassage } from "@/lib/psc/reading-scope";
+import { getXiYouQuestPracticeBand } from "@/lib/psc/practice-band";
+import {
+  getAcceptedOptionIndices,
+  isAcceptedQuizAnswer,
+  withConfiguredAcceptedAnswers,
+} from "@/lib/quiz-answers";
 
 // ============================================================
 // Hardcoded question subsets for the mock exam
@@ -60,12 +68,6 @@ const EXAM_PASSAGE = {
   content: "\u5728\u6211\u7684\u8BB0\u5FC6\u4E2D\uFF0C\u7236\u4EB2\u662F\u4E00\u4E2A\u4E25\u8083\u800C\u6C89\u9ED8\u7684\u4EBA\u3002\u4ED6\u5F88\u5C11\u8BF4\u8BDD\uFF0C\u4F46\u4ED6\u7528\u884C\u52A8\u8868\u8FBE\u4ED6\u5BF9\u6211\u4EEC\u7684\u5173\u7231\u3002\u8BB0\u5F97\u6709\u4E00\u6B21\uFF0C\u6211\u5728\u5B66\u6821\u91CC\u611F\u5230\u5F88\u6CA5\u4E27\uFF0C\u56E0\u4E3A\u6211\u7684\u6210\u7EE9\u4E0D\u592A\u7406\u60F3\u3002\u6211\u6709\u70B9\u513F\u5BB3\u6015\u544A\u8BC9\u7236\u4EB2\u8FD9\u4E2A\u574F\u6D88\u606F\u3002\u4F46\u662F\uFF0C\u5F53\u6211\u9F13\u8D77\u52C7\u6C14\u5411\u4ED6\u5766\u767D\u65F6\uFF0C\u4ED6\u6CA1\u6709\u8D23\u9A82\u6211\uFF0C\u53CD\u800C\u7ED9\u4E86\u6211\u9F13\u52B1\u548C\u652F\u6301\u3002\u4ED6\u8BF4\uFF1A\u201C\u4E00\u65F6\u7684\u5931\u8D25\u4E0D\u4EE3\u8868\u6C38\u4E45\u7684\u5931\u8D25\uFF0C\u91CD\u8981\u7684\u662F\u4F60\u8981\u5B66\u4F1A\u4ECE\u5931\u8D25\u4E2D\u7AD9\u8D77\u6765\u3002\u201D\u8FD9\u4E2A\u6559\u8BAD\u6211\u4E00\u76F4\u8BB0\u5F97\u3002\u4ECE\u90A3\u4EE5\u540E\uFF0C\u6BCF\u5F53\u6211\u9047\u5230\u56F0\u96BE\u7684\u65F6\u5019\uFF0C\u6211\u90FD\u4F1A\u60F3\u8D77\u7236\u4EB2\u8BF4\u8FC7\u7684\u8BDD\u3002\u4ED6\u6559\u4F1A\u4E86\u6211\u575A\u5F3A\u548C\u52C7\u6562\u3002\u867D\u7136\u4ED6\u4E0D\u5584\u4E8E\u7528\u8BED\u8A00\u8868\u8FBE\u611F\u60C5\uFF0C\u4F46\u4ED6\u7684\u7231\u4E00\u76F4\u5728\u6211\u8EAB\u8FB9\u3002\u7236\u4EB2\u7528\u4ED6\u81EA\u5DF1\u7684\u65B9\u5F0F\u544A\u8BC9\u6211\uFF1A\u771F\u6B63\u7684\u529B\u91CF\u4E0D\u5728\u4E8E\u4ECE\u4E0D\u8DCC\u5012\uFF0C\u800C\u5728\u4E8E\u6BCF\u6B21\u8DCC\u5012\u540E\u90FD\u80FD\u91CD\u65B0\u7AD9\u8D77\u6765\u3002\u73B0\u5728\u6211\u957F\u5927\u4E86\uFF0C\u8D8A\u6765\u8D8A\u7406\u89E3\u7236\u4EB2\u5F53\u5E74\u7684\u7528\u5FC3\u3002\u6211\u60F3\u5BF9\u4ED6\u8BF4\u4E00\u58F0\uFF1A\u8C22\u8C22\u60A8\uFF0C\u7238\u7238\u3002",
 };
 
-const EXAM_TOPICS = [
-  "我的家庭", "我的一位朋友", "我尊敬的人", "我最喜欢的季节",
-  "我最喜欢的运动", "我的一次难忘旅行", "我的一次失败经历",
-  "我学习普通话的体会", "我的一天", "我的家乡",
-];
-
 // ============================================================
 // Component config
 // ============================================================
@@ -79,7 +81,6 @@ interface ComponentConfig {
   points: number;
 }
 
-// Full 5-section exam (official PSC weighting: 10/20/10/30/30)
 const COMPONENTS: ComponentConfig[] = [
   { number: 1, name: "Monosyllabic Characters", chineseName: "读单音节字词", timeLimitSeconds: 210, weight: 0.10, points: 10 },
   { number: 2, name: "Multisyllabic Words", chineseName: "读多音节词语", timeLimitSeconds: 150, weight: 0.20, points: 20 },
@@ -105,18 +106,8 @@ const PREP_TIME_SECONDS = 15 * 60;
 const EXAM_TOPIC_CHOICES = 2;
 
 // ============================================================
-// PSC Grade mapping
+// XiYouQuest practice-band mapping
 // ============================================================
-
-function getPSCGrade(score: number): { grade: string; description: string } {
-  if (score >= 97) return { grade: "一级甲等", description: "First Class, Grade A" };
-  if (score >= 92) return { grade: "一级乙等", description: "First Class, Grade B" };
-  if (score >= 87) return { grade: "二级甲等", description: "Second Class, Grade A" };
-  if (score >= 80) return { grade: "二级乙等", description: "Second Class, Grade B" };
-  if (score >= 70) return { grade: "三级甲等", description: "Third Class, Grade A" };
-  if (score >= 60) return { grade: "三级乙等", description: "Third Class, Grade B" };
-  return { grade: "不达标", description: "Below Standard" };
-}
 
 // ============================================================
 // Main ExamRunner
@@ -204,24 +195,26 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
   // Randomize answer positions on client side
   const activeQuizQuestions = useMemo(() => {
     const questions = quizQuestions ?? EXAM_QUIZ_QUESTIONS;
-    return questions.map(randomizeAnswerPositions);
+    return questions.map(withConfiguredAcceptedAnswers).map(randomizeAnswerPositions);
   }, [quizQuestions]);
 
-  const activePassage = passage ?? EXAM_PASSAGE;
-  const activeTopics = topics ?? EXAM_TOPICS;
+  const passageSource = passage ?? EXAM_PASSAGE;
+  const passageScope = scopeOfficialReadingPassage(passageSource.content);
+  const activePassage = { ...passageSource, content: passageScope.text };
   const [examPhase, setExamPhase] = useState<ExamPhase>("start");
   const [examMode, setExamMode] = useState<ExamMode>("full");
   // Components for the selected mode — drives sequencing, weighting and display
   const activeComponents = examMode === "no-s3" ? NO_S3_COMPONENTS : COMPONENTS;
   // Lift the speaking topic choices so the prep screen shows the exact future choices
   const examTopicChoices = useMemo(
-    () => [...activeTopics].sort(() => Math.random() - 0.5).slice(0, EXAM_TOPIC_CHOICES),
-    [activeTopics]
+    () => [...(topics ?? OFFICIAL_PSC_SPEAKING_TOPICS)].sort(() => Math.random() - 0.5).slice(0, EXAM_TOPIC_CHOICES),
+    [topics]
   );
   const [currentComponentIndex, setCurrentComponentIndex] = useState(0);
   const [rawDataList, setRawDataList] = useState<ComponentRawData[]>([]);
   const [componentResults, setComponentResults] = useState<ComponentResult[]>([]);
   const [assessmentProgress, setAssessmentProgress] = useState(0);
+  const [assessmentError, setAssessmentError] = useState<string | null>(null);
   // Prep notes are intentionally kept in local state only and NEVER threaded into
   // ComponentRawData / the save payload, so they cannot carry into the scored exam.
   const [prepNotes, setPrepNotes] = useState("");
@@ -342,7 +335,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
         const quizResults = activeQuizQuestions.map((q, i) => ({
           question: q,
           selectedIndex: answers[i] ?? -1,
-          isCorrect: answers[i] === q.correctIndex,
+          isCorrect: isAcceptedQuizAnswer(q, answers[i] ?? -1),
         }));
 
         // Weighted scoring
@@ -428,7 +421,6 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           const formData = new FormData();
           formData.append("audio", raw.audioBlob, "recording.wav");
           formData.append("topic", raw.selectedTopic ?? "");
-          formData.append("spokenDurationSeconds", String(raw.spokenDurationSeconds ?? 0));
 
           const c5Response = await fetchWithRetry("/api/speech/c5-assess", {
             method: "POST",
@@ -461,11 +453,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
             },
           };
         } catch {
-          result = {
-            componentNumber: 5,
-            score: 0,
-            xpEarned: 0,
-          };
+          throw new Error("C5 practice assessment unavailable");
         }
       } else {
         // No data (time expired without recording)
@@ -481,7 +469,13 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
       return result;
     });
 
-    const allResults = await Promise.all(promises);
+    let allResults: ComponentResult[];
+    try {
+      allResults = await Promise.all(promises);
+    } catch {
+      setAssessmentError("A practice assessment was unavailable. No mock-exam result or XP was recorded. Restart the mock exam to retry.");
+      return;
+    }
     // Sort by component number
     allResults.sort((a, b) => a.componentNumber - b.componentNumber);
     results.push(...allResults);
@@ -498,6 +492,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
 
     if (currentComponentIndex + 1 >= activeComponents.length) {
       // All components done — start assessment
+      setAssessmentError(null);
       setExamPhase("assessing");
       setAssessmentProgress(0);
       runAllAssessments(newRawList);
@@ -526,7 +521,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
         const config = activeComponents.find((c) => c.number === cr.componentNumber);
         return sum + cr.score * (config?.weight ?? 0);
       }, 0);
-      const grade = getPSCGrade(weightedTotal).grade;
+      const practiceBand = getXiYouQuestPracticeBand(weightedTotal).label;
       const totalXP = componentResults.reduce((sum, cr) => sum + cr.xpEarned, 0);
       const totalDuration = Math.round((Date.now() - examStartTime) / 1000);
       const componentScores = componentResults.map((cr) => {
@@ -540,7 +535,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           totalScore: Math.round(weightedTotal * 10) / 10,
-          grade,
+          practiceBand,
           componentScores,
           durationSeconds: totalDuration,
           totalXp: totalXP,
@@ -569,11 +564,10 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
               pronunciation: { score: cr.c5Detail.pronunciation.score, notes: cr.c5Detail.pronunciation.notes },
               vocabGrammar: { score: cr.c5Detail.vocabGrammar.score, notes: cr.c5Detail.vocabGrammar.notes },
               fluency: { score: cr.c5Detail.fluency.score, notes: cr.c5Detail.fluency.notes },
-              transcript: cr.c5Detail.transcript.slice(0, 500),
             } : undefined,
           })),
           totalScore: Math.round(weightedTotal * 10) / 10,
-          grade,
+          practiceBand,
         }),
       })
         .then((res) => (res.ok ? res.json() : null))
@@ -608,7 +602,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           <div className="text-center space-y-2">
             <h2 className="font-pixel text-sm">Mock PSC Examination</h2>
             <p className="text-muted-foreground">
-              Complete all {activeComponents.length} components to receive your estimated PSC grade.
+              Complete all {activeComponents.length} components to receive a XiYouQuest practice estimate.
             </p>
             <p className="text-base text-muted-foreground">
               15 min preparation + ~{totalMinutes} minutes exam
@@ -704,7 +698,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
                       <div className="flex items-center gap-2">
                         <span className="text-lg font-bold">{Math.round(exam.total_score * 10) / 10}</span>
                         <Badge variant={exam.total_score >= 80 ? "default" : exam.total_score >= 60 ? "secondary" : "destructive"}>
-                          {exam.grade}
+                          {getXiYouQuestPracticeBand(exam.total_score).label}
                         </Badge>
                       </div>
                     </button>
@@ -912,6 +906,20 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
 
   // ---- Assessing Screen ----
   if (examPhase === "assessing") {
+    if (assessmentError) {
+      return (
+        <Card>
+          <CardContent className="pt-4 sm:pt-6 space-y-4 sm:space-y-6">
+            <div className="text-center space-y-4">
+              <h2 className="font-pixel text-sm">Practice Assessment Unavailable</h2>
+              <p className="text-muted-foreground">{assessmentError}</p>
+              <Button onClick={() => window.location.reload()}>Restart Mock Exam</Button>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
     return (
       <Card>
         <CardContent className="pt-4 sm:pt-6 space-y-4 sm:space-y-6">
@@ -937,7 +945,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
     }, 0);
 
     const totalXP = componentResults.reduce((sum, cr) => sum + cr.xpEarned, 0);
-    const gradeInfo = getPSCGrade(weightedTotal);
+    const practiceBand = getXiYouQuestPracticeBand(weightedTotal);
     const totalDuration = Math.round((Date.now() - examStartTime) / 1000);
 
     return (
@@ -952,22 +960,21 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
               </p>
             </div>
 
-            {/* PSC Grade */}
             <div className="text-center space-y-2 py-5">
               <p className="text-5xl sm:text-7xl font-bold">{Math.round(weightedTotal * 10) / 10}</p>
-              <p className="text-base sm:text-lg text-muted-foreground">Total Score (out of 100)</p>
+              <p className="text-base sm:text-lg text-muted-foreground">XiYouQuest weighted practice score (out of 100)</p>
               <div className="mt-3">
                 <Badge
                   variant={weightedTotal >= 80 ? "default" : weightedTotal >= 60 ? "secondary" : "destructive"}
                   className="text-xl sm:text-2xl px-5 py-1.5"
                 >
-                  {gradeInfo.grade}
+                  {practiceBand.label}
                 </Badge>
-                <p className="text-sm sm:text-base text-muted-foreground mt-2">{gradeInfo.description}</p>
+                <p className="text-sm sm:text-base text-muted-foreground mt-2">{practiceBand.description}</p>
+                <p className="text-xs text-muted-foreground mt-1">XiYouQuest practice estimate, not an official PSC result.</p>
               </div>
             </div>
 
-            {/* Component breakdown — PSC point format */}
             <div className="space-y-3">
               <h3 className="text-base font-bold text-muted-foreground uppercase">Component Scores</h3>
               {componentResults.map((cr) => {
@@ -1003,16 +1010,16 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
               <p className="text-base sm:text-lg text-muted-foreground">Total XP Earned</p>
             </div>
 
-            {/* Grade scale reference */}
             <div className="space-y-2">
-              <h3 className="text-base font-bold text-muted-foreground uppercase">PSC Grade Scale</h3>
+              <h3 className="text-base font-bold text-muted-foreground uppercase">XiYouQuest Practice Bands</h3>
+              <p className="text-xs text-muted-foreground">A product practice rule for feedback, never an official PSC grade scale.</p>
               <div className="grid grid-cols-2 gap-2 text-sm sm:text-base">
-                <div className="rounded border p-2.5"><span className="font-medium">一级甲等:</span> 97+</div>
-                <div className="rounded border p-2.5"><span className="font-medium">一级乙等:</span> 92-96.9</div>
-                <div className="rounded border p-2.5"><span className="font-medium">二级甲等:</span> 87-91.9</div>
-                <div className="rounded border p-2.5"><span className="font-medium">二级乙等:</span> 80-86.9</div>
-                <div className="rounded border p-2.5"><span className="font-medium">三级甲等:</span> 70-79.9</div>
-                <div className="rounded border p-2.5"><span className="font-medium">三级乙等:</span> 60-69.9</div>
+                <div className="rounded border p-2.5"><span className="font-medium">Mastery:</span> 97+</div>
+                <div className="rounded border p-2.5"><span className="font-medium">Advanced:</span> 92-96.9</div>
+                <div className="rounded border p-2.5"><span className="font-medium">Strong:</span> 87-91.9</div>
+                <div className="rounded border p-2.5"><span className="font-medium">Proficient:</span> 80-86.9</div>
+                <div className="rounded border p-2.5"><span className="font-medium">Developing:</span> 70-79.9</div>
+                <div className="rounded border p-2.5"><span className="font-medium">Foundation:</span> 60-69.9</div>
               </div>
             </div>
           </CardContent>
@@ -1201,7 +1208,9 @@ function DetailedResultCard({ result }: { result: ComponentResult }) {
                                 <>
                                   <span className="text-muted-foreground"> | Correct: </span>
                                   <span className="text-green-600 font-medium">
-                                    {qr.question.options[qr.question.correctIndex]}
+                                    {getAcceptedOptionIndices(qr.question)
+                                      .map((optionIndex) => qr.question.options[optionIndex])
+                                      .join(" / ")}
                                   </span>
                                 </>
                               )}
@@ -1272,15 +1281,11 @@ function DetailedResultCard({ result }: { result: ComponentResult }) {
 }
 
 // ============================================================
-// C5 Detail Card (PSC-style score breakdown)
-// ============================================================
-
 function C5DetailCard({ detail }: { detail: NonNullable<ComponentResult["c5Detail"]> }) {
   const [showTranscript, setShowTranscript] = useState(false);
 
   return (
     <div className="space-y-4">
-      {/* Total PSC score */}
       <div className="text-center py-3">
         <p className={`text-3xl sm:text-4xl font-bold ${
           detail.totalScore >= 25 ? "text-green-600" :
@@ -1288,7 +1293,8 @@ function C5DetailCard({ detail }: { detail: NonNullable<ComponentResult["c5Detai
         }`}>
           {detail.totalScore}/30
         </p>
-        <p className="text-sm text-muted-foreground">PSC C5 Score (命题说话)</p>
+        <p className="text-sm text-muted-foreground">PSC-aligned practice estimate (命题说话)</p>
+        <p className="text-xs text-muted-foreground mt-1">Not an official PSC result.</p>
       </div>
 
       {/* Pronunciation */}
@@ -2177,7 +2183,7 @@ function SpeakingComponent({ topicChoices, timeLimitSeconds, onComplete }: Speak
                 elapsedTime >= timeLimitSeconds ? "text-green-600" : "text-orange-500"
               }`}>
                 {elapsedTime >= timeLimitSeconds
-                  ? "3 minutes reached! You can stop when ready."
+                  ? "Time limit reached. Recording ends automatically."
                   : `Speak for at least ${formatTime(timeLimitSeconds - elapsedTime)} more`}
               </p>
             </div>

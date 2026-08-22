@@ -3,6 +3,9 @@ import dynamic from "next/dynamic";
 import { loadSelectedCharacter } from "@/lib/character-loader";
 import { shuffle, sampleByTone } from "@/lib/utils";
 import type { QuizQuestion } from "@/types/practice";
+import { OFFICIAL_PSC_SPEAKING_TOPICS } from "@/lib/psc/official-speaking-topics";
+import { scopeOfficialReadingPassage } from "@/lib/psc/reading-scope";
+import { withConfiguredAcceptedAnswers } from "@/lib/quiz-answers";
 
 const ExamRunner = dynamic(() => import("./exam-runner").then(m => m.ExamRunner), {
   loading: () => (
@@ -45,7 +48,7 @@ export default async function MockExamPage() {
   const userId = user!.id;
 
   // Fetch character and all component questions in parallel
-  const [character, { data: c1Questions }, { data: c2Questions }, { data: c3Questions }, { data: c4Passages }, { data: c5Topics }] = await Promise.all([
+  const [character, { data: c1Questions }, { data: c2Questions }, { data: c3Questions }, { data: c4Passages }] = await Promise.all([
     loadSelectedCharacter(supabase, userId),
     supabase
       .from("question_banks")
@@ -67,11 +70,6 @@ export default async function MockExamPage() {
       .select("id, content, metadata")
       .eq("component", 4)
       .limit(50),
-    supabase
-      .from("question_banks")
-      .select("content")
-      .eq("component", 5)
-      .limit(150),
   ]);
 
   // Tone-stratified selection so the exam isn't skewed toward one tone (e.g. 3rd tone)
@@ -87,14 +85,16 @@ export default async function MockExamPage() {
   if (c3Questions && c3Questions.length > 0) {
     const allParsed = c3Questions
       .filter((row: { metadata: unknown }) => row.metadata && typeof row.metadata === "object")
-      .map((row: { id: string; content: string; metadata: { type: string; options: string[]; correctIndex: number; explanation: string } }) => ({
+      .map((row: { id: string; content: string; metadata: { type: string; options: string[]; correctIndex: number; explanation: string; acceptedAnswers?: string[] } }) => ({
         id: row.id,
         type: row.metadata.type as QuizQuestion["type"],
         prompt: row.content,
         options: row.metadata.options,
         correctIndex: row.metadata.correctIndex,
         explanation: row.metadata.explanation,
-      }));
+        acceptedAnswers: row.metadata.acceptedAnswers,
+      }))
+      .map(withConfiguredAcceptedAnswers);
     const wc = shuffle(allParsed.filter(q => q.type === "word-choice")).slice(0, 10);
     const mw = shuffle(allParsed.filter(q => q.type === "measure-word")).slice(0, 10);
     const so = shuffle(allParsed.filter(q => q.type === "sentence-order")).slice(0, 5);
@@ -105,21 +105,18 @@ export default async function MockExamPage() {
   let examPassage: { id: string; title: string; content: string } | undefined;
   if (c4Passages && c4Passages.length > 0) {
     const picked = shuffle(c4Passages)[0] as { id: string; content: string; metadata: { title: string } };
-    examPassage = { id: picked.id, title: picked.metadata.title ?? "Untitled", content: picked.content };
+    const scope = scopeOfficialReadingPassage(picked.content);
+    examPassage = { id: picked.id, title: picked.metadata.title ?? "Untitled", content: scope.text };
   }
 
-  // C5: Pick random topics
-  let examTopics: string[] | undefined;
-  if (c5Topics && c5Topics.length > 0) {
-    examTopics = shuffle(c5Topics.map((q: { content: string }) => q.content)).slice(0, 10);
-  }
+  const examTopics = shuffle([...OFFICIAL_PSC_SPEAKING_TOPICS]);
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="font-pixel text-base text-primary pixel-glow leading-relaxed">Mock PSC Exam</h1>
         <p className="text-muted-foreground">
-          <span className="font-chinese">模拟考试</span> — Complete all 5 components to get your estimated PSC grade.
+          <span className="font-chinese">模拟考试</span> — Complete all 5 components for a XiYouQuest practice estimate, not an official PSC result.
         </p>
       </div>
 

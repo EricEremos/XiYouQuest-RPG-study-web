@@ -1,7 +1,7 @@
 /**
  * PSC Component 5 (命题说话) scoring module.
  *
- * Implements the official PSC C5 rubric:
+ * Calculates a PSC-aligned XiYouQuest practice estimate, never an official PSC result:
  *   Total: 30 points = 20 pronunciation + 5 vocab/grammar + 5 fluency - time penalty
  *
  * Pronunciation (20 pts): 6 levels based on error count & dialect presence from ISE
@@ -220,10 +220,19 @@ function scoreFluency(
 
 // ---------- Time penalty ----------
 
-/** -1 point for each second under 3 minutes, capped at 30 (the total C5 score). */
-function calculateTimePenalty(spokenDurationSeconds: number): number {
+/**
+ * PSC's published Component 5 shortfall categories, expressed as deterministic
+ * XiYouQuest practice bands. Learner-facing results remain practice estimates.
+ */
+export function calculateTimePenalty(spokenDurationSeconds: number): number {
   if (spokenDurationSeconds >= 180) return 0;
-  return Math.min(30, 180 - Math.floor(spokenDurationSeconds));
+  if (spokenDurationSeconds >= 160) return 1;
+  if (spokenDurationSeconds >= 140) return 2;
+  if (spokenDurationSeconds >= 120) return 3;
+  if (spokenDurationSeconds >= 90) return 4;
+  if (spokenDurationSeconds >= 60) return 5;
+  if (spokenDurationSeconds > 30) return 6;
+  return 30;
 }
 
 // ---------- Main scoring function ----------

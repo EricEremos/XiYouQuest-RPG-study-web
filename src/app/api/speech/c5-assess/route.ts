@@ -1,31 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/supabase/server";
+import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { transcribeAudio } from "@/lib/iflytek-speech/asr-client";
 import {
   assessPronunciation,
   type PronunciationAssessmentResult,
 } from "@/lib/iflytek-speech/client";
 import { analyzeC5Speaking } from "@/lib/gemini/client";
-import { calculateC5Score, type C5AssessmentResult } from "@/lib/scoring/c5-scoring";
+import { calculateC5Score } from "@/lib/scoring/c5-scoring";
+import { getPcmWavDurationSeconds } from "@/lib/audio-utils";
+import {
+  getSupplementarySpeakingTopics,
+  OFFICIAL_PSC_SPEAKING_TOPICS,
+} from "@/lib/psc/official-speaking-topics";
 
 // ISE read_chapter max audio duration. 120s fails; 82s works. Use 90s with margin.
 // PCM 16kHz 16-bit mono = 32000 bytes/s.
 const ISE_MAX_SECONDS = 90;
 const ISE_MAX_PCM_BYTES = ISE_MAX_SECONDS * 32000;
+const C5_MAX_RECORDING_SECONDS = 180;
+const C5_DURATION_TOLERANCE_SECONDS = 1;
 
-const EMPTY_RESULT: C5AssessmentResult = {
-  pronunciation: { score: 0, deduction: 20, level: 6, label: "六档", notes: "No speech detected" },
-  vocabGrammar: { score: 0, deduction: 5, level: 3, label: "三档", notes: "No speech detected" },
-  fluency: { score: 0, deduction: 5, level: 3, label: "三档", notes: "No speech detected" },
-  timePenalty: 30,
-  totalScore: 0,
-  normalizedScore: 0,
-  transcript: "",
-  errorCount: 0,
-};
+async function isControlledSpeakingTopic(
+  topic: string,
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<boolean> {
+  if (OFFICIAL_PSC_SPEAKING_TOPICS.some((officialTopic) => officialTopic === topic)) return true;
+
+  const { data, error } = await supabase
+    .from("question_banks")
+    .select("content")
+    .eq("component", 5)
+    .limit(150);
+  if (error) return false;
+
+  return getSupplementarySpeakingTopics(
+    (data ?? []).map((question: { content: string }) => question.content),
+  ).includes(topic);
+}
 
 /**
- * Split audio + transcript into <=120s chunks and assess each via ISE,
+ * Split audio + transcript into <=90s chunks and assess each via ISE,
  * then merge all word-level results into a single combined result.
  */
 async function assessFullAudio(
@@ -73,8 +87,8 @@ async function assessFullAudio(
 
     chunkPromises.push(
       assessPronunciation(chunkBuffer, chunkText, "zh-CN", "read_chapter")
-        .catch((err) => {
-          console.error(`[C5] ISE chunk ${i + 1}/${chunkCount} failed:`, err);
+        .catch(() => {
+          console.warn(`[C5] ISE chunk ${i + 1}/${chunkCount} unavailable`);
           return null;
         }),
     );
@@ -83,8 +97,8 @@ async function assessFullAudio(
   const settled = await Promise.all(chunkPromises);
   const results = settled.filter((r): r is PronunciationAssessmentResult => r !== null);
 
-  if (results.length === 0) {
-    throw new Error("All ISE chunks failed");
+  if (results.length !== chunkCount) {
+    throw new Error("One or more ISE chunks failed");
   }
 
   console.log(`[C5] ISE: ${results.length}/${chunkCount} chunks succeeded`);
@@ -125,11 +139,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const formData = await request.formData();
-    const audio = formData.get("audio") as File;
-    const topic = formData.get("topic") as string;
-    const spokenDurationStr = formData.get("spokenDurationSeconds") as string;
+    const audio = formData.get("audio");
+    const topic = formData.get("topic");
 
-    if (!audio || !topic) {
+    if (!(audio instanceof File) || typeof topic !== "string" || !topic) {
       return NextResponse.json({ error: "Missing audio or topic" }, { status: 400 });
     }
 
@@ -139,8 +152,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Audio file too large (max 25MB)" }, { status: 400 });
     }
 
-    const spokenDurationSeconds = parseFloat(spokenDurationStr) || 0;
     const buffer = Buffer.from(await audio.arrayBuffer());
+    const measuredDurationSeconds = getPcmWavDurationSeconds(buffer);
+    if (
+      measuredDurationSeconds === null ||
+      measuredDurationSeconds > C5_MAX_RECORDING_SECONDS + C5_DURATION_TOLERANCE_SECONDS
+    ) {
+      return NextResponse.json(
+        { error: "Invalid C5 recording. Please record again." },
+        { status: 400 },
+      );
+    }
+
+    const supabase = await createClient();
+    if (!(await isControlledSpeakingTopic(topic, supabase))) {
+      return NextResponse.json(
+        { error: "Selected topic is not available for C5 practice." },
+        { status: 400 },
+      );
+    }
+    const spokenDurationSeconds = Math.min(
+      measuredDurationSeconds,
+      C5_MAX_RECORDING_SECONDS,
+    );
 
     // Step 1: ASR transcription
     console.log("[C5] Step 1: Transcribing audio...");
@@ -148,17 +182,22 @@ export async function POST(request: NextRequest) {
     try {
       const asrResult = await transcribeAudio(buffer);
       transcript = asrResult.transcript.trim();
-    } catch (err) {
-      console.error("[C5] ASR transcription failed:", err);
-      return NextResponse.json(EMPTY_RESULT);
+    } catch {
+      console.warn("[C5] ASR unavailable");
+      return NextResponse.json(
+        { error: "Practice assessment unavailable. Please retry." },
+        { status: 503 },
+      );
     }
 
     if (!transcript) {
-      console.log("[C5] Empty transcript — returning zeroed result");
-      return NextResponse.json(EMPTY_RESULT);
+      return NextResponse.json(
+        { error: "No recognizable speech detected. Please record again." },
+        { status: 422 },
+      );
     }
 
-    console.log(`[C5] Transcript (${transcript.length} chars): ${transcript.substring(0, 200)}...`);
+    console.info("[C5] Transcript received", { characters: transcript.length });
 
     // Step 2: ISE pronunciation scoring (chunked) + Gemini content analysis (in parallel)
     console.log("[C5] Step 2: Running ISE + Gemini in parallel...");
@@ -176,10 +215,17 @@ export async function POST(request: NextRequest) {
       transcript,
     });
 
-    console.log(`[C5] Final score: ${result.totalScore}/30 (normalized: ${result.normalizedScore}/100)`);
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error("[C5] Assessment error:", error);
-    return NextResponse.json({ error: "C5 assessment failed" }, { status: 500 });
+    console.info("[C5] Practice assessment completed");
+    return NextResponse.json({
+      ...result,
+      assessmentType: "psc_aligned_practice_estimate",
+      assessmentVersion: "psc-practice-c5-v1",
+    });
+  } catch {
+    console.error("[C5] Practice assessment unavailable");
+    return NextResponse.json(
+      { error: "Practice assessment unavailable. Please retry." },
+      { status: 503 },
+    );
   }
 }

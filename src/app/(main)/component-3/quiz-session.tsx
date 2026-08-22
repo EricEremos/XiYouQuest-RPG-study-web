@@ -16,6 +16,7 @@ import { useBGM } from "@/components/shared/bgm-provider";
 import type { ExpressionName } from "@/types/character";
 import type { QuizQuestion, QuestionResult, ComponentNumber } from "@/types/practice";
 import { getDialogue } from "@/lib/dialogue";
+import { getAcceptedOptionIndices, isAcceptedQuizAnswer } from "@/lib/quiz-answers";
 
 interface QuizSessionProps {
   questions: QuizQuestion[];
@@ -136,7 +137,7 @@ export function QuizSession({ questions, character, characterId, component, lpNo
     setSelectedAnswer(answerIndex);
     setPhase("result");
 
-    const isCorrect = answerIndex === currentQuestion.correctIndex;
+    const isCorrect = isAcceptedQuizAnswer(currentQuestion, answerIndex);
 
     // Calculate XP
     const newStreak = isCorrect ? streak + 1 : 0;
@@ -269,11 +270,11 @@ export function QuizSession({ questions, character, characterId, component, lpNo
       return "border-2 border-border hover:border-primary hover:bg-accent/50 transition-all hover:shadow-sm";
     }
 
-    if (index === currentQuestion.correctIndex) {
+    if (getAcceptedOptionIndices(currentQuestion).includes(index)) {
       return "border-2 border-green-500 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 animate-in fade-in duration-300";
     }
 
-    if (index === selectedAnswer && index !== currentQuestion.correctIndex) {
+    if (index === selectedAnswer) {
       return "border-2 border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300";
     }
 
@@ -487,12 +488,12 @@ export function QuizSession({ questions, character, characterId, component, lpNo
                     </div>
 
                     {/* Show correct/incorrect indicators */}
-                    {phase === "result" && index === currentQuestion.correctIndex && (
+                    {phase === "result" && getAcceptedOptionIndices(currentQuestion).includes(index) && (
                       <span className="mt-2 block text-sm font-medium text-green-600">
                         Correct answer
                       </span>
                     )}
-                    {phase === "result" && index === selectedAnswer && index !== currentQuestion.correctIndex && (
+                    {phase === "result" && index === selectedAnswer && !getAcceptedOptionIndices(currentQuestion).includes(index) && (
                       <span className="mt-2 block text-sm font-medium text-red-600">
                         Your answer
                       </span>

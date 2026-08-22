@@ -78,7 +78,7 @@ describe("AudioRecorder", () => {
     const { getByRole, getByText } = render(
       <AudioRecorder
         onRecordingComplete={mockOnComplete}
-        maxDurationSeconds={60}
+        maxDurationSeconds={180}
       />,
     );
 
@@ -86,10 +86,10 @@ describe("AudioRecorder", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(getByText("60 seconds remaining")).toBeTruthy();
+    expect(getByText("180 seconds remaining")).toBeTruthy();
 
     await act(async () => {
-      vi.advanceTimersByTime(60_000);
+      vi.advanceTimersByTime(180_000);
     });
 
     expect(mockOnComplete).toHaveBeenCalledOnce();

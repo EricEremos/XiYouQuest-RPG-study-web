@@ -39,7 +39,7 @@ export const progressUpdateSchema = z.object({
   questionsAttempted: z.number().int().min(0).optional().default(0),
   questionsCorrect: z.number().int().min(0).optional().default(0),
   bestStreak: z.number().int().min(0).optional().default(0),
-});
+}).strict();
 
 // --- AI API Schemas ---
 
@@ -159,10 +159,7 @@ export const chatResumeSchema = z.object({
 
 export const chatGenerateImageSchema = z.object({
   sessionId: uuid,
-  conversationSummary: z.string().min(1).max(2000),
-  characterName: z.string().max(100).optional(),
-  scenarioTitle: z.string().max(200).optional(),
-});
+}).strict();
 
 export const chatHistoryQuerySchema = z.object({
   sessionId: uuid.optional(),

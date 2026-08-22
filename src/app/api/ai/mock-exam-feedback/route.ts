@@ -24,11 +24,10 @@ const schema = z.object({
       pronunciation: z.object({ score: z.number(), notes: z.string() }),
       vocabGrammar: z.object({ score: z.number(), notes: z.string() }),
       fluency: z.object({ score: z.number(), notes: z.string() }),
-      transcript: z.string(),
-    }).optional(),
+    }).strict().optional(),
   })).min(1).max(5),
   totalScore: z.number().min(0).max(100),
-  grade: z.string().max(20),
+  practiceBand: z.string().max(20),
 });
 
 export const maxDuration = 60;
@@ -46,9 +45,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
 
-    const { componentResults, totalScore, grade } = parsed.data;
+    const { componentResults, totalScore, practiceBand } = parsed.data;
 
-    const systemPrompt = `You are an expert PSC (Putonghua Proficiency Test) coach giving personalized feedback after a mock exam. Write a concise, actionable analysis in English.
+    const systemPrompt = `You are a XiYouQuest PSC-aligned practice coach giving personalized feedback after a mock exam. Write a concise, actionable analysis in English.
 
 Structure your response in exactly 3 sections with these headers (use ** for bold):
 
@@ -59,13 +58,14 @@ Structure your response in exactly 3 sections with these headers (use ** for bol
 2-3 sentences identifying the weakest areas. Be specific — mention problem words, question types, or pronunciation patterns. If word scores are provided, call out the lowest-scoring ones.
 
 **Study Plan**
-2-3 sentences with a prioritized action plan. Suggest specific drills (e.g. "practice tone pairs for C1", "review measure words for C3"). Focus on what will improve the PSC grade the most.
+2-3 sentences with a prioritized action plan. Suggest specific drills (e.g. "practice tone pairs for C1", "review measure words for C3"). Focus on what will improve the learner's XiYouQuest practice performance.
 
 Rules:
 - English only. No emojis. No bullet points within sections.
 - Reference components by name: C1=Monosyllabic Characters, C2=Multisyllabic Words, C3=Vocabulary & Grammar, C4=Passage Reading, C5=Prompted Speaking.
 - Keep it tight — every sentence must add value. Total response under 200 words.
-- Be encouraging but honest.`;
+- Be encouraging but honest.
+- Treat every score and practice band as XiYouQuest feedback only. Never claim, predict, or imply an official PSC result, grade, certification, eligibility, or policy decision.`;
 
     // Build a condensed data summary for the prompt
     const summary = componentResults.map((cr) => {
@@ -95,7 +95,7 @@ Rules:
       return parts.join(" | ");
     });
 
-    const userPrompt = `Mock exam results — Total: ${totalScore}/100, Grade: ${grade}\n${summary.join("\n")}`;
+    const userPrompt = `XiYouQuest mock-practice results — Total: ${totalScore}/100, Practice band: ${practiceBand}\n${summary.join("\n")}`;
 
     const feedback = await quickCompletion(systemPrompt, userPrompt, 500);
 

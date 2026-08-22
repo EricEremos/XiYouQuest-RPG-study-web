@@ -20,7 +20,6 @@ import { useBGM } from "@/components/shared/bgm-provider";
 import type { ExpressionName } from "@/types/character";
 import type { ComponentNumber } from "@/types/practice";
 
-// 3 minutes in seconds
 const TOTAL_TIME = 180;
 
 // Number of topic choices offered (real CBT PSC offers 2)
@@ -89,8 +88,10 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const limitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasPlayedGreeting = useRef(false);
   const handleRecordingCompleteRef = useRef<(blob: Blob) => void>(() => {});
+  const stopRecordingRef = useRef<() => void>(() => {});
 
   // Pick the topic choices on mount
   useEffect(() => {
@@ -125,6 +126,10 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
     return () => {
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = 0;
+      if (limitTimeoutRef.current) {
+        clearTimeout(limitTimeoutRef.current);
+        limitTimeoutRef.current = null;
+      }
       if (audioContextRef.current?.state !== "closed") {
         audioContextRef.current?.close();
       }
@@ -165,8 +170,8 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
             showAchievementToasts(data.newAchievements);
           }
         }
-      } catch (err) {
-        console.error("Failed to save progress:", err);
+      } catch {
+        console.error("[C5] Practice-progress update unavailable");
       }
 
       // Complete learning path node if launched from learning path
@@ -181,8 +186,8 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
               xpEarned: totalXPEarned,
             }),
           });
-        } catch (err) {
-          console.error("Failed to complete LP node:", err);
+        } catch {
+          console.error("[C5] Learning-path completion update unavailable");
         }
         router.push("/learning-path");
         return;
@@ -305,9 +310,16 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
       setIsRecording(true);
       setLearningActive(true);
       setPhase("recording");
+      elapsedTimeRef.current = 0;
       setElapsedTime(0);
       setExpression("listening");
       setDialogue(getDialogue(character.name, "c5_listening"));
+
+      limitTimeoutRef.current = setTimeout(() => {
+        elapsedTimeRef.current = TOTAL_TIME;
+        setElapsedTime(TOTAL_TIME);
+        stopRecordingRef.current();
+      }, TOTAL_TIME * 1000);
     } catch {
       setExpression("surprised");
       setDialogue(getDialogue(character.name, "c5_mic_error"));
@@ -319,6 +331,10 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
+    }
+    if (limitTimeoutRef.current) {
+      clearTimeout(limitTimeoutRef.current);
+      limitTimeoutRef.current = null;
     }
 
     if (!isRecording) return;
@@ -356,6 +372,10 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
     handleRecordingCompleteRef.current(wavBlob);
   }, [isRecording, setLearningActive]);
 
+  useEffect(() => {
+    stopRecordingRef.current = stopRecording;
+  }, [stopRecording]);
+
   // Handle completed recording
   const handleRecordingComplete = useCallback(async (audioBlob: Blob) => {
     setPhase("assessing");
@@ -369,7 +389,6 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
       const formData = new FormData();
       formData.append("audio", audioBlob, "recording.wav");
       formData.append("topic", selectedTopic ?? "");
-      formData.append("spokenDurationSeconds", String(spokenTime));
 
       const assessResponse = await fetchWithRetry("/api/speech/c5-assess", {
         method: "POST",
@@ -377,8 +396,9 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
       });
 
       if (!assessResponse.ok) {
-        const errBody = await assessResponse.json().catch(() => ({}));
-        console.error("[C5] Assessment API error:", assessResponse.status, errBody);
+        console.error("[C5] Assessment API unavailable", {
+          status: assessResponse.status,
+        });
         throw new Error(`Assessment failed (${assessResponse.status})`);
       }
 
@@ -403,7 +423,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
             characterId,
             component: 5,
             questionText: `Topic: "${selectedTopic}". Score: ${c5Result.totalScore}/30. Spoken for ${Math.floor(spokenTime / 60)}m ${spokenTime % 60}s.`,
-            userAnswer: c5Result.transcript || "Prompted speaking attempt",
+            userAnswer: "Prompted speaking attempt",
             pronunciationScore: c5Result.normalizedScore,
             isCorrect: isGood,
           }),
@@ -580,8 +600,9 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                     {analysis.totalScore}/30
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    PSC C5 Score (命题说话)
+                    PSC-aligned practice estimate (命题说话)
                   </p>
+                  <p className="text-xs text-muted-foreground mt-1">Not an official PSC result.</p>
                 </div>
 
                 {/* XP and Time */}
@@ -743,7 +764,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                 elapsedTime >= TOTAL_TIME ? "text-green-600" : "text-orange-500"
               }`}>
                 {elapsedTime >= TOTAL_TIME
-                  ? "3 minutes reached! You can stop when ready."
+                  ? "3-minute practice limit reached. Recording will end automatically."
                   : `Speak for at least ${formatTime(TOTAL_TIME - elapsedTime)} more`}
               </p>
             </div>

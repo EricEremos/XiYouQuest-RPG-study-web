@@ -4,7 +4,7 @@ import { z } from "zod";
 
 const insertSchema = z.object({
   totalScore: z.number().min(0).max(100),
-  grade: z.string().max(20),
+  practiceBand: z.string().max(20),
   componentScores: z.array(z.object({
     componentNumber: z.number().int().min(1).max(5),
     score: z.number().min(0).max(100),
@@ -12,12 +12,12 @@ const insertSchema = z.object({
   })).min(1).max(5),
   durationSeconds: z.number().int().min(0),
   totalXp: z.number().int().min(0),
-});
+}).strict();
 
 const patchSchema = z.object({
   id: z.string().uuid(),
   aiFeedback: z.string().max(5000),
-});
+}).strict();
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -28,14 +28,14 @@ export async function POST(request: NextRequest) {
   const parsed = insertSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const { totalScore, grade, componentScores, durationSeconds, totalXp } = parsed.data;
+  const { totalScore, practiceBand, componentScores, durationSeconds, totalXp } = parsed.data;
 
   const { data, error } = await supabase
     .from("mock_exam_results")
     .insert({
       user_id: user.id,
       total_score: totalScore,
-      grade,
+      grade: practiceBand,
       component_scores: componentScores,
       duration_seconds: durationSeconds,
       total_xp: totalXp,

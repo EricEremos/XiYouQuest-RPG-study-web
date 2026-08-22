@@ -17,12 +17,15 @@ import { useAudioSettings } from "@/components/shared/audio-settings";
 import { useAchievementToast } from "@/components/shared/achievement-toast";
 import type { ExpressionName } from "@/types/character";
 import type { ComponentNumber } from "@/types/practice";
+import type { ReadingPassageSource } from "@/lib/psc/reading-passage-source";
 
 interface Passage {
   id: string;
   title: string;
   content: string;
   passageNumber: number | null;
+  syllableCount: number;
+  source: ReadingPassageSource;
 }
 
 interface ReadingSessionProps {
@@ -591,7 +594,10 @@ export function ReadingSession({ passages, character, characterId, component, lp
                       <ChineseText text={passage.content} />
                     </p>
                     <p className="mt-2 text-sm font-medium text-foreground/70 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
-                      {passage.content.length} characters
+                      {passage.syllableCount} scoped Han characters · XiYouQuest practice scope: first 400
+                    </p>
+                    <p className="mt-1 text-xs text-foreground/60 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
+                      {passage.source.label}
                     </p>
                   </CardContent>
                   {/* Native button covering the card: one Tab stop with a
@@ -790,6 +796,9 @@ export function ReadingSession({ passages, character, characterId, component, lp
             <CardContent className="py-6 space-y-4">
               {/* Passage header */}
               <h2 className="text-xl font-bold font-chinese">{selectedPassage?.title}</h2>
+              <p className="text-xs text-muted-foreground">
+                {selectedPassage?.source.label}
+              </p>
 
               {/* Click hint / Stop button */}
               <div className="flex items-center justify-between gap-2">

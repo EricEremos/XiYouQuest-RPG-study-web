@@ -371,19 +371,11 @@ export default function CompanionChatClient({
 
       // Generate image every 4 user turns (non-blocking)
       if (newTurnCount > 0 && newTurnCount % 3 === 0) {
-        // Build conversation summary from last 8 messages (use ref for latest state)
-        const recentMsgs = messagesRef.current.slice(-8).map(m =>
-          `${m.role === "user" ? "User" : selectedCharacter.name}: ${m.content}`
-        ).join("\n");
-
         fetchWithRetry("/api/chat/generate-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sessionId,
-            conversationSummary: recentMsgs,
-            characterName: selectedCharacter.name,
-            scenarioTitle: selectedScenario?.title,
           }),
         }).then(async (imgRes) => {
           if (imgRes.ok) {
@@ -406,7 +398,7 @@ export default function CompanionChatClient({
     } finally {
       setIsProcessing(false);
     }
-  }, [sessionId, selectedCharacter, selectedScenario, playTTS, showBackgroundImage, softLimitDismissed, filterOffTopic]);
+  }, [sessionId, selectedCharacter, playTTS, showBackgroundImage, softLimitDismissed, filterOffTopic]);
 
   // ── Reset to start ──
   const handleNewChat = useCallback(() => {
