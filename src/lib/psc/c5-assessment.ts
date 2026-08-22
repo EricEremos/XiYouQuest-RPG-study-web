@@ -1,8 +1,8 @@
 import { fetchWithRetry } from "@/lib/fetch-retry";
 
 export const C5_ASSESSMENT_TIMEOUT_MS = 150_000;
-export const C5_ASSESSMENT_TYPE = "psc_aligned_practice_estimate";
-export const C5_ASSESSMENT_VERSION = "psc-practice-c5-v1";
+export const C5_ASSESSMENT_TYPE = "xiyouquest_speaking_practice_signal";
+export const C5_ASSESSMENT_VERSION = "xiyouquest-speaking-practice-v2";
 
 export interface C5ScoreCategory {
   score: number;

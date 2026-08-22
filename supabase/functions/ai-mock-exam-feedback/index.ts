@@ -58,6 +58,7 @@ const schema = z.object({
     .max(5),
   totalScore: z.number().min(0).max(100),
   practiceBand: z.string().max(20),
+  scoreVersion: z.enum(["psc-2021-v1", "legacy-five-component-v1"]),
 });
 
 Deno.serve(async (req: Request) => {
@@ -73,7 +74,10 @@ Deno.serve(async (req: Request) => {
       return errorResponse("Invalid input", 400);
     }
 
-    const { componentResults, totalScore, practiceBand } = parsed.data;
+    const { componentResults, totalScore, practiceBand, scoreVersion } = parsed.data;
+    const componentNames = scoreVersion === "psc-2021-v1"
+      ? "C1=Monosyllabic Characters, C2=Multisyllabic Words, C3=Passage Reading, C4=Prompted Speaking"
+      : "C1=Monosyllabic Characters, C2=Multisyllabic Words, C3=Vocabulary & Grammar, C4=Passage Reading, C5=Prompted Speaking";
 
     const systemPrompt = `You are a XiYouQuest PSC-aligned practice coach giving personalized feedback after a mock exam. Write a concise, actionable analysis in English.
 
@@ -90,7 +94,7 @@ Structure your response in exactly 3 sections with these headers (use ** for bol
 
 Rules:
 - English only. No emojis. No bullet points within sections.
-- Reference components by name: C1=Monosyllabic Characters, C2=Multisyllabic Words, C3=Vocabulary & Grammar, C4=Passage Reading, C5=Prompted Speaking.
+- Reference components by name: ${componentNames}.
 - Keep it tight â€” every sentence must add value. Total response under 200 words.
 - Be encouraging but honest.
 - Treat every score and practice band as XiYouQuest feedback only. Never claim, predict, or imply an official PSC result, grade, certification, eligibility, or policy decision.`;

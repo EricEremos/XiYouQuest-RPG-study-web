@@ -243,8 +243,8 @@ Deno.serve(async (req: Request) => {
     console.info("[C5] Practice assessment completed");
     return jsonResponse({
       ...result,
-      assessmentType: "psc_aligned_practice_estimate",
-      assessmentVersion: "psc-practice-c5-v1",
+      assessmentType: "xiyouquest_speaking_practice_signal",
+      assessmentVersion: "xiyouquest-speaking-practice-v2",
     });
   } catch {
     console.error("[speech-c5-assess] Practice assessment unavailable");

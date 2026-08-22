@@ -126,10 +126,10 @@ export default async function Component3Page({
     <div className="space-y-4">
       <div>
         <h1 className="font-pixel text-base text-primary pixel-glow leading-relaxed">
-          Component 3: Vocabulary &amp; Grammar Judgment
+          Supplementary Diagnostic: Vocabulary &amp; Grammar
         </h1>
         <p className="text-muted-foreground">
-          <span className="font-chinese">选择判断</span> — Choose the correct or more standard Putonghua vocabulary and grammar.
+          <span className="font-chinese">选择判断</span> — Choose the correct or more standard Putonghua vocabulary and grammar. This diagnostic is not part of the current four-component PSC mock score.
         </p>
       </div>
 

@@ -1250,7 +1250,7 @@ function QuizAssessment({
     <Card>
       <CardContent className="pt-6 space-y-4">
         <div className="flex items-center justify-between">
-          <Badge variant="outline" className="font-pixel text-base px-3 py-1">C3: Vocabulary & Grammar</Badge>
+          <Badge variant="outline" className="font-pixel text-base px-3 py-1">Supplementary: Vocabulary & Grammar</Badge>
           <span className="font-pixel text-xl text-muted-foreground">
             {currentQ + 1} / {questions.length}
           </span>
@@ -1952,7 +1952,7 @@ function CurriculumRoadmap({
                       <div className="flex-1 min-w-0">
                         <span className="text-base font-medium">Mock Exam {examNum}</span>
                         <p className="text-sm text-muted-foreground">
-                          Full PSC simulation (C1–C5) · ~30min
+                          Current PSC practice simulation (C1–C4) · ~28min incl. prep
                         </p>
                       </div>
                       <Lock className="h-4 w-4 text-muted-foreground/40 shrink-0" />

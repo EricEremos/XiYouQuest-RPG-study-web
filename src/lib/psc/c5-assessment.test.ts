@@ -29,7 +29,7 @@ describe("C5 assessment contract", () => {
     fetchWithRetry.mockReset();
   });
 
-  it("accepts only a complete PSC-aligned response", () => {
+  it("accepts only a complete XiYouQuest practice response", () => {
     expect(parseC5AssessmentResponse(validResponse)).toEqual(validResponse);
   });
 

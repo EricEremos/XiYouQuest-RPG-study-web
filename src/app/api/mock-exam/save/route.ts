@@ -9,6 +9,7 @@ const insertSchema = z.object({
     componentNumber: z.number().int().min(1).max(5),
     score: z.number().min(0).max(100),
     points: z.number().min(0).max(100),
+    scoreVersion: z.enum(["psc-2021-v1", "legacy-five-component-v1"]).optional(),
   })).min(1).max(5),
   durationSeconds: z.number().int().min(0),
   totalXp: z.number().int().min(0),

@@ -212,8 +212,8 @@ function scoreFluency(
 // ---------- Time penalty ----------
 
 /**
- * PSC's published Component 5 shortfall categories, expressed as deterministic
- * XiYouQuest practice bands. Learner-facing results remain practice estimates.
+ * A three-minute XiYouQuest practice-duration heuristic. Learner-facing results
+ * remain practice feedback and never represent a current PSC Component 4 grade.
  */
 export function calculateTimePenalty(spokenDurationSeconds: number): number {
   if (spokenDurationSeconds >= 180) return 0;

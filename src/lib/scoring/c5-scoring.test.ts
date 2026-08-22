@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calculateC5Score, calculateTimePenalty } from "./c5-scoring";
 
-describe("XiYouQuest C5 PSC-aligned practice duration scoring", () => {
+describe("XiYouQuest prompted-speaking practice duration scoring", () => {
   it.each([
     [180, 0],
     [179, 1],

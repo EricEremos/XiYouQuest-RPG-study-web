@@ -23,6 +23,18 @@ import { getXiYouQuestPracticeBand } from "@/lib/psc/practice-band";
 import { assessC4Passage } from "@/lib/psc/c4-passage-assessment";
 import { requestC5Assessment } from "@/lib/psc/c5-assessment";
 import {
+  CURRENT_PSC_MOCK_COMPONENTS,
+  CURRENT_PSC_MOCK_SCORE_VERSION,
+  LEGACY_FIVE_COMPONENTS,
+  LEGACY_FIVE_COMPONENT_SCORE_VERSION,
+  calculateMockExamWeightedTotal,
+  getMockExamComponent,
+  getMockExamComponentBySource,
+  type MockExamComponent,
+  type MockExamScoreVersion,
+  type PracticeComponentNumber,
+} from "@/lib/psc/mock-exam-contract";
+import {
   getAcceptedOptionIndices,
   isAcceptedQuizAnswer,
   withConfiguredAcceptedAnswers,
@@ -32,7 +44,6 @@ import {
 // Hardcoded question subsets for the mock exam
 // ============================================================
 
-// C3: 25 questions — 10 word-choice + 10 measure-word + 5 sentence-order (matches real PSC)
 const EXAM_QUIZ_QUESTIONS: QuizQuestion[] = [
   // Part A: Word Selection (词语判断) — 10 items, 0.25 pts each
   { id: "wc1", type: "word-choice", prompt: "Which is more standard Putonghua?", options: ["工作", "返工"], correctIndex: 0, explanation: "'工作' is standard Putonghua. '返工' is Cantonese." },
@@ -74,32 +85,7 @@ const EXAM_PASSAGE = {
 // Component config
 // ============================================================
 
-interface ComponentConfig {
-  number: 1 | 2 | 3 | 4 | 5;
-  name: string;
-  chineseName: string;
-  timeLimitSeconds: number;
-  weight: number;
-  points: number;
-}
-
-const COMPONENTS: ComponentConfig[] = [
-  { number: 1, name: "Monosyllabic Characters", chineseName: "读单音节字词", timeLimitSeconds: 210, weight: 0.10, points: 10 },
-  { number: 2, name: "Multisyllabic Words", chineseName: "读多音节词语", timeLimitSeconds: 150, weight: 0.20, points: 20 },
-  { number: 3, name: "Vocabulary & Grammar", chineseName: "选择判断", timeLimitSeconds: 180, weight: 0.10, points: 10 },
-  { number: 4, name: "Passage Reading", chineseName: "朗读短文", timeLimitSeconds: 240, weight: 0.30, points: 30 },
-  { number: 5, name: "Prompted Speaking", chineseName: "命题说话", timeLimitSeconds: 180, weight: 0.30, points: 30 },
-];
-
-// Section-3-omitted exam (common computer-based PSC: 10/20/30/40 — speaking weighted 40%)
-const NO_S3_COMPONENTS: ComponentConfig[] = [
-  { number: 1, name: "Monosyllabic Characters", chineseName: "读单音节字词", timeLimitSeconds: 210, weight: 0.10, points: 10 },
-  { number: 2, name: "Multisyllabic Words", chineseName: "读多音节词语", timeLimitSeconds: 150, weight: 0.20, points: 20 },
-  { number: 4, name: "Passage Reading", chineseName: "朗读短文", timeLimitSeconds: 240, weight: 0.30, points: 30 },
-  { number: 5, name: "Prompted Speaking", chineseName: "命题说话", timeLimitSeconds: 180, weight: 0.40, points: 40 },
-];
-
-type ExamMode = "full" | "no-s3";
+type ExamMode = "legacy" | "current";
 
 // 15 minutes of preparation before the exam (real PSC gives 15 min)
 const PREP_TIME_SECONDS = 15 * 60;
@@ -119,7 +105,7 @@ type ExamPhase = "start" | "prep" | "component" | "transition" | "assessing" | "
 
 // Raw data collected during exam (no scoring)
 interface ComponentRawData {
-  componentNumber: 1 | 2 | 3 | 4 | 5;
+  componentNumber: PracticeComponentNumber;
   audioBlob?: Blob;
   referenceText?: string;
   items?: string[];
@@ -130,7 +116,8 @@ interface ComponentRawData {
 
 // Detailed results computed after exam
 interface ComponentResult {
-  componentNumber: 1 | 2 | 3 | 4 | 5;
+  componentNumber: PracticeComponentNumber;
+  sourceComponentNumber: PracticeComponentNumber;
   score: number;
   xpEarned: number;
   wordScores?: { word: string; score: number | null }[];
@@ -146,6 +133,8 @@ interface ComponentResult {
     errorCount: number;
   };
 }
+
+type AssessmentResult = Omit<ComponentResult, "sourceComponentNumber">;
 
 interface ExamRunnerProps {
   character: {
@@ -165,19 +154,23 @@ interface ExamRunnerProps {
 export function ExamRunner({ character, characters, words, quizQuestions, passage, topics }: ExamRunnerProps) {
   const { showAchievementToasts } = useAchievementToast();
 
-  // Randomize answer positions on client side
-  const activeQuizQuestions = useMemo(() => {
-    const questions = quizQuestions ?? EXAM_QUIZ_QUESTIONS;
-    return questions.map(withConfiguredAcceptedAnswers).map(randomizeAnswerPositions);
-  }, [quizQuestions]);
-
   const passageSource = passage ?? EXAM_PASSAGE;
   const passageScope = scopeOfficialReadingPassage(passageSource.content);
   const activePassage = { ...passageSource, content: passageScope.text };
   const [examPhase, setExamPhase] = useState<ExamPhase>("start");
-  const [examMode, setExamMode] = useState<ExamMode>("full");
-  // Components for the selected mode — drives sequencing, weighting and display
-  const activeComponents = examMode === "no-s3" ? NO_S3_COMPONENTS : COMPONENTS;
+  const [examMode, setExamMode] = useState<ExamMode>("current");
+  const scoreVersion: MockExamScoreVersion = examMode === "current"
+    ? CURRENT_PSC_MOCK_SCORE_VERSION
+    : LEGACY_FIVE_COMPONENT_SCORE_VERSION;
+  const activeComponents = examMode === "current"
+    ? CURRENT_PSC_MOCK_COMPONENTS
+    : LEGACY_FIVE_COMPONENTS;
+  const legacyQuizQuestions = useMemo(() => {
+    const questions = quizQuestions ?? EXAM_QUIZ_QUESTIONS;
+    return questions
+      .map(withConfiguredAcceptedAnswers)
+      .map(randomizeAnswerPositions);
+  }, [quizQuestions]);
   // Lift the speaking topic choices so the prep screen shows the exact future choices
   const examTopicChoices = useMemo(
     () => [...(topics ?? OFFICIAL_PSC_SPEAKING_TOPICS)].sort(() => Math.random() - 0.5).slice(0, EXAM_TOPIC_CHOICES),
@@ -196,7 +189,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
   const [mockExamAchChecked, setMockExamAchChecked] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [aiFeedbackLoading, setAiFeedbackLoading] = useState(false);
-  const [history, setHistory] = useState<{ id: string; total_score: number; grade: string; component_scores: { componentNumber: number; score: number; points: number }[]; ai_feedback: string | null; duration_seconds: number; total_xp: number; created_at: string }[]>([]);
+  const [history, setHistory] = useState<{ id: string; total_score: number; grade: string; component_scores: { componentNumber: number; score: number; points: number; scoreVersion?: MockExamScoreVersion }[]; ai_feedback: string | null; duration_seconds: number; total_xp: number; created_at: string }[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const hasSavedRef = useRef(false);
@@ -255,7 +248,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             characterId: character.id,
-            component: r.componentNumber,
+            component: r.sourceComponentNumber,
             score: Math.round(r.score),
             xpEarned: r.xpEarned,
           }),
@@ -308,12 +301,14 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
 
     // Process all components in parallel
     const promises = allRawData.map(async (raw) => {
-      let result: ComponentResult;
+      const componentConfig = getMockExamComponentBySource(scoreVersion, raw.componentNumber);
+      if (!componentConfig) throw new Error("Unsupported mock exam component");
+      let result: AssessmentResult;
 
       if (raw.componentNumber === 3) {
         // C3: Quiz scoring (no API call needed)
         const answers = raw.quizAnswers ?? [];
-        const quizResults = activeQuizQuestions.map((q, i) => ({
+        const quizResults = legacyQuizQuestions.map((q, i) => ({
           question: q,
           selectedIndex: answers[i] ?? -1,
           isCorrect: isAcceptedQuizAnswer(q, answers[i] ?? -1),
@@ -321,7 +316,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
 
         // Weighted scoring
         let rawScore = 0;
-        activeQuizQuestions.forEach((q, i) => {
+        legacyQuizQuestions.forEach((q, i) => {
           if (quizResults[i].isCorrect) {
             rawScore += q.type === "word-choice" ? 0.25 : 0.5;
           }
@@ -430,7 +425,11 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
 
       completed++;
       setAssessmentProgress(Math.round((completed / allRawData.length) * 100));
-      return result;
+      return {
+        ...result,
+        componentNumber: componentConfig.number,
+        sourceComponentNumber: raw.componentNumber,
+      };
     });
 
     let allResults: ComponentResult[];
@@ -447,7 +446,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
     setComponentResults(results);
     saveAllProgress(results);
     setExamPhase("results");
-  }, [activeQuizQuestions, saveAllProgress]);
+  }, [legacyQuizQuestions, saveAllProgress, scoreVersion]);
 
   // ---- Component complete handler ----
   const handleComponentDone = useCallback((rawData: ComponentRawData) => {
@@ -481,16 +480,18 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
         })
         .catch(() => {});
 
-      const weightedTotal = componentResults.reduce((sum, cr) => {
-        const config = activeComponents.find((c) => c.number === cr.componentNumber);
-        return sum + cr.score * (config?.weight ?? 0);
-      }, 0);
+      const weightedTotal = calculateMockExamWeightedTotal(scoreVersion, componentResults);
       const practiceBand = getXiYouQuestPracticeBand(weightedTotal).label;
       const totalXP = componentResults.reduce((sum, cr) => sum + cr.xpEarned, 0);
       const totalDuration = Math.round((Date.now() - examStartTime) / 1000);
       const componentScores = componentResults.map((cr) => {
         const config = activeComponents.find((c) => c.number === cr.componentNumber);
-        return { componentNumber: cr.componentNumber, score: cr.score, points: Math.round((cr.score * (config?.weight ?? 0)) * 10) / 10 };
+        return {
+          componentNumber: cr.componentNumber,
+          score: cr.score,
+          points: Math.round((cr.score * ((config?.points ?? 0) / 100)) * 10) / 10,
+          scoreVersion,
+        };
       });
 
       // Save mock exam result to DB
@@ -532,6 +533,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           })),
           totalScore: Math.round(weightedTotal * 10) / 10,
           practiceBand,
+          scoreVersion,
         }),
       })
         .then((res) => (res.ok ? res.json() : null))
@@ -552,7 +554,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
         .finally(() => setAiFeedbackLoading(false));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [examPhase, mockExamAchChecked, showAchievementToasts, componentResults]);
+  }, [examPhase, mockExamAchChecked, showAchievementToasts, componentResults, scoreVersion]);
 
   // ---- Start Screen ----
   if (examPhase === "start") {
@@ -573,27 +575,26 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
             </p>
           </div>
 
-          {/* Exam mode selector */}
           <div className="space-y-2">
             <h3 className="text-base font-bold text-muted-foreground uppercase">Exam Format</h3>
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => setExamMode("full")}
+                onClick={() => setExamMode("current")}
                 className={`rounded-lg border-2 p-3 text-left transition-colors cursor-pointer ${
-                  examMode === "full" ? "border-primary bg-accent" : "border-border hover:border-primary/50"
+                  examMode === "current" ? "border-primary bg-accent" : "border-border hover:border-primary/50"
                 }`}
               >
-                <p className="font-medium text-base">Full (5 sections)</p>
-                <p className="text-base text-muted-foreground">Includes 选择判断. Speaking = 30%.</p>
+                <p className="font-medium text-base">Current PSC practice (4 components)</p>
+                <p className="text-base text-muted-foreground">C1/C2/C3/C4 · 10/20/30/40 points.</p>
               </button>
               <button
-                onClick={() => setExamMode("no-s3")}
+                onClick={() => setExamMode("legacy")}
                 className={`rounded-lg border-2 p-3 text-left transition-colors cursor-pointer ${
-                  examMode === "no-s3" ? "border-primary bg-accent" : "border-border hover:border-primary/50"
+                  examMode === "legacy" ? "border-primary bg-accent" : "border-border hover:border-primary/50"
                 }`}
               >
-                <p className="font-medium text-base">No Section 3 (4 sections)</p>
-                <p className="text-base text-muted-foreground">Common CBT format. Speaking = 40%.</p>
+                <p className="font-medium text-base">Legacy XiYouQuest diagnostic</p>
+                <p className="text-base text-muted-foreground">Historical 5-section practice. Not the current PSC mock.</p>
               </button>
             </div>
           </div>
@@ -669,7 +670,10 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
                     {isExpanded && (
                       <div className="border-t px-3 pb-3 pt-2 space-y-2">
                         {exam.component_scores.map((cs) => {
-                          const config = COMPONENTS.find((c) => c.number === cs.componentNumber);
+                          const config = getMockExamComponent(
+                            cs.scoreVersion ?? LEGACY_FIVE_COMPONENT_SCORE_VERSION,
+                            cs.componentNumber,
+                          );
                           return (
                             <div key={cs.componentNumber} className="flex justify-between text-sm">
                               <span>C{cs.componentNumber}: {config?.name}</span>
@@ -700,7 +704,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
 
   // ---- Preparation Screen (15 min, shows all questions + notes) ----
   if (examPhase === "prep") {
-    const showQuiz = examMode === "full";
+    const showQuiz = examMode === "legacy";
     return (
       <div className="space-y-4">
         {/* Sticky prep header with countdown */}
@@ -779,9 +783,9 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
         {showQuiz && (
           <Card>
             <CardContent className="pt-4 space-y-2">
-              <h3 className="text-sm font-medium">选择判断 · Vocabulary &amp; Grammar ({activeQuizQuestions.length})</h3>
+              <h3 className="text-sm font-medium">选择判断 · Vocabulary &amp; Grammar ({legacyQuizQuestions.length})</h3>
               <div className="max-h-[260px] overflow-y-auto rounded-lg border bg-muted/30 p-3 space-y-2">
-                {activeQuizQuestions.map((q, idx) => (
+                {legacyQuizQuestions.map((q, idx) => (
                   <div key={q.id} className="text-sm">
                     <p className="font-medium">{idx + 1}. {q.prompt}</p>
                     <p className="text-muted-foreground font-chinese">
@@ -794,20 +798,18 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           </Card>
         )}
 
-        {/* C4: Passage */}
         <Card>
           <CardContent className="pt-4 space-y-2">
-            <h3 className="text-sm font-medium">朗读短文 · Passage — {activePassage.title}</h3>
+            <h3 className="text-sm font-medium">朗读短文 · {examMode === "current" ? "C3 Passage" : "C4 Passage"} — {activePassage.title}</h3>
             <div className="max-h-[260px] overflow-y-auto rounded-lg border bg-muted/30 p-3">
               <p className="text-base leading-loose font-chinese">{activePassage.content}</p>
             </div>
           </CardContent>
         </Card>
 
-        {/* C5: Prompted speaking topic choices */}
         <Card>
           <CardContent className="pt-4 space-y-2">
-            <h3 className="text-sm font-medium">命题说话 · Prompted Speaking — choose 1 of {examTopicChoices.length} in the exam</h3>
+            <h3 className="text-sm font-medium">命题说话 · {examMode === "current" ? "C4 Prompted Speaking" : "C5 Prompted Speaking"} — choose 1 of {examTopicChoices.length} in the exam</h3>
             <div className="grid grid-cols-2 gap-3">
               {examTopicChoices.map((topic, idx) => (
                 <div key={idx} className="rounded-lg border-2 border-border p-4 text-center">
@@ -838,7 +840,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
         <CardContent className="pt-4 sm:pt-6 space-y-4 sm:space-y-6">
           <div className="text-center space-y-2">
             <Badge variant="default" className="text-base sm:text-lg px-3 sm:px-4 py-1">
-              Component {lastRaw.componentNumber} Complete
+              Component {getMockExamComponentBySource(scoreVersion, lastRaw.componentNumber)?.number} Complete
             </Badge>
           </div>
 
@@ -903,10 +905,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
 
   // ---- Results Screen ----
   if (examPhase === "results") {
-    const weightedTotal = componentResults.reduce((sum, cr) => {
-      const config = activeComponents.find((c) => c.number === cr.componentNumber);
-      return sum + cr.score * (config?.weight ?? 0);
-    }, 0);
+    const weightedTotal = calculateMockExamWeightedTotal(scoreVersion, componentResults);
 
     const totalXP = componentResults.reduce((sum, cr) => sum + cr.xpEarned, 0);
     const practiceBand = getXiYouQuestPracticeBand(weightedTotal);
@@ -943,7 +942,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
               <h3 className="text-base font-bold text-muted-foreground uppercase">Component Scores</h3>
               {componentResults.map((cr) => {
                 const config = activeComponents.find((c) => c.number === cr.componentNumber);
-                const pscPoints = cr.score * (config?.weight ?? 0);
+                const pscPoints = cr.score * ((config?.points ?? 0) / 100);
                 const maxPoints = config?.points ?? 0;
                 return (
                   <div key={cr.componentNumber} className="flex items-center justify-between rounded-lg border p-4">
@@ -1008,7 +1007,11 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
 
         {/* Detailed results per component */}
         {componentResults.map((cr) => (
-          <DetailedResultCard key={cr.componentNumber} result={cr} />
+          <DetailedResultCard
+            key={cr.componentNumber}
+            result={cr}
+            config={activeComponents.find((component) => component.number === cr.componentNumber)}
+          />
         ))}
 
         <div className="flex justify-center pb-8">
@@ -1032,7 +1035,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
         <Badge variant="outline">{currentComp.name}</Badge>
       </div>
 
-      {currentComp.number === 1 && (
+      {currentComp.sourceComponentNumber === 1 && (
         <PronunciationComponent
           componentNumber={1}
           items={characters}
@@ -1041,7 +1044,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           onComplete={handleComponentDone}
         />
       )}
-      {currentComp.number === 2 && (
+      {currentComp.sourceComponentNumber === 2 && (
         <PronunciationComponent
           componentNumber={2}
           items={words}
@@ -1050,21 +1053,21 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           onComplete={handleComponentDone}
         />
       )}
-      {currentComp.number === 3 && (
+      {currentComp.sourceComponentNumber === 3 && (
         <QuizComponent
-          questions={activeQuizQuestions}
+          questions={legacyQuizQuestions}
           timeLimitSeconds={currentComp.timeLimitSeconds}
           onComplete={handleComponentDone}
         />
       )}
-      {currentComp.number === 4 && (
+      {currentComp.sourceComponentNumber === 4 && (
         <PassageComponent
           passage={activePassage}
           timeLimitSeconds={currentComp.timeLimitSeconds}
           onComplete={handleComponentDone}
         />
       )}
-      {currentComp.number === 5 && (
+      {currentComp.sourceComponentNumber === 5 && (
         <SpeakingComponent
           topicChoices={examTopicChoices}
           timeLimitSeconds={currentComp.timeLimitSeconds}
@@ -1079,9 +1082,8 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
 // Detailed Result Card (shown per component on results screen)
 // ============================================================
 
-function DetailedResultCard({ result }: { result: ComponentResult }) {
+function DetailedResultCard({ result, config }: { result: ComponentResult; config?: MockExamComponent }) {
   const [expanded, setExpanded] = useState(false);
-  const config = COMPONENTS.find((c) => c.number === result.componentNumber);
 
   return (
     <Card>
@@ -1257,8 +1259,8 @@ function C5DetailCard({ detail }: { detail: NonNullable<ComponentResult["c5Detai
         }`}>
           {detail.totalScore}/30
         </p>
-        <p className="text-sm text-muted-foreground">PSC-aligned practice estimate (命题说话)</p>
-        <p className="text-xs text-muted-foreground mt-1">Not an official PSC result.</p>
+        <p className="text-sm text-muted-foreground">XiYouQuest speaking practice signal (命题说话)</p>
+        <p className="text-xs text-muted-foreground mt-1">Normalized for XiYouQuest practice only; not an official PSC Component 4 score.</p>
       </div>
 
       {/* Pronunciation */}

@@ -218,8 +218,8 @@ export async function POST(request: NextRequest) {
     console.info("[C5] Practice assessment completed");
     return NextResponse.json({
       ...result,
-      assessmentType: "psc_aligned_practice_estimate",
-      assessmentVersion: "psc-practice-c5-v1",
+      assessmentType: "xiyouquest_speaking_practice_signal",
+      assessmentVersion: "xiyouquest-speaking-practice-v2",
     });
   } catch {
     console.error("[C5] Practice assessment unavailable");

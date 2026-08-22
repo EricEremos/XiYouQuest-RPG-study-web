@@ -55,7 +55,7 @@ export default async function Component5Page({
     <div className="space-y-4">
       <div>
         <h1 className="font-pixel text-base text-primary pixel-glow leading-relaxed">
-          Component 5: Prompted Speaking
+          Component 4: Prompted Speaking
         </h1>
         <p className="text-muted-foreground">
           <span className="font-chinese">命题说话</span> — Speak on a given topic for 3 minutes with natural fluency and structure.
@@ -64,6 +64,9 @@ export default async function Component5Page({
           {usesSupplementaryBank
             ? "Supplementary practice bank · not used in the mock exam"
             : "Official PSC bank · 50 topics · two choices per session"}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          XiYouQuest automated feedback is for practice only. Official PSC Component 4 assessment is examiner-scored.
         </p>
         {!usesSupplementaryBank && (
           <p className="mt-1 text-xs text-muted-foreground">

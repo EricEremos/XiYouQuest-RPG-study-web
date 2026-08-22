@@ -116,7 +116,7 @@ export default async function MockExamPage() {
       <div>
         <h1 className="font-pixel text-base text-primary pixel-glow leading-relaxed">Mock PSC Exam</h1>
         <p className="text-muted-foreground">
-          <span className="font-chinese">模拟考试</span> — Complete all 5 components for a XiYouQuest practice estimate, not an official PSC result.
+          <span className="font-chinese">模拟考试</span> — Complete the current 4 PSC components for a XiYouQuest practice estimate, not an official PSC result.
         </p>
       </div>
 

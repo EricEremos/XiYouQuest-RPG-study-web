@@ -678,7 +678,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                     {analysis.totalScore}/30
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    PSC-aligned practice estimate (命题说话)
+                    XiYouQuest prompted-speaking practice feedback (命题说话)
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">Not an official PSC result.</p>
                 </div>
