@@ -9,8 +9,8 @@ import { AudioRecorder } from "@/components/practice/audio-recorder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { calculateXP } from "@/lib/gamification/xp";
 import { fetchWithRetry } from "@/lib/fetch-retry";
+import { assessC4Passage } from "@/lib/psc/c4-passage-assessment";
 import { getDialogue } from "@/lib/dialogue";
 import { ChineseText } from "@/components/shared/chinese-text";
 import { useAudioSettings } from "@/components/shared/audio-settings";
@@ -78,6 +78,8 @@ export function ReadingSession({ passages, character, characterId, component, lp
   const [sentenceScores, setSentenceScores] = useState<SentenceScore[]>([]);
   const [totalXPEarned, setTotalXPEarned] = useState(0);
   const [, setFeedbackText] = useState("");
+  const [progressSaveError, setProgressSaveError] = useState<string | null>(null);
+  const [progressSaveAttempt, setProgressSaveAttempt] = useState(0);
   const hasPlayedGreeting = useRef(false);
 
   // Background overlay ref for passage images (DOM-managed on body)
@@ -159,9 +161,17 @@ export function ReadingSession({ passages, character, characterId, component, lp
 
   // Save progress when reading assessment completes
   const hasSavedProgress = useRef(false);
+  const isSavingProgress = useRef(false);
   useEffect(() => {
-    if (phase !== "feedback" || overallScore === null || !characterId || hasSavedProgress.current) return;
-    hasSavedProgress.current = true;
+    if (
+      phase !== "feedback" ||
+      overallScore === null ||
+      !characterId ||
+      hasSavedProgress.current ||
+      isSavingProgress.current
+    ) return;
+    isSavingProgress.current = true;
+    let cancelled = false;
 
     const saveProgress = async () => {
       try {
@@ -179,20 +189,14 @@ export function ReadingSession({ passages, character, characterId, component, lp
             bestStreak: overallScore >= 60 ? 1 : 0,
           }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.newAchievements?.length > 0) {
-            showAchievementToasts(data.newAchievements);
-          }
+        if (!res.ok) throw new Error(`Progress update failed (${res.status})`);
+        const data = await res.json();
+        if (data.newAchievements?.length > 0) {
+          showAchievementToasts(data.newAchievements);
         }
-      } catch (err) {
-        console.error("Failed to save progress:", err);
-      }
 
-      // Complete learning path node if launched from learning path
-      if (lpNodeId) {
-        try {
-          await fetchWithRetry("/api/learning/node/complete", {
+        if (lpNodeId) {
+          const nodeResponse = await fetchWithRetry("/api/learning/node/complete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -201,16 +205,28 @@ export function ReadingSession({ passages, character, characterId, component, lp
               xpEarned: totalXPEarned,
             }),
           });
-        } catch (err) {
-          console.error("Failed to complete LP node:", err);
+          if (!nodeResponse.ok) throw new Error(`Learning Path update failed (${nodeResponse.status})`);
         }
-        router.push("/learning-path");
-        return;
+
+        if (cancelled) return;
+        hasSavedProgress.current = true;
+        setProgressSaveError(null);
+        if (lpNodeId) router.push("/learning-path");
+      } catch (err) {
+        console.error("Failed to save C4 progress:", err);
+        if (!cancelled) {
+          setProgressSaveError("Your assessment is ready, but progress could not be saved. Retry before leaving this page.");
+        }
+      } finally {
+        isSavingProgress.current = false;
       }
     };
 
-    saveProgress();
-  }, [phase, overallScore]); // eslint-disable-line react-hooks/exhaustive-deps
+    void saveProgress();
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, overallScore, progressSaveAttempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Play the entire passage as a model reading (sentence-by-sentence to avoid Vercel timeout)
   const playModelReading = useCallback(async () => {
@@ -373,71 +389,25 @@ export function ReadingSession({ passages, character, characterId, component, lp
     setDialogue(getDialogue(character.name, "c4_analyzing"));
 
     try {
-      // Send audio to speech assessment API
-      const formData = new FormData();
-      formData.append("audio", audioBlob, "recording.wav");
-      formData.append("referenceText", selectedPassage.content);
-      formData.append("category", "read_chapter");
+      const assessment = await assessC4Passage(
+        audioBlob,
+        selectedPassage.content,
+        async (blob, referenceText, category) => {
+          const formData = new FormData();
+          formData.append("audio", blob, "recording.wav");
+          formData.append("referenceText", referenceText);
+          formData.append("category", category);
 
-      const assessResponse = await fetchWithRetry("/api/speech/assess", {
-        method: "POST",
-        body: formData,
-      });
-
-      let pronunciationScore = 0;
-      let sentenceResults: SentenceScore[] = [];
-
-      if (!assessResponse.ok) {
-        const errBody = await assessResponse.json().catch(() => ({}));
-        console.error("[C4] Assessment API error:", assessResponse.status, errBody);
-        throw new Error(`Assessment failed (${assessResponse.status})`);
-      }
-
-      const assessResult = await assessResponse.json();
-      pronunciationScore = assessResult.pronunciationScore ?? 0;
-
-      // Prefer ISE sentence-level scores (returned by read_chapter/read_sentence)
-      if (assessResult.sentences && assessResult.sentences.length > 0) {
-        // Map ISE sentence scores back to our UI sentences by matching content
-        for (const sentence of sentences) {
-          const rawSentence = sentence.replace(/[。！？；，、：""''（）《》\s]/g, "");
-          // Find the ISE sentence whose content best matches this UI sentence
-          const match = assessResult.sentences.find((s: { content: string; score: number }) => {
-            const rawIse = s.content.replace(/[。！？；，、：""''（）《》\s]/g, "");
-            return rawIse === rawSentence || rawSentence.includes(rawIse) || rawIse.includes(rawSentence);
+          const response = await fetchWithRetry("/api/speech/assess", {
+            method: "POST",
+            body: formData,
           });
-          sentenceResults.push({ sentence, score: match?.score ?? pronunciationScore });
-        }
-      } else if (assessResult.words && assessResult.words.length > 0) {
-        // Fallback: reconstruct sentence scores from word-level data
-        let wordIndex = 0;
-        for (const sentence of sentences) {
-          const rawSentence = sentence.replace(/[。！？；，、：""''（）《》\s]/g, "");
-          let consumed = 0;
-          let sentenceTotal = 0;
-          let sentenceWordCount = 0;
-
-          while (consumed < rawSentence.length && wordIndex < assessResult.words.length) {
-            const wordResult = assessResult.words[wordIndex];
-            if (consumed + wordResult.word.length > rawSentence.length + 1) break;
-            consumed += wordResult.word.length;
-            sentenceTotal += wordResult.accuracyScore ?? 0;
-            sentenceWordCount++;
-            wordIndex++;
-          }
-
-          const avgScore = sentenceWordCount > 0 ? Math.round(sentenceTotal / sentenceWordCount) : 0;
-          sentenceResults.push({ sentence, score: avgScore });
-        }
-      }
-
-      // If no sentence-level data, create from overall score
-      if (sentenceResults.length === 0) {
-        sentenceResults = sentences.map((sentence) => ({
-          sentence,
-          score: pronunciationScore,
-        }));
-      }
+          if (!response.ok) throw new Error(`Assessment failed (${response.status})`);
+          return response.json();
+        },
+      );
+      const pronunciationScore = assessment.score;
+      const sentenceResults = assessment.sentenceScores;
 
       setOverallScore(pronunciationScore);
       setSentenceScores(sentenceResults);
@@ -445,13 +415,7 @@ export function ReadingSession({ passages, character, characterId, component, lp
       const isGood = pronunciationScore >= 60;
       const isPerfect = pronunciationScore >= 90;
 
-      // Calculate XP
-      const xpResult = calculateXP({
-        pronunciationScore,
-        isCorrect: isGood,
-        currentStreak: isGood ? 1 : 0,
-      });
-      setTotalXPEarned(xpResult.totalXP);
+      setTotalXPEarned(assessment.xpEarned);
 
       // Get AI character feedback
       setPhase("feedback");
@@ -501,7 +465,7 @@ export function ReadingSession({ passages, character, characterId, component, lp
 
       // Companion voice disabled
     } catch {
-      setPhase("feedback");
+      setPhase("ready");
       setExpression("surprised");
       setDialogue(getDialogue(character.name, "c4_error"));
       setOverallScore(null);
@@ -548,6 +512,8 @@ export function ReadingSession({ passages, character, characterId, component, lp
     setSentenceScores([]);
     setTotalXPEarned(0);
     setFeedbackText("");
+    setProgressSaveError(null);
+    hasSavedProgress.current = false;
 
     setExpression("neutral");
     setDialogue(getDialogue(character.name, "c4_initial"));
@@ -636,14 +602,45 @@ export function ReadingSession({ passages, character, characterId, component, lp
 
             <div className="flex flex-col gap-2">
               {lpNodeId ? (
-                <p className="text-sm text-muted-foreground animate-pulse text-center">Returning to Learning Path...</p>
+                progressSaveError ? (
+                  <>
+                    <p role="alert" className="text-sm text-destructive text-center">{progressSaveError}</p>
+                    <Button
+                      onClick={() => {
+                        setProgressSaveError(null);
+                        setProgressSaveAttempt((attempt) => attempt + 1);
+                      }}
+                      className="w-full"
+                    >
+                      Retry Saving Progress
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground animate-pulse text-center">Saving progress and returning to Learning Path...</p>
+                )
               ) : (
                 <>
+                  {progressSaveError && (
+                    <>
+                      <p role="alert" className="text-sm text-destructive text-center">{progressSaveError}</p>
+                      <Button
+                        onClick={() => {
+                          setProgressSaveError(null);
+                          setProgressSaveAttempt((attempt) => attempt + 1);
+                        }}
+                        className="w-full"
+                      >
+                        Retry Saving Progress
+                      </Button>
+                    </>
+                  )}
                   <Button onClick={() => {
                     setPhase("ready");
                     setOverallScore(null);
                     setSentenceScores([]);
                     setFeedbackText("");
+                    setProgressSaveError(null);
+                    hasSavedProgress.current = false;
                     setExpression("neutral");
                     setDialogue(getDialogue(character.name, "c4_retry"));
                   }} className="w-full">

@@ -21,6 +21,7 @@ import { OFFICIAL_PSC_SPEAKING_TOPICS } from "@/lib/psc/official-speaking-topics
 import { scopeOfficialReadingPassage } from "@/lib/psc/reading-scope";
 import { getXiYouQuestPracticeBand } from "@/lib/psc/practice-band";
 import { assessC4Passage } from "@/lib/psc/c4-passage-assessment";
+import { requestC5Assessment } from "@/lib/psc/c5-assessment";
 import {
   getAcceptedOptionIndices,
   isAcceptedQuizAnswer,
@@ -199,6 +200,14 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
   const [historyLoading, setHistoryLoading] = useState(true);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const hasSavedRef = useRef(false);
+  const c5AssessmentAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      c5AssessmentAbortRef.current?.abort();
+      c5AssessmentAbortRef.current = null;
+    };
+  }, []);
 
   // ---- 15-minute preparation phase ----
   // When prep time runs out, the exam starts automatically.
@@ -372,21 +381,16 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           ...assessment,
         };
       } else if (raw.componentNumber === 5 && raw.audioBlob) {
-        // C5: Prompted speaking — 3-step pipeline via /api/speech/c5-assess
+        c5AssessmentAbortRef.current?.abort();
+        const controller = new AbortController();
+        c5AssessmentAbortRef.current = controller;
         try {
-          const formData = new FormData();
-          formData.append("audio", raw.audioBlob, "recording.wav");
-          formData.append("topic", raw.selectedTopic ?? "");
-
-          const c5Response = await fetchWithRetry("/api/speech/c5-assess", {
-            method: "POST",
-            body: formData,
-          });
-          if (!c5Response.ok) {
-            throw new Error(`C5 assessment failed (${c5Response.status})`);
-          }
-          const c5Result = await c5Response.json();
-          const score = c5Result.normalizedScore ?? 0;
+          const c5Result = await requestC5Assessment(
+            raw.audioBlob,
+            raw.selectedTopic ?? "",
+            controller.signal,
+          );
+          const score = c5Result.normalizedScore;
 
           const xpResult = calculateXP({
             pronunciationScore: score,
@@ -399,17 +403,21 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
             score,
             xpEarned: xpResult.totalXP,
             c5Detail: {
-              totalScore: c5Result.totalScore ?? 0,
+              totalScore: c5Result.totalScore,
               pronunciation: c5Result.pronunciation,
               vocabGrammar: c5Result.vocabGrammar,
               fluency: c5Result.fluency,
-              timePenalty: c5Result.timePenalty ?? 0,
-              transcript: c5Result.transcript ?? "",
-              errorCount: c5Result.errorCount ?? 0,
+              timePenalty: c5Result.timePenalty,
+              transcript: c5Result.transcript,
+              errorCount: c5Result.errorCount,
             },
           };
         } catch {
           throw new Error("C5 practice assessment unavailable");
+        } finally {
+          if (c5AssessmentAbortRef.current === controller) {
+            c5AssessmentAbortRef.current = null;
+          }
         }
       } else {
         // No data (time expired without recording)

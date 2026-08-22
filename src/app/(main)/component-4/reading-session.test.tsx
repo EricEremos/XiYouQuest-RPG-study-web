@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ReadingSession } from "./reading-session";
+
+const { fetchWithRetry } = vi.hoisted(() => ({ fetchWithRetry: vi.fn() }));
 
 vi.mock("next/link", () => ({
   default: ({ children, ...props }: React.ComponentProps<"a">) => <a {...props}>{children}</a>,
@@ -19,7 +21,11 @@ vi.mock("@/components/character/dialogue-box", () => ({
 }));
 
 vi.mock("@/components/practice/audio-recorder", () => ({
-  AudioRecorder: () => <div />,
+  AudioRecorder: ({ onRecordingComplete }: { onRecordingComplete: (audio: Blob) => void }) => (
+    <button type="button" onClick={() => onRecordingComplete(new Blob(["audio"]))}>
+      Submit C4 recording
+    </button>
+  ),
 }));
 
 vi.mock("@/components/shared/achievement-toast", () => ({
@@ -38,7 +44,7 @@ vi.mock("@/lib/dialogue", () => ({
 }));
 
 vi.mock("@/lib/fetch-retry", () => ({
-  fetchWithRetry: vi.fn(),
+  fetchWithRetry,
 }));
 
 vi.mock("@/lib/gamification/xp", () => ({
@@ -72,6 +78,10 @@ function renderReadingSession(source: { label: string; isSchoolProvided: boolean
 }
 
 describe("ReadingSession provenance label", () => {
+  beforeEach(() => {
+    fetchWithRetry.mockReset();
+  });
+
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
@@ -105,5 +115,25 @@ describe("ReadingSession provenance label", () => {
     expect(
       screen.getByText("XiYouQuest practice passage — source record pending; not an official PSC reading text."),
     ).toBeInTheDocument();
+  });
+
+  it("does not save progress after a malformed successful C4 assessment response", async () => {
+    vi.stubGlobal("speechSynthesis", { cancel: vi.fn() });
+    fetchWithRetry.mockResolvedValue(
+      new Response(JSON.stringify({ pronunciationScore: 120, words: [] }), { status: 200 }),
+    );
+
+    renderReadingSession({
+      label: "School-provided practice source: PSC reading collection (2026-08)",
+      isSchoolProvided: true,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Practice passage: Test passage" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit C4 recording" }));
+
+    await waitFor(() => expect(fetchWithRetry).toHaveBeenCalledOnce());
+    expect(fetchWithRetry).not.toHaveBeenCalledWith(
+      "/api/progress/update",
+      expect.anything(),
+    );
   });
 });

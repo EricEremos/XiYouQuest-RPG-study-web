@@ -31,4 +31,17 @@ describe("assessC4Passage", () => {
       ],
     });
   });
+
+  it("rejects a malformed successful response instead of recording an untrusted score", async () => {
+    await expect(
+      assessC4Passage(
+        new Blob(["audio"]),
+        "你好。",
+        vi.fn().mockResolvedValue({
+          pronunciationScore: 120,
+          words: [],
+        }),
+      ),
+    ).rejects.toThrow("Invalid C4 assessment response");
+  });
 });

@@ -44,6 +44,8 @@ import type { QuizQuestion } from "@/types/practice";
 import type { LearningPlan, LearningNode, LearningCheckpoint } from "@/types/database";
 import type { UnlockedAchievement } from "@/lib/achievements/types";
 import { getXiYouQuestPracticeBand } from "@/lib/psc/practice-band";
+import { assessC4Passage } from "@/lib/psc/c4-passage-assessment";
+import { requestC5Assessment } from "@/lib/psc/c5-assessment";
 import { isAcceptedQuizAnswer, withConfiguredAcceptedAnswers } from "@/lib/quiz-answers";
 
 // ============================================================
@@ -214,7 +216,7 @@ type GradingResult =
   | { key: string; score: number }
   | { key: string; unavailable: true };
 
-function gradeComponent(raw: AssessmentRawData): Promise<GradingResult> {
+function gradeComponent(raw: AssessmentRawData, signal?: AbortSignal): Promise<GradingResult> {
   const key = `c${raw.componentNumber}`;
 
   // Quiz — instant, no API call
@@ -262,18 +264,24 @@ function gradeComponent(raw: AssessmentRawData): Promise<GradingResult> {
   if (raw.componentNumber === 4) {
     return (async () => {
       try {
-        const formData = new FormData();
-        formData.append("audio", raw.audioBlob!, "recording.wav");
-        formData.append("referenceText", raw.referenceText ?? "");
-        formData.append("category", "read_chapter");
+        const assessment = await assessC4Passage(
+          raw.audioBlob!,
+          raw.referenceText ?? "",
+          async (audioBlob, referenceText, category) => {
+            const formData = new FormData();
+            formData.append("audio", audioBlob, "recording.wav");
+            formData.append("referenceText", referenceText);
+            formData.append("category", category);
 
-        const res = await fetchWithRetry("/api/speech/assess", {
-          method: "POST",
-          body: formData,
-        });
-        if (!res.ok) throw new Error("Assessment failed");
-        const data = await res.json();
-        return { key, score: Math.round(data.pronunciationScore ?? 0) };
+            const response = await fetchWithRetry("/api/speech/assess", {
+              method: "POST",
+              body: formData,
+            });
+            if (!response.ok) throw new Error("Assessment failed");
+            return response.json();
+          },
+        );
+        return { key, score: assessment.score };
       } catch {
         return { key, unavailable: true };
       }
@@ -283,17 +291,12 @@ function gradeComponent(raw: AssessmentRawData): Promise<GradingResult> {
   // C5 prompted speaking
   return (async () => {
     try {
-      const formData = new FormData();
-      formData.append("audio", raw.audioBlob!, "recording.wav");
-      formData.append("topic", raw.selectedTopic ?? "");
-
-      const res = await fetchWithRetry("/api/speech/c5-assess", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error("C5 assessment failed");
-      const data = await res.json();
-      return { key, score: Math.round(data.normalizedScore ?? 0) };
+      const data = await requestC5Assessment(
+        raw.audioBlob!,
+        raw.selectedTopic ?? "",
+        signal,
+      );
+      return { key, score: Math.round(data.normalizedScore) };
     } catch {
       return { key, unavailable: true };
     }
@@ -643,6 +646,7 @@ function MiniExamFlow({
   const [assessProgress, setAssessProgress] = useState(0);
   const [assessmentError, setAssessmentError] = useState<string | null>(null);
   const processingRef = useRef(false);
+  const gradingAbortRef = useRef(new AbortController());
   // Background grading: fire each component's grading immediately when done recording
   const gradingPromisesRef = useRef<Promise<GradingResult>[]>([]);
 
@@ -652,6 +656,10 @@ function MiniExamFlow({
     setLearningActive(active);
     return () => setLearningActive(false);
   }, [phase, setLearningActive]);
+
+  useEffect(() => {
+    return () => gradingAbortRef.current.abort();
+  }, []);
 
   const randomizedQuiz = useMemo(() => {
     return (assessmentData.quizQuestions ?? [])
@@ -670,7 +678,7 @@ function MiniExamFlow({
 
   const advancePhase = useCallback((data: AssessmentRawData) => {
     // Start grading this component immediately in the background
-    gradingPromisesRef.current.push(gradeComponent(data));
+    gradingPromisesRef.current.push(gradeComponent(data, gradingAbortRef.current.signal));
 
     setPhase(prev => {
       let idx = ASSESSMENT_PHASE_ORDER.indexOf(prev);
@@ -2821,27 +2829,34 @@ function SpeakingDrillSession({
   const [done, setDone] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
   const [assessmentError, setAssessmentError] = useState<string | null>(null);
+  const assessmentAbortRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      assessmentAbortRef.current?.abort();
+      assessmentAbortRef.current = null;
+    };
+  }, []);
+
   const handleRecordingComplete = useCallback(async (audioBlob: Blob) => {
     if (!selectedTopic) return;
     setAssessmentError(null);
     setAssessing(true);
+    const controller = new AbortController();
+    assessmentAbortRef.current = controller;
 
     try {
-      const formData = new FormData();
-      formData.append("audio", audioBlob, "recording.wav");
-      formData.append("topic", selectedTopic);
-
-      const res = await fetchWithRetry("/api/speech/c5-assess", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error("C5 assessment failed");
-      const data = await res.json();
-      setFinalScore(Math.round(data.normalizedScore ?? 0));
+      const data = await requestC5Assessment(audioBlob, selectedTopic, controller.signal);
+      if (!isMountedRef.current) return;
+      setFinalScore(Math.round(data.normalizedScore));
     } catch {
+      if (!isMountedRef.current) return;
       setAssessmentError("The practice assessment service was unavailable. No score was recorded.");
     } finally {
+      if (assessmentAbortRef.current === controller) assessmentAbortRef.current = null;
+      if (!isMountedRef.current) return;
       setAssessing(false);
       setDone(true);
     }

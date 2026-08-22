@@ -21,7 +21,42 @@ export type C4AssessmentRequest = (
   blob: Blob,
   referenceText: string,
   category: "read_chapter",
-) => Promise<C4AssessmentResponse>;
+) => Promise<unknown>;
+
+export function parseC4AssessmentResponse(value: unknown): C4AssessmentResponse {
+  if (!value || typeof value !== "object") throw new Error("Invalid C4 assessment response");
+  const result = value as Record<string, unknown>;
+  if (
+    typeof result.pronunciationScore !== "number" ||
+    !Number.isFinite(result.pronunciationScore) ||
+    result.pronunciationScore < 0 ||
+    result.pronunciationScore > 100 ||
+    !Array.isArray(result.words)
+  ) {
+    throw new Error("Invalid C4 assessment response");
+  }
+  const words = result.words.map((word) => {
+    if (!word || typeof word !== "object") throw new Error("Invalid C4 assessment word");
+    const candidate = word as Record<string, unknown>;
+    if (
+      typeof candidate.word !== "string" ||
+      candidate.word.length === 0 ||
+      typeof candidate.accuracyScore !== "number" ||
+      !Number.isFinite(candidate.accuracyScore) ||
+      candidate.accuracyScore < 0 ||
+      candidate.accuracyScore > 100 ||
+      typeof candidate.errorType !== "string"
+    ) {
+      throw new Error("Invalid C4 assessment word");
+    }
+    return {
+      word: candidate.word,
+      accuracyScore: candidate.accuracyScore,
+      errorType: candidate.errorType,
+    };
+  });
+  return { pronunciationScore: result.pronunciationScore, words };
+}
 
 export function splitIntoC4Sentences(content: string): string[] {
   return content.split(/(?<=[。！？；])/g).filter((sentence) => sentence.trim().length > 0);
@@ -61,7 +96,9 @@ export async function assessC4Passage(
   referenceText: string,
   requestAssessment: C4AssessmentRequest,
 ): Promise<C4PassageAssessment> {
-  const apiResult = await requestAssessment(audioBlob, referenceText, "read_chapter");
+  const apiResult = parseC4AssessmentResponse(
+    await requestAssessment(audioBlob, referenceText, "read_chapter"),
+  );
   const score = apiResult.pronunciationScore;
   const xpResult = calculateXP({
     pronunciationScore: score,

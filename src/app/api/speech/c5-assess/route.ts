@@ -129,7 +129,7 @@ async function assessFullAudio(
   };
 }
 
-export const maxDuration = 150;
+export const maxDuration = 140;
 
 export async function POST(request: NextRequest) {
   const user = await getSessionUser();

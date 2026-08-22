@@ -15,15 +15,13 @@ import { encodeWAV } from "@/lib/audio-utils";
 import { shuffle } from "@/lib/utils";
 import { getSpeakingGuide } from "@/lib/speaking-guides";
 import { fetchWithRetry } from "@/lib/fetch-retry";
+import { requestC5Assessment, type C5AssessmentResponse } from "@/lib/psc/c5-assessment";
 import { useAchievementToast } from "@/components/shared/achievement-toast";
 import { useBGM } from "@/components/shared/bgm-provider";
 import type { ExpressionName } from "@/types/character";
 import type { ComponentNumber } from "@/types/practice";
 
 const TOTAL_TIME = 180;
-const C5_ASSESSMENT_TIMEOUT_MS = 150_000;
-const C5_ASSESSMENT_TYPE = "psc_aligned_practice_estimate";
-const C5_ASSESSMENT_VERSION = "psc-practice-c5-v1";
 
 // Number of topic choices offered (real CBT PSC offers 2)
 const TOPIC_CHOICES = 2;
@@ -51,47 +49,8 @@ type SessionPhase =
   | "feedback"
   | "complete";
 
-interface C5SpeakingAnalysis {
-  pronunciation: { score: number; deduction: number; level: number; label: string; notes: string };
-  vocabGrammar: { score: number; deduction: number; level: number; label: string; notes: string };
-  fluency: { score: number; deduction: number; level: number; label: string; notes: string };
-  timePenalty: number;
-  totalScore: number;
-  normalizedScore: number;
-  transcript: string;
-  errorCount: number;
+interface C5SpeakingAnalysis extends C5AssessmentResponse {
   overallFeedback: string;
-}
-
-type C5ScoreCategory = C5SpeakingAnalysis["pronunciation"];
-
-interface C5AssessmentResponse extends Omit<C5SpeakingAnalysis, "overallFeedback"> {
-  assessmentType: typeof C5_ASSESSMENT_TYPE;
-  assessmentVersion: typeof C5_ASSESSMENT_VERSION;
-}
-
-function isC5ScoreCategory(value: unknown): value is C5ScoreCategory {
-  if (!value || typeof value !== "object") return false;
-  const category = value as Record<string, unknown>;
-  return ["score", "deduction", "level"].every(
-    (key) => typeof category[key] === "number" && Number.isFinite(category[key]),
-  ) && ["label", "notes"].every((key) => typeof category[key] === "string");
-}
-
-function isC5AssessmentResponse(value: unknown): value is C5AssessmentResponse {
-  if (!value || typeof value !== "object") return false;
-  const result = value as Record<string, unknown>;
-  return (
-    result.assessmentType === C5_ASSESSMENT_TYPE &&
-    result.assessmentVersion === C5_ASSESSMENT_VERSION &&
-    isC5ScoreCategory(result.pronunciation) &&
-    isC5ScoreCategory(result.vocabGrammar) &&
-    isC5ScoreCategory(result.fluency) &&
-    ["timePenalty", "totalScore", "normalizedScore", "errorCount"].every(
-      (key) => typeof result[key] === "number" && Number.isFinite(result[key]),
-    ) &&
-    typeof result.transcript === "string"
-  );
 }
 
 export function SpeakingSession({ topics, character, characterId, component, lpNodeId }: SpeakingSessionProps) {
@@ -111,6 +70,8 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
   const [showTranscript, setShowTranscript] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [volume, setVolume] = useState(0);
+  const [progressSaveError, setProgressSaveError] = useState<string | null>(null);
+  const [progressSaveAttempt, setProgressSaveAttempt] = useState(0);
 
   // Structure + tips tailored to the selected topic's category
   const guide = selectedTopic ? getSpeakingGuide(selectedTopic) : null;
@@ -126,7 +87,6 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownResolveRef = useRef<(() => void) | null>(null);
   const assessmentAbortRef = useRef<AbortController | null>(null);
-  const assessmentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(false);
   const hasPlayedGreeting = useRef(false);
   const handleRecordingCompleteRef = useRef<(blob: Blob) => void>(() => {});
@@ -178,10 +138,6 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
       }
       countdownResolveRef.current?.();
       countdownResolveRef.current = null;
-      if (assessmentTimeoutRef.current) {
-        clearTimeout(assessmentTimeoutRef.current);
-        assessmentTimeoutRef.current = null;
-      }
       assessmentAbortRef.current?.abort();
       assessmentAbortRef.current = null;
       if (audioContextRef.current?.state !== "closed") {
@@ -191,14 +147,23 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
       analyserRef.current = null;
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
+      setLearningActive(false);
     };
-  }, []);
+  }, [setLearningActive]);
 
   // Save progress when speaking assessment completes
   const hasSavedProgress = useRef(false);
+  const isSavingProgress = useRef(false);
   useEffect(() => {
-    if (phase !== "feedback" || !analysis || !characterId || hasSavedProgress.current) return;
-    hasSavedProgress.current = true;
+    if (
+      phase !== "feedback" ||
+      !analysis ||
+      !characterId ||
+      hasSavedProgress.current ||
+      isSavingProgress.current
+    ) return;
+    let cancelled = false;
+    isSavingProgress.current = true;
 
     const saveProgress = async () => {
       const spokenTime = elapsedTimeRef.current;
@@ -218,20 +183,14 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
             bestStreak: analysis.normalizedScore >= 60 ? 1 : 0,
           }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.newAchievements?.length > 0) {
-            showAchievementToasts(data.newAchievements);
-          }
+        if (!res.ok) throw new Error(`Practice-progress update failed (${res.status})`);
+        const data = await res.json();
+        if (data.newAchievements?.length > 0) {
+          showAchievementToasts(data.newAchievements);
         }
-      } catch {
-        console.error("[C5] Practice-progress update unavailable");
-      }
 
-      // Complete learning path node if launched from learning path
-      if (lpNodeId) {
-        try {
-          await fetchWithRetry("/api/learning/node/complete", {
+        if (lpNodeId) {
+          const completion = await fetchWithRetry("/api/learning/node/complete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -240,16 +199,29 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
               xpEarned: totalXPEarned,
             }),
           });
-        } catch {
-          console.error("[C5] Learning-path completion update unavailable");
+          if (!completion.ok) throw new Error(`Learning-path completion failed (${completion.status})`);
         }
-        router.push("/learning-path");
-        return;
+
+        if (cancelled) return;
+        hasSavedProgress.current = true;
+        setProgressSaveError(null);
+        if (lpNodeId) {
+          router.push("/learning-path");
+        }
+      } catch {
+        if (!cancelled) {
+          setProgressSaveError("Your practice result is ready, but progress could not be saved. Retry before leaving.");
+        }
+      } finally {
+        isSavingProgress.current = false;
       }
     };
 
-    saveProgress();
-  }, [phase, analysis]); // eslint-disable-line react-hooks/exhaustive-deps
+    void saveProgress();
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, analysis, characterId, component, totalXPEarned, lpNodeId, router, showAchievementToasts, progressSaveAttempt]);
 
   // Timer logic — counts up (stopwatch)
   useEffect(() => {
@@ -386,6 +358,16 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
         stopRecordingRef.current();
       }, TOTAL_TIME * 1000);
     } catch {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = 0;
+      if (audioContextRef.current?.state !== "closed") {
+        void audioContextRef.current?.close();
+      }
+      audioContextRef.current = null;
+      analyserRef.current = null;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      setLearningActive(false);
       if (!isMountedRef.current) return;
       setExpression("surprised");
       setDialogue(getDialogue(character.name, "c5_mic_error"));
@@ -415,6 +397,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
     if (audioContextRef.current?.state !== "closed") {
       audioContextRef.current?.close();
     }
+    audioContextRef.current = null;
 
     // Stop mic stream
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -450,39 +433,15 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
     setDialogue(getDialogue(character.name, "c5_analyzing"));
 
     const spokenTime = elapsedTimeRef.current;
+    const assessmentAbortController = new AbortController();
 
     try {
-      // Send audio to C5 assessment API
-      const formData = new FormData();
-      formData.append("audio", audioBlob, "recording.wav");
-      formData.append("topic", selectedTopic ?? "");
-
-      const assessmentAbortController = new AbortController();
       assessmentAbortRef.current = assessmentAbortController;
-      assessmentTimeoutRef.current = setTimeout(
-        () => assessmentAbortController.abort(),
-        C5_ASSESSMENT_TIMEOUT_MS,
+      const c5Result = await requestC5Assessment(
+        audioBlob,
+        selectedTopic ?? "",
+        assessmentAbortController.signal,
       );
-
-      const assessResponse = await fetchWithRetry("/api/speech/c5-assess", {
-        method: "POST",
-        body: formData,
-        signal: assessmentAbortController.signal,
-      }, {
-        maxRetries: 0,
-      });
-
-      if (!assessResponse.ok) {
-        console.error("[C5] Assessment API unavailable", {
-          status: assessResponse.status,
-        });
-        throw new Error(`Assessment failed (${assessResponse.status})`);
-      }
-
-      const c5Result: unknown = await assessResponse.json();
-      if (!isC5AssessmentResponse(c5Result)) {
-        throw new Error("Invalid C5 assessment response");
-      }
 
       // Calculate XP using normalized score
       const isGood = c5Result.normalizedScore >= 60;
@@ -542,11 +501,9 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
       setDialogue(getDialogue(character.name, "c5_error"));
       setAnalysis(null);
     } finally {
-      if (assessmentTimeoutRef.current) {
-        clearTimeout(assessmentTimeoutRef.current);
-        assessmentTimeoutRef.current = null;
+      if (assessmentAbortRef.current === assessmentAbortController) {
+        assessmentAbortRef.current = null;
       }
-      assessmentAbortRef.current = null;
     }
   }, [selectedTopic, characterId, character.name]);
 
@@ -563,6 +520,8 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
     setAnalysis(null);
     setTotalXPEarned(0);
     setShowTranscript(false);
+    setProgressSaveError(null);
+    setProgressSaveAttempt(0);
     setExpression("neutral");
     setDialogue(getDialogue(character.name, "c5_initial"));
     hasSavedProgress.current = false;
@@ -638,7 +597,9 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
 
             <div className="flex flex-col gap-2">
               {lpNodeId ? (
-                <p className="text-sm text-muted-foreground animate-pulse text-center">Returning to Learning Path...</p>
+                <p className={`text-sm text-center ${progressSaveError ? "text-amber-600" : "text-muted-foreground animate-pulse"}`}>
+                  {progressSaveError ? "Progress has not been saved yet." : "Saving progress..."}
+                </p>
               ) : (
                 <>
                   <Button onClick={() => {
@@ -648,6 +609,8 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                     setTotalXPEarned(0);
                     setShowTranscript(false);
                     hasSavedProgress.current = false;
+                    setProgressSaveError(null);
+                    setProgressSaveAttempt(0);
                     setExpression("encouraging");
                     setDialogue(`Let's try "${selectedTopic}" again! Remember to follow the structure.`);
                   }} className="w-full">
@@ -668,6 +631,22 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
           <div className="flex-1 md:w-[70%]">
             <Card className="h-full">
               <CardContent className="pt-6 space-y-4 max-h-[75vh] overflow-y-auto">
+            {progressSaveError && (
+              <div role="alert" className="rounded-lg border border-amber-500/50 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100">
+                <p>{progressSaveError}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => {
+                    setProgressSaveError(null);
+                    setProgressSaveAttempt((attempt) => attempt + 1);
+                  }}
+                >
+                  Retry saving progress
+                </Button>
+              </div>
+            )}
             <h2 className="font-pixel text-sm text-center">
               Speaking Assessment: <span className="font-chinese text-base">{selectedTopic}</span>
             </h2>
