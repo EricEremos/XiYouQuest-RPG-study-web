@@ -1,6 +1,6 @@
 import { IFLYTEK_APP_ID } from "./env.ts";
 import { buildIflytekWsUrl } from "./iflytek-auth.ts";
-import { calculateAsrTimeoutMs } from "./iflytek-asr-frames.ts";
+import { calculateAsrTimeoutMs, createAsrAudioFrames } from "./iflytek-asr-frames.ts";
 import { getAsrProviderConfig } from "./iflytek-asr-config.ts";
 import { segmentPcm, stripWavHeader } from "./iflytek-asr-segments.ts";
 
@@ -70,9 +70,9 @@ async function transcribeSegment(pcmData: Uint8Array): Promise<string> {
     ws.onopen = () => {
       // Burst upload in 10KB chunks with backpressure. Bursting is ~7x faster
       // than the docs' 40ms real-time pacing and iFlytek accepts it.
-      const CHUNK_SIZE = 10240;
       const BUFFER_HIGH_WATER = 65536;
-      let offset = 0;
+      const frames = createAsrAudioFrames(pcmData);
+      let frameIndex = 0;
 
       const sendTerminalFrame = () => {
         if (settled || ws.readyState !== WebSocket.OPEN) return;
@@ -91,34 +91,35 @@ async function transcribeSegment(pcmData: Uint8Array): Promise<string> {
       const sendChunks = () => {
         if (settled || ws.readyState !== WebSocket.OPEN) return;
 
-        while (offset < pcmData.length) {
+        while (frameIndex < frames.length) {
+          const frame = frames[frameIndex];
+          if (frame.status === 2) {
+            sendTerminalFrame();
+            return;
+          }
+
           if (ws.bufferedAmount > BUFFER_HIGH_WATER) {
             setTimeout(sendChunks, 5);
             return;
           }
 
-          const end = Math.min(offset + CHUNK_SIZE, pcmData.length);
-          const isFirst = offset === 0;
-
-          const frame: Record<string, unknown> = {
+          const payload: Record<string, unknown> = {
             data: {
-              status: isFirst ? 0 : 1,
+              status: frame.status,
               format: "audio/L16;rate=16000",
               encoding: "raw",
-              audio: uint8ArrayToBase64(pcmData.subarray(offset, end)),
+              audio: uint8ArrayToBase64(frame.audio),
             },
           };
 
-          if (isFirst) {
-            frame.common = { app_id: IFLYTEK_APP_ID() };
-            frame.business = business;
+          if (frame.status === 0) {
+            payload.common = { app_id: IFLYTEK_APP_ID() };
+            payload.business = business;
           }
 
-          ws.send(JSON.stringify(frame));
-          offset = end;
+          ws.send(JSON.stringify(payload));
+          frameIndex += 1;
         }
-
-        sendTerminalFrame();
       };
 
       sendChunks();

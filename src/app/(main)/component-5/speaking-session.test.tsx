@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-const { mockGetUserMedia, mockSetLearningActive, mockFetchWithRetry } = vi.hoisted(() => ({
+const { mockGetUserMedia, mockSetLearningActive, mockFetchWithRetry, mockRequestC5Assessment } = vi.hoisted(() => ({
   mockGetUserMedia: vi.fn(),
   mockSetLearningActive: vi.fn(),
   mockFetchWithRetry: vi.fn(),
+  mockRequestC5Assessment: vi.fn(),
 }));
 
 import { SpeakingSession } from "./speaking-session";
@@ -38,6 +39,10 @@ vi.mock("@/lib/dialogue", () => ({
 
 vi.mock("@/lib/fetch-retry", () => ({
   fetchWithRetry: mockFetchWithRetry,
+}));
+
+vi.mock("@/lib/psc/c5-assessment", () => ({
+  requestC5Assessment: mockRequestC5Assessment,
 }));
 
 vi.mock("@/lib/gamification/xp", () => ({
@@ -102,7 +107,7 @@ describe("SpeakingSession", () => {
     mockGetUserMedia.mockResolvedValue({
       getTracks: () => [{ stop: stopTrack }],
     });
-    mockFetchWithRetry.mockResolvedValue({ ok: false, status: 503 });
+    mockRequestC5Assessment.mockRejectedValue(new Error("Assessment unavailable"));
 
     render(
       <SpeakingSession
@@ -140,9 +145,9 @@ describe("SpeakingSession", () => {
     mockGetUserMedia.mockResolvedValue({
       getTracks: () => [{ stop: stopTrack }],
     });
-    mockFetchWithRetry.mockImplementation(
-      (_input: string, init?: RequestInit) => new Promise((_resolve, reject) => {
-        assessmentSignal = init?.signal ?? undefined;
+    mockRequestC5Assessment.mockImplementation(
+      (_audio: Blob, _topic: string, signal?: AbortSignal) => new Promise((_resolve, reject) => {
+        assessmentSignal = signal;
         assessmentSignal?.addEventListener("abort", () => reject(new Error("aborted")));
       }),
     );
@@ -164,21 +169,21 @@ describe("SpeakingSession", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start Speaking" }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3_000);
+      await Promise.resolve();
     });
+    expect(screen.getByRole("button", { name: "Stop Recording" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Stop Recording" }));
 
     await act(async () => {
       await Promise.resolve();
     });
 
-    expect(mockFetchWithRetry).toHaveBeenCalledWith(
-      "/api/speech/c5-assess",
-      expect.objectContaining({ method: "POST", signal: expect.any(AbortSignal) }),
-      { maxRetries: 0 },
-    );
+    expect(mockRequestC5Assessment).toHaveBeenCalledWith(expect.any(Blob), "Test topic", expect.any(AbortSignal));
+    expect(mockRequestC5Assessment).toHaveBeenCalledOnce();
     expect(stopTrack).toHaveBeenCalledOnce();
 
     view.unmount();
     expect(assessmentSignal?.aborted).toBe(true);
   });
+
 });
