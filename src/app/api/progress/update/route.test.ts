@@ -27,18 +27,13 @@ const requestBody = {
 };
 
 describe("progress update attempt idempotency", () => {
-  it("returns the prior result before any new progress mutation for the same attempt", async () => {
-    const existingAttempt = {
-      select: vi.fn(),
-      eq: vi.fn(),
-      maybeSingle: vi.fn(),
-    };
-    existingAttempt.select.mockReturnValue(existingAttempt);
-    existingAttempt.eq.mockReturnValue(existingAttempt);
-    existingAttempt.maybeSingle.mockResolvedValue({ data: { id: "existing-session" }, error: null });
+  it("delegates a keyed attempt to the atomic RPC and returns its idempotent result", async () => {
     const supabase = {
-      from: vi.fn(() => existingAttempt),
-      rpc: vi.fn(),
+      from: vi.fn(),
+      rpc: vi.fn().mockResolvedValue({
+        data: [{ already_recorded: true }],
+        error: null,
+      }),
     };
     createClient.mockResolvedValue(supabase);
     getSessionUser.mockResolvedValue({ id: "verified-user", email: "learner@connect.ust.hk" });
@@ -50,9 +45,20 @@ describe("progress update attempt idempotency", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ alreadyRecorded: true, newAchievements: [] });
-    expect(supabase.from).toHaveBeenCalledTimes(1);
-    expect(supabase.rpc).not.toHaveBeenCalled();
-    expect(existingAttempt.eq).toHaveBeenNthCalledWith(1, "user_id", "verified-user");
-    expect(existingAttempt.eq).toHaveBeenNthCalledWith(2, "client_attempt_id", requestBody.attemptId);
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(supabase.rpc).toHaveBeenCalledWith("record_practice_progress", {
+      p_user_id: "verified-user",
+      p_character_id: requestBody.characterId,
+      p_client_attempt_id: requestBody.attemptId,
+      p_component: requestBody.component,
+      p_score: requestBody.score,
+      p_xp_earned: requestBody.xpEarned,
+      p_duration_seconds: requestBody.durationSeconds,
+      p_questions_attempted: requestBody.questionsAttempted,
+      p_questions_correct: requestBody.questionsCorrect,
+      p_best_streak: requestBody.bestStreak,
+      p_today: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      p_daily_bonus_base: 25,
+    });
   });
 });
