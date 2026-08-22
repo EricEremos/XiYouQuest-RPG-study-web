@@ -20,6 +20,7 @@ import type { UnlockedAchievement } from "@/lib/achievements/types";
 import { OFFICIAL_PSC_SPEAKING_TOPICS } from "@/lib/psc/official-speaking-topics";
 import { scopeOfficialReadingPassage } from "@/lib/psc/reading-scope";
 import { getXiYouQuestPracticeBand } from "@/lib/psc/practice-band";
+import { assessC4Passage } from "@/lib/psc/c4-passage-assessment";
 import {
   getAcceptedOptionIndices,
   isAcceptedQuizAnswer,
@@ -143,35 +144,6 @@ interface ComponentResult {
     transcript: string;
     errorCount: number;
   };
-}
-
-// Split passage into sentences by Chinese punctuation (same as reading-session.tsx)
-function splitIntoSentences(content: string): string[] {
-  return content.split(/(?<=[。！？；])/g).filter((s) => s.trim().length > 0);
-}
-
-// Compute sentence-by-sentence scores from word-level data (same as reading-session.tsx)
-function computeSentenceScores(
-  passageContent: string,
-  words: Array<{ word: string; accuracyScore: number; errorType: string }>
-): { sentence: string; score: number }[] {
-  const sentences = splitIntoSentences(passageContent);
-  let wordIndex = 0;
-  return sentences.map((sentence) => {
-    const rawSentence = sentence.replace(/[。！？；，、：\u201C\u201D\u2018\u2019（）《》\s]/g, "");
-    let consumed = 0;
-    let sentenceTotal = 0;
-    let sentenceWordCount = 0;
-    while (consumed < rawSentence.length && wordIndex < words.length) {
-      const w = words[wordIndex];
-      if (consumed + w.word.length > rawSentence.length + 1) break;
-      consumed += w.word.length;
-      sentenceTotal += w.accuracyScore ?? 0;
-      sentenceWordCount++;
-      wordIndex++;
-    }
-    return { sentence, score: sentenceWordCount > 0 ? Math.round(sentenceTotal / sentenceWordCount) : 0 };
-  });
 }
 
 interface ExamRunnerProps {
@@ -390,31 +362,15 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           };
         }
       } else if (raw.componentNumber === 4 && raw.audioBlob) {
-        // C4: Passage reading — sentence-by-sentence scores
-        try {
-          const apiResult = await assessAudio(raw.audioBlob, raw.referenceText ?? "", "read_chapter");
-          const score = apiResult.pronunciationScore ?? 0;
-          const sentenceScores = computeSentenceScores(raw.referenceText ?? "", apiResult.words ?? []);
-          const xpResult = calculateXP({
-            pronunciationScore: score,
-            isCorrect: score >= 60,
-            currentStreak: score >= 60 ? 1 : 0,
-          });
-
-          result = {
-            componentNumber: 4,
-            score,
-            xpEarned: xpResult.totalXP,
-            sentenceScores,
-          };
-        } catch {
-          result = {
-            componentNumber: 4,
-            score: 0,
-            xpEarned: 0,
-            sentenceScores: splitIntoSentences(raw.referenceText ?? "").map(s => ({ sentence: s, score: 0 })),
-          };
-        }
+        const assessment = await assessC4Passage(
+          raw.audioBlob,
+          raw.referenceText ?? "",
+          assessAudio,
+        );
+        result = {
+          componentNumber: 4,
+          ...assessment,
+        };
       } else if (raw.componentNumber === 5 && raw.audioBlob) {
         // C5: Prompted speaking — 3-step pipeline via /api/speech/c5-assess
         try {

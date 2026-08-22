@@ -133,4 +133,52 @@ describe("SpeakingSession", () => {
     expect(screen.getByText("Assessment data unavailable. Please try again.")).toBeTruthy();
     expect(mockSetLearningActive).toHaveBeenLastCalledWith(false);
   });
+
+  it("submits C5 once and aborts an in-flight assessment when the session unmounts", async () => {
+    const stopTrack = vi.fn();
+    let assessmentSignal: AbortSignal | undefined;
+    mockGetUserMedia.mockResolvedValue({
+      getTracks: () => [{ stop: stopTrack }],
+    });
+    mockFetchWithRetry.mockImplementation(
+      (_input: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+        assessmentSignal = init?.signal ?? undefined;
+        assessmentSignal?.addEventListener("abort", () => reject(new Error("aborted")));
+      }),
+    );
+
+    const view = render(
+      <SpeakingSession
+        topics={["Test topic"]}
+        character={{
+          name: "Test companion",
+          personalityPrompt: "",
+          voiceId: "",
+          expressions: {},
+        }}
+        component={5}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Speak about: Test topic" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Speaking" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Stop Recording" }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockFetchWithRetry).toHaveBeenCalledWith(
+      "/api/speech/c5-assess",
+      expect.objectContaining({ method: "POST", signal: expect.any(AbortSignal) }),
+      { maxRetries: 0 },
+    );
+    expect(stopTrack).toHaveBeenCalledOnce();
+
+    view.unmount();
+    expect(assessmentSignal?.aborted).toBe(true);
+  });
 });

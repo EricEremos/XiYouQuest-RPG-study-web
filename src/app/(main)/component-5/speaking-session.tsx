@@ -21,6 +21,9 @@ import type { ExpressionName } from "@/types/character";
 import type { ComponentNumber } from "@/types/practice";
 
 const TOTAL_TIME = 180;
+const C5_ASSESSMENT_TIMEOUT_MS = 150_000;
+const C5_ASSESSMENT_TYPE = "psc_aligned_practice_estimate";
+const C5_ASSESSMENT_VERSION = "psc-practice-c5-v1";
 
 // Number of topic choices offered (real CBT PSC offers 2)
 const TOPIC_CHOICES = 2;
@@ -60,6 +63,37 @@ interface C5SpeakingAnalysis {
   overallFeedback: string;
 }
 
+type C5ScoreCategory = C5SpeakingAnalysis["pronunciation"];
+
+interface C5AssessmentResponse extends Omit<C5SpeakingAnalysis, "overallFeedback"> {
+  assessmentType: typeof C5_ASSESSMENT_TYPE;
+  assessmentVersion: typeof C5_ASSESSMENT_VERSION;
+}
+
+function isC5ScoreCategory(value: unknown): value is C5ScoreCategory {
+  if (!value || typeof value !== "object") return false;
+  const category = value as Record<string, unknown>;
+  return ["score", "deduction", "level"].every(
+    (key) => typeof category[key] === "number" && Number.isFinite(category[key]),
+  ) && ["label", "notes"].every((key) => typeof category[key] === "string");
+}
+
+function isC5AssessmentResponse(value: unknown): value is C5AssessmentResponse {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Record<string, unknown>;
+  return (
+    result.assessmentType === C5_ASSESSMENT_TYPE &&
+    result.assessmentVersion === C5_ASSESSMENT_VERSION &&
+    isC5ScoreCategory(result.pronunciation) &&
+    isC5ScoreCategory(result.vocabGrammar) &&
+    isC5ScoreCategory(result.fluency) &&
+    ["timePenalty", "totalScore", "normalizedScore", "errorCount"].every(
+      (key) => typeof result[key] === "number" && Number.isFinite(result[key]),
+    ) &&
+    typeof result.transcript === "string"
+  );
+}
+
 export function SpeakingSession({ topics, character, characterId, component, lpNodeId }: SpeakingSessionProps) {
   const router = useRouter();
   const { showAchievementToasts } = useAchievementToast();
@@ -89,6 +123,11 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
   const animFrameRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const limitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownResolveRef = useRef<(() => void) | null>(null);
+  const assessmentAbortRef = useRef<AbortController | null>(null);
+  const assessmentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(false);
   const hasPlayedGreeting = useRef(false);
   const handleRecordingCompleteRef = useRef<(blob: Blob) => void>(() => {});
   const stopRecordingRef = useRef<() => void>(() => {});
@@ -123,13 +162,28 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
 
   // Cleanup audio context on unmount
   useEffect(() => {
+    isMountedRef.current = true;
+
     return () => {
+      isMountedRef.current = false;
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = 0;
       if (limitTimeoutRef.current) {
         clearTimeout(limitTimeoutRef.current);
         limitTimeoutRef.current = null;
       }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      countdownResolveRef.current?.();
+      countdownResolveRef.current = null;
+      if (assessmentTimeoutRef.current) {
+        clearTimeout(assessmentTimeoutRef.current);
+        assessmentTimeoutRef.current = null;
+      }
+      assessmentAbortRef.current?.abort();
+      assessmentAbortRef.current = null;
       if (audioContextRef.current?.state !== "closed") {
         audioContextRef.current?.close();
       }
@@ -254,6 +308,10 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, sampleRate: 16000 },
       });
+      if (!isMountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
 
       // Enter countdown phase
@@ -264,17 +322,24 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
 
       // 3-second countdown
       await new Promise<void>((resolve) => {
+        countdownResolveRef.current = resolve;
         let remaining = 3;
-        const countdownInterval = setInterval(() => {
+        countdownIntervalRef.current = setInterval(() => {
           remaining--;
           if (remaining <= 0) {
-            clearInterval(countdownInterval);
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current);
+              countdownIntervalRef.current = null;
+            }
+            countdownResolveRef.current = null;
             resolve();
           } else {
             setCountdown(remaining);
           }
         }, 1000);
       });
+
+      if (!isMountedRef.current || streamRef.current !== stream) return;
 
       // Set up audio context and start recording
       const audioContext = new AudioContext({ sampleRate: 16000 });
@@ -321,6 +386,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
         stopRecordingRef.current();
       }, TOTAL_TIME * 1000);
     } catch {
+      if (!isMountedRef.current) return;
       setExpression("surprised");
       setDialogue(getDialogue(character.name, "c5_mic_error"));
     }
@@ -378,6 +444,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
 
   // Handle completed recording
   const handleRecordingComplete = useCallback(async (audioBlob: Blob) => {
+    if (!isMountedRef.current) return;
     setPhase("assessing");
     setExpression("thinking");
     setDialogue(getDialogue(character.name, "c5_analyzing"));
@@ -390,9 +457,19 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
       formData.append("audio", audioBlob, "recording.wav");
       formData.append("topic", selectedTopic ?? "");
 
+      const assessmentAbortController = new AbortController();
+      assessmentAbortRef.current = assessmentAbortController;
+      assessmentTimeoutRef.current = setTimeout(
+        () => assessmentAbortController.abort(),
+        C5_ASSESSMENT_TIMEOUT_MS,
+      );
+
       const assessResponse = await fetchWithRetry("/api/speech/c5-assess", {
         method: "POST",
         body: formData,
+        signal: assessmentAbortController.signal,
+      }, {
+        maxRetries: 0,
       });
 
       if (!assessResponse.ok) {
@@ -402,7 +479,10 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
         throw new Error(`Assessment failed (${assessResponse.status})`);
       }
 
-      const c5Result = await assessResponse.json();
+      const c5Result: unknown = await assessResponse.json();
+      if (!isC5AssessmentResponse(c5Result)) {
+        throw new Error("Invalid C5 assessment response");
+      }
 
       // Calculate XP using normalized score
       const isGood = c5Result.normalizedScore >= 60;
@@ -445,6 +525,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
           : "Keep practicing! Focus on pronunciation and speaking for the full duration.";
       }
 
+      if (!isMountedRef.current) return;
       setDialogue(overallFeedback);
       setAnalysis({ ...c5Result, overallFeedback });
       setPhase("feedback");
@@ -455,10 +536,17 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
         c5Result.normalizedScore >= 60 ? "happy" : "encouraging";
       setExpression(feedbackExpression);
     } catch {
+      if (!isMountedRef.current) return;
       setPhase("feedback");
       setExpression("surprised");
       setDialogue(getDialogue(character.name, "c5_error"));
       setAnalysis(null);
+    } finally {
+      if (assessmentTimeoutRef.current) {
+        clearTimeout(assessmentTimeoutRef.current);
+        assessmentTimeoutRef.current = null;
+      }
+      assessmentAbortRef.current = null;
     }
   }, [selectedTopic, characterId, character.name]);
 
