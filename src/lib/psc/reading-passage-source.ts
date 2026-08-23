@@ -13,12 +13,15 @@ function nonEmptyText(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-export function getReadingPassageSource(metadata: PassageMetadata | null | undefined): ReadingPassageSource {
-  const sourceTitle = nonEmptyText(metadata?.source_title);
-  const sourceVersion = nonEmptyText(metadata?.source_version);
+export function getReadingPassageSource(metadata: unknown): ReadingPassageSource {
+  const sourceMetadata = metadata && typeof metadata === "object"
+    ? metadata as PassageMetadata
+    : undefined;
+  const sourceTitle = nonEmptyText(sourceMetadata?.source_title);
+  const sourceVersion = nonEmptyText(sourceMetadata?.source_version);
 
   if (
-    metadata?.source_scope === "school_provided_public_use" &&
+    sourceMetadata?.source_scope === "school_provided_public_use" &&
     sourceTitle &&
     sourceVersion
   ) {

@@ -12,10 +12,11 @@ vi.mock("@/lib/gemini/client", () => ({ quickCompletion }));
 import { POST } from "./route";
 
 const currentComponentResults = [
-  { componentNumber: 1, score: 100, scoreVersion: "psc-2021-v1" },
-  { componentNumber: 2, score: 80, scoreVersion: "psc-2021-v1" },
-  { componentNumber: 3, score: 60, scoreVersion: "psc-2021-v1" },
-  { componentNumber: 4, score: 40, scoreVersion: "psc-2021-v1" },
+  { componentNumber: 1, score: 100, scoreVersion: "psc-2021-v2" },
+  { componentNumber: 2, score: 80, scoreVersion: "psc-2021-v2" },
+  { componentNumber: 3, score: 60, scoreVersion: "psc-2021-v2" },
+  { componentNumber: 4, score: 40, scoreVersion: "psc-2021-v2" },
+  { componentNumber: 5, score: 20, scoreVersion: "psc-2021-v2" },
 ];
 
 function request(body: object) {
@@ -26,14 +27,14 @@ function request(body: object) {
 }
 
 describe("mock exam feedback contract", () => {
-  it("rejects a current PSC payload that includes a legacy-only component", async () => {
+  it("rejects an incomplete formal PSC payload", async () => {
     getSessionUser.mockResolvedValue({ id: "verified-user" });
 
     const response = await POST(request({
-      componentResults: [...currentComponentResults.slice(0, 3), { componentNumber: 5, score: 40, scoreVersion: "psc-2021-v1" }],
-      totalScore: 60,
+      componentResults: currentComponentResults.filter((result) => result.componentNumber !== 4),
+      totalScore: 50,
       practiceBand: "Mastery",
-      scoreVersion: "psc-2021-v1",
+      scoreVersion: "psc-2021-v2",
     }));
 
     expect(response.status).toBe(400);
@@ -49,9 +50,9 @@ describe("mock exam feedback contract", () => {
           ? { ...result, scoreVersion: "legacy-five-component-v1" }
           : result
       )),
-      totalScore: 60,
+      totalScore: 50,
       practiceBand: "Foundation",
-      scoreVersion: "psc-2021-v1",
+      scoreVersion: "psc-2021-v2",
     }));
 
     expect(response.status).toBe(400);
@@ -64,15 +65,15 @@ describe("mock exam feedback contract", () => {
 
     const response = await POST(request({
       componentResults: currentComponentResults,
-      totalScore: 60,
+      totalScore: 50,
       practiceBand: "Mastery",
-      scoreVersion: "psc-2021-v1",
+      scoreVersion: "psc-2021-v2",
     }));
 
     expect(response.status).toBe(200);
     expect(quickCompletion).toHaveBeenCalledWith(
       expect.any(String),
-      expect.stringContaining("Total: 60/100, Practice band: Foundation"),
+      expect.stringContaining("Total: 50/100, Practice band: Starting point"),
       500,
     );
   });

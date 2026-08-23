@@ -70,21 +70,21 @@ interface PracticeHistoryClientProps {
 const COMPONENT_NAMES: Record<number, string> = {
   1: "C1",
   2: "C2",
-  3: "Extra C3",
-  4: "C3",
-  5: "C4",
-  6: "Extra 2",
-  7: "Extra 3",
+  3: "C3",
+  4: "C4",
+  5: "C5",
+  6: "C6",
+  7: "C7",
 };
 
 const COMPONENT_FULL_NAMES: Record<number, string> = {
   1: "Monosyllabic",
   2: "Multisyllabic",
-  3: "Supplementary Vocabulary & Grammar",
+  3: "Selection & Judgment",
   4: "Passage Reading",
   5: "Prompted Speaking",
-  6: "Cantonese Mistakes",
-  7: "Polyphonic",
+  6: "Supplementary Cantonese Mistakes",
+  7: "Supplementary Polyphonic Characters",
 };
 
 const COMPONENT_COLORS: Record<number, string> = {
@@ -101,9 +101,9 @@ const FILTER_TABS = [
   { value: "all", label: "All" },
   { value: "1", label: "C1" },
   { value: "2", label: "C2" },
-  { value: "3", label: "Extra C3" },
-  { value: "4", label: "C3" },
-  { value: "5", label: "C4" },
+  { value: "3", label: "C3" },
+  { value: "4", label: "C4" },
+  { value: "5", label: "C5" },
   { value: "6", label: "C6" },
   { value: "7", label: "C7" },
 ];

@@ -33,7 +33,7 @@ RECOMMENDED STRATEGY
 2-3 sentences. Prioritized action plan with specific drills and sub-skills to target.
 
 Rules: English only. No emojis. No bullet points. Keep it tight — every sentence must add value. Reference C1-C7 by full name. Use actual numbers. This is XiYouQuest practice feedback only: never claim, predict, or imply an official PSC result, grade, certification, eligibility, or policy decision.
-C1=Monosyllabic Characters C2=Multisyllabic Words C3=Vocabulary & Grammar C4=Passage Reading C5=Prompted Speaking C6=Cantonese Mistakes C7=Polyphonic Characters`;
+C1=Monosyllabic Characters C2=Multisyllabic Words C3=Selection & Judgment C4=Passage Reading C5=Prompted Speaking C6=Supplementary Cantonese Mistakes C7=Supplementary Polyphonic Characters`;
 
     const dataStr = JSON.stringify(
       { progress, recentSessions: recentSessions?.slice(0, 20), questProgress },

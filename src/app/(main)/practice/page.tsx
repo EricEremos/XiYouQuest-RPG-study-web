@@ -7,14 +7,14 @@ import { ArrowRight } from "lucide-react";
 const COMPONENTS = [
   { number: 1, sourceComponentNumber: 1, name: "Monosyllabic Characters", chinese: "读单音节字词", path: "/component-1" },
   { number: 2, sourceComponentNumber: 2, name: "Multisyllabic Words", chinese: "读多音节词语", path: "/component-2" },
-  { number: 3, sourceComponentNumber: 4, name: "Passage Reading", chinese: "朗读短文", path: "/component-4" },
-  { number: 4, sourceComponentNumber: 5, name: "Prompted Speaking", chinese: "命题说话", path: "/component-5" },
+  { number: 3, sourceComponentNumber: 3, name: "Selection & Judgment", chinese: "选择判断", path: "/component-3" },
+  { number: 4, sourceComponentNumber: 4, name: "Passage Reading", chinese: "朗读短文", path: "/component-4" },
+  { number: 5, sourceComponentNumber: 5, name: "Prompted Speaking", chinese: "命题说话", path: "/component-5" },
 ];
 
 const SUPPLEMENTARY = [
-  { id: "vocabulary-grammar", label: "Extra 1", sourceComponentNumber: 3, name: "Vocabulary & Grammar Diagnostic", chinese: "选择判断", path: "/component-3" },
-  { id: "cantonese-mistakes", label: "Extra 2", sourceComponentNumber: 6, name: "Cantonese Mistakes", chinese: "易错字词练习", path: "/component-6" },
-  { id: "polyphonic-characters", label: "Extra 3", sourceComponentNumber: 7, name: "Polyphonic Characters", chinese: "多音字练习", path: "/component-7" },
+  { id: "cantonese-mistakes", label: "Supplementary C6", sourceComponentNumber: 6, name: "Cantonese Mistakes", chinese: "易错字词练习", path: "/component-6" },
+  { id: "polyphonic-characters", label: "Supplementary C7", sourceComponentNumber: 7, name: "Polyphonic Characters", chinese: "多音字练习", path: "/component-7" },
 ];
 
 function getAccuracyColor(accuracy: number): string {

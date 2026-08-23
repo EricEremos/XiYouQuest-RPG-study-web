@@ -95,7 +95,7 @@ export default async function Component4Page({
     <div className="space-y-4">
       <div>
         <h1 className="font-pixel text-base text-primary pixel-glow leading-relaxed drop-shadow-md [text-shadow:_0_1px_4px_rgb(255_255_255_/_80%)]">
-          Component 3: Passage Reading
+          Component 4: Passage Reading
         </h1>
         <p className="text-foreground/90 font-medium [text-shadow:_0_1px_3px_rgb(255_255_255_/_70%)]">
           <span className="font-chinese">朗读短文</span> — Read a passage aloud with correct pronunciation, pacing, and fluency.

@@ -40,11 +40,11 @@
 - [Practice Components](#practice-components)
   - [C1: Monosyllabic Characters](#c1-monosyllabic-characters-读单音节字词)
   - [C2: Multisyllabic Words](#c2-multisyllabic-words-读多音节词语)
-  - [Supplementary C3: Vocabulary & Grammar](#supplementary-c3-vocabulary--grammar-judgment-选择判断)
-  - [PSC-formatted C3: Passage Reading](#psc-formatted-c3-passage-reading-朗读短文)
-  - [PSC-formatted C4: Prompted Speaking](#psc-formatted-c4-prompted-speaking-命题说话)
-  - [C6: Cantonese Mistakes Drill](#c6-cantonese-mistakes-drill-易错字词练习)
-  - [C7: Polyphonic Characters Quiz](#c7-polyphonic-characters-quiz-多音字练习)
+  - [C3: Selection & Judgment](#c3-selection--judgment-选择判断)
+  - [C4: Passage Reading](#c4-passage-reading-朗读短文)
+  - [C5: Prompted Speaking](#c5-prompted-speaking-命题说话)
+  - [Supplementary C6: Cantonese Mistakes Drill](#supplementary-c6-cantonese-mistakes-drill-易错字词练习)
+  - [Supplementary C7: Polyphonic Characters Quiz](#supplementary-c7-polyphonic-characters-quiz-多音字练习)
 - [Mock Exam](#mock-exam-psc-format-xiyouquest-practice)
 - [Main Quest RPG](#main-quest-rpg)
 - [Companion Chat](#companion-chat)
@@ -71,7 +71,7 @@
 
 ## Overview
 
-XiYouQuest transforms Putonghua Proficiency Test (PSC / 普通话水平测试) preparation into a gamified, AI-driven adventure. Inspired by the classic Chinese novel *Journey to the West*, players travel alongside Sun Wukong and companions through a 7-stage RPG campaign while practicing the current four-component PSC mock format and three XiYouQuest supplementary drills.
+XiYouQuest transforms Putonghua Proficiency Test (PSC / 普通话水平测试) preparation into a gamified, AI-driven adventure. Inspired by the classic Chinese novel *Journey to the West*, players travel alongside Sun Wukong and companions through a 7-stage RPG campaign while practicing a formal five-component PSC-format mock (C1–C5) and two XiYouQuest supplementary drills (C6–C7).
 
 Every practice session flows through a multi-service pipeline:
 
@@ -85,7 +85,7 @@ Record -> WAV Encode -> iFlytek ISE -> XML Parse -> Gemini Feedback -> XP Award 
 
 | Feature | Description |
 |---------|-------------|
-| **7 Practice Components** | Four PSC-formatted mock components (C1–C4) plus three XiYouQuest supplementary drills |
+| **7 Practice Components** | Five PSC-format mock components (C1–C5) plus two XiYouQuest supplementary drills (C6–C7) |
 | **Main Quest RPG** | 7-stage Journey to the West campaign with turn-based pronunciation battles against mythical bosses |
 | **Companion Chat** | Voice-driven conversations with AI companions — real-time pronunciation scoring, image generation, and scenario-based dialogue |
 | **Personalized Learning Path** | AI-generated adaptive curriculum with multi-phase study plans, checkpoint assessments, and formative progress tracking |
@@ -93,7 +93,7 @@ Record -> WAV Encode -> iFlytek ISE -> XML Parse -> Gemini Feedback -> XP Award 
 | **AI Companions** | 4 Journey to the West characters with unique personalities, expressions, voice lines, and conversation styles |
 | **AI Feedback** | Character-personalized, context-aware study tips powered by DeepSeek V4 Flash via OpenRouter |
 | **AI Image Generation** | Context-aware pixel-art scene images auto-generated every 3 chat turns via Gemini 2.5 Flash Image |
-| **Full Mock Exam** | Timed four-component PSC-format mock (C1–C4; 10/20/30/40 points) with XiYouQuest formative feedback |
+| **Full Mock Exam** | Timed five-component PSC-format practice simulation (C1–C5; 10/20/10/30/30 points) with XiYouQuest formative feedback |
 | **TTS Playback** | Native Putonghua model audio for every word, sentence, and passage via iFlytek TTS |
 | **Practice History** | Detailed session history with score trends, radar charts, component breakdowns, and AI-generated insights |
 | **40 Achievements** | 4-tier achievement system (Common/Uncommon/Rare/Epic) with toast notifications and friend activity feed |
@@ -182,7 +182,7 @@ Same architecture as C1 with key differences:
 | XML Parsing | Per-syllable scores | `<word total_score>` with syllable breakdown |
 | Tone Analysis | Single tone per character | Multi-tone per word (weighted average) |
 
-### Supplementary C3: Vocabulary & Grammar Judgment (选择判断)
+### C3: Selection & Judgment (选择判断)
 
 Multiple-choice quiz testing vocabulary accuracy and grammatical judgment — no audio recording.
 
@@ -192,9 +192,9 @@ Multiple-choice quiz testing vocabulary accuracy and grammatical judgment — no
 | **measure-word** (量词搭配) | Choose the correct measure word | 一___书 -> 本/个/条/只 |
 | **sentence-order** (语序判断) | Select the grammatically correct sentence | Reordered sentence options |
 
-5 questions per type = 15 total. Answer positions randomized via `useMemo`. Correct -> 10 XP + static explanation. Wrong -> 2 XP + AI-generated explanation.
+10 word-choice questions, 10 measure-word questions, and 5 sentence-order questions form the 25-question formal mock section. Answer positions are randomized via `useMemo`. Correct -> 10 XP + static explanation. Wrong -> 2 XP + AI-generated explanation.
 
-### PSC-formatted C3: Passage Reading (朗读短文)
+### C4: Passage Reading (朗读短文)
 
 Read a full Chinese passage aloud with sentence-by-sentence scoring.
 
@@ -207,7 +207,7 @@ Phase 5 - FEEDBACK: Color-coded sentences (green >=80, yellow >=60, red <60)
            -> Gemini feedback -> companion dialogue -> progress update
 ```
 
-### PSC-formatted C4: Prompted Speaking (命题说话)
+### C5: Prompted Speaking (命题说话)
 
 The most complex component — a 3-minute timed free-speaking exercise assessed by a 3-step pipeline.
 
@@ -226,7 +226,7 @@ Step 3: calculateC5Score() - XiYouQuest formative practice rubric (30 internal p
   +-- Time penalty: -1/sec under 3 minutes
 ```
 
-### C6: Cantonese Mistakes Drill (易错字词练习)
+### Supplementary C6: Cantonese Mistakes Drill (易错字词练习)
 
 Supplementary pronunciation drill for common Cantonese-speaker errors:
 
@@ -238,20 +238,21 @@ Supplementary pronunciation drill for common Cantonese-speaker errors:
 
 2 groups x 5 words x 3 categories = 30 words across 6 rounds. Uses ISE `read_word` category.
 
-### C7: Polyphonic Characters Quiz (多音字练习)
+### Supplementary C7: Polyphonic Characters Quiz (多音字练习)
 
 Supplementary MCQ testing polyphonic characters (多音字) — characters with multiple valid pronunciations. Reuses C3 `QuizSession`. Questions show sentences with the target character **highlighted**; options are pinyin readings. 15 questions per session.
 
 ### Mock Exam: PSC-format XiYouQuest Practice
 
-Timed, sequential practice of the four current PSC-format components with AI-generated XiYouQuest feedback:
+Timed, sequential practice of the five current PSC-format components with XiYouQuest formative feedback:
 
 | Component | Time Limit | Weight | Method |
 |-----------|-----------|--------|--------|
 | C1 Monosyllabic | 3:30 | 10 pts | ISE `read_syllable` |
 | C2 Multisyllabic | 2:30 | 20 pts | ISE `read_word` |
-| C3 Passage | 4:00 | 30 pts | ISE `read_chapter` |
-| C4 Prompted Speaking | 3:00 | 40 pts | XiYouQuest formative speaking-practice pipeline |
+| C3 Selection & Judgment | 3:00 | 10 pts | 10 word-choice, 10 measure-word, 5 sentence-order questions |
+| C4 Passage Reading | 4:00 | 30 pts | ISE `read_chapter`; only a verified school-provided public-use source is eligible |
+| C5 Prompted Speaking | 3:00 | 30 pts | XiYouQuest formative speaking-practice pipeline |
 
 Results are persisted to `mock_exam_results` with component-level score breakdowns. An AI feedback report identifies practice priorities and suggests targeted drills. Every automated result is XiYouQuest formative feedback, never an official PSC grade, certification result, pass/fail decision, or prediction.
 

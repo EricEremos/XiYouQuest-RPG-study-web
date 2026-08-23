@@ -87,7 +87,7 @@ type ViewState =
 const COMPONENT_INFO: Record<number, { name: string; chineseName: string; short: string }> = {
   1: { name: "Monosyllabic Characters", chineseName: "读单音节字词", short: "C1" },
   2: { name: "Multisyllabic Words", chineseName: "读多音节词语", short: "C2" },
-  3: { name: "Vocabulary & Grammar", chineseName: "选择判断", short: "C3" },
+  3: { name: "Selection & Judgment", chineseName: "选择判断", short: "C3" },
   4: { name: "Passage Reading", chineseName: "朗读短文", short: "C4" },
   5: { name: "Prompted Speaking", chineseName: "命题说话", short: "C5" },
   6: { name: "Tone Drills", chineseName: "声调练习", short: "C6" },
@@ -948,7 +948,7 @@ function MiniExamPassage({
       <CardContent className="pt-6 space-y-4">
         <div className="flex items-center justify-between">
           <Badge variant="outline" className="font-pixel text-base px-3 py-1">
-            C3: Passage Reading
+            C4: Passage Reading
           </Badge>
           <Badge variant={timer.isRunning && timer.timeRemaining <= 30 ? "destructive" : "secondary"}>
             {timer.isRunning ? timer.formatTime : formatTimerDisplay(timeLimitSeconds)}
@@ -1105,7 +1105,7 @@ function MiniExamSpeaking({
     return (
       <Card>
         <CardContent className="pt-6 space-y-4 text-center">
-          <Badge variant="outline" className="font-pixel text-base px-3 py-1">C4: Prompted Speaking</Badge>
+          <Badge variant="outline" className="font-pixel text-base px-3 py-1">C5: Prompted Speaking</Badge>
           <p className="font-chinese text-lg font-bold">{selectedTopic}</p>
           <p className="text-5xl sm:text-6xl font-bold text-primary animate-pulse">{countdown}</p>
           <p className="text-base text-muted-foreground">Get ready to speak...</p>
@@ -1121,7 +1121,7 @@ function MiniExamSpeaking({
       <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="flex items-center justify-between">
-            <Badge variant="outline" className="font-pixel text-base px-3 py-1">C4: Prompted Speaking</Badge>
+            <Badge variant="outline" className="font-pixel text-base px-3 py-1">C5: Prompted Speaking</Badge>
             <Badge variant={timer.timeRemaining <= 30 ? "destructive" : "secondary"} className="text-3xl px-4 py-2">
               {timer.formatTime}
             </Badge>
@@ -1149,7 +1149,7 @@ function MiniExamSpeaking({
       <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="flex items-center justify-between">
-            <Badge variant="outline" className="font-pixel text-base px-3 py-1">C4: Prompted Speaking</Badge>
+            <Badge variant="outline" className="font-pixel text-base px-3 py-1">C5: Prompted Speaking</Badge>
             <Badge variant="secondary" className="text-3xl px-4 py-2">
               {formatTimerDisplay(timeLimitSeconds)}
             </Badge>
@@ -1157,7 +1157,7 @@ function MiniExamSpeaking({
           <div className="text-center space-y-2">
             <p className="text-base text-muted-foreground">Your topic:</p>
             <p className="font-chinese text-xl font-bold text-foreground">{selectedTopic}</p>
-            <p className="text-base text-muted-foreground">Speak for 2-3 minutes. A 3-second countdown will start.</p>
+            <p className="text-base text-muted-foreground">Speak for 3 minutes. A 3-second countdown will start.</p>
           </div>
           <div className="flex justify-center gap-3">
             <Button variant="outline" onClick={() => { setSelectedTopic(null); selectedTopicRef.current = null; setSpeakPhase("choosing"); }}>
@@ -1178,7 +1178,7 @@ function MiniExamSpeaking({
     <Card>
       <CardContent className="pt-6 space-y-4">
         <div className="flex items-center justify-between">
-          <Badge variant="outline" className="font-pixel text-base px-3 py-1">C4: Prompted Speaking</Badge>
+          <Badge variant="outline" className="font-pixel text-base px-3 py-1">C5: Prompted Speaking</Badge>
           <Badge variant="secondary">
             {formatTimerDisplay(timeLimitSeconds)}
           </Badge>
@@ -1186,7 +1186,7 @@ function MiniExamSpeaking({
         <p className="font-chinese text-lg sm:text-xl text-center text-muted-foreground">命题说话</p>
 
         <p className="text-base sm:text-xl text-center text-muted-foreground">
-          Choose a topic, then speak for 2-3 minutes:
+          Choose a topic, then speak for 3 minutes:
         </p>
         <div className="space-y-2">
           {topicChoices.map((topic, i) => (
@@ -1250,7 +1250,7 @@ function QuizAssessment({
     <Card>
       <CardContent className="pt-6 space-y-4">
         <div className="flex items-center justify-between">
-          <Badge variant="outline" className="font-pixel text-base px-3 py-1">Supplementary: Vocabulary & Grammar</Badge>
+          <Badge variant="outline" className="font-pixel text-base px-3 py-1">C3: Selection & Judgment</Badge>
           <span className="font-pixel text-xl text-muted-foreground">
             {currentQ + 1} / {questions.length}
           </span>
@@ -1952,7 +1952,7 @@ function CurriculumRoadmap({
                       <div className="flex-1 min-w-0">
                         <span className="text-base font-medium">Mock Exam {examNum}</span>
                         <p className="text-sm text-muted-foreground">
-                          Current PSC practice simulation (C1–C4) · ~28min incl. prep
+                          Formal PSC-format practice simulation (C1–C5) · ~29min incl. prep
                         </p>
                       </div>
                       <Lock className="h-4 w-4 text-muted-foreground/40 shrink-0" />

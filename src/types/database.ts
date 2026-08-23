@@ -202,7 +202,7 @@ export interface MockExamResult {
   user_id: string;
   total_score: number;
   grade: string;
-  component_scores: { componentNumber: number; score: number; points: number; scoreVersion?: "psc-2021-v1" | "legacy-five-component-v1" }[];
+  component_scores: { componentNumber: number; score: number; points: number; scoreVersion?: "psc-2021-v2" | "psc-2021-v1" | "legacy-five-component-v1" }[];
   ai_feedback: string | null;
   duration_seconds: number;
   total_xp: number;

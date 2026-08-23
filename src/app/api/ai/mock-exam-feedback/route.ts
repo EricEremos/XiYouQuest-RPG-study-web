@@ -12,7 +12,7 @@ const schema = z.object({
   componentResults: z.array(z.object({
     componentNumber: z.number().int().min(1).max(5),
     score: z.number().min(0).max(100),
-    scoreVersion: z.enum(["psc-2021-v1", "legacy-five-component-v1"]),
+    scoreVersion: z.enum(["psc-2021-v2", "psc-2021-v1", "legacy-five-component-v1"]),
     wordScores: z.array(z.object({
       word: z.string(),
       score: z.number().nullable(),
@@ -34,7 +34,7 @@ const schema = z.object({
   })).min(1).max(5),
   totalScore: z.number().min(0).max(100),
   practiceBand: z.string().max(20),
-  scoreVersion: z.enum(["psc-2021-v1", "legacy-five-component-v1"]),
+  scoreVersion: z.enum(["psc-2021-v2", "psc-2021-v1", "legacy-five-component-v1"]),
 });
 
 export const maxDuration = 60;
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     const practiceBand = getXiYouQuestPracticeBand(normalizedResult.totalScore).label;
     const componentNames = scoreVersion === "psc-2021-v1"
       ? "C1=Monosyllabic Characters, C2=Multisyllabic Words, C3=Passage Reading, C4=Prompted Speaking"
-      : "C1=Monosyllabic Characters, C2=Multisyllabic Words, C3=Vocabulary & Grammar, C4=Passage Reading, C5=Prompted Speaking";
+      : "C1=Monosyllabic Characters, C2=Multisyllabic Words, C3=Selection & Judgment, C4=Passage Reading, C5=Prompted Speaking";
 
     const systemPrompt = `You are a XiYouQuest PSC-aligned practice coach giving personalized feedback after a mock exam. Write a concise, actionable analysis in English.
 

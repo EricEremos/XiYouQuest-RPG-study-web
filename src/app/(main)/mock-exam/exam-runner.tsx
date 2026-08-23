@@ -25,8 +25,6 @@ import { requestC5Assessment } from "@/lib/psc/c5-assessment";
 import {
   CURRENT_PSC_MOCK_COMPONENTS,
   CURRENT_PSC_MOCK_SCORE_VERSION,
-  LEGACY_FIVE_COMPONENTS,
-  LEGACY_FIVE_COMPONENT_SCORE_VERSION,
   calculateMockExamWeightedTotal,
   getMockExamComponent,
   getMockExamComponentBySource,
@@ -76,17 +74,9 @@ const EXAM_QUIZ_QUESTIONS: QuizQuestion[] = [
   { id: "so5", type: "sentence-order", prompt: "Which sentence is correct?", options: ["他是一个很好的医生。", "他是一个医生很好。"], correctIndex: 0, explanation: "Adjective + 的 + noun is the correct attributive structure." },
 ];
 
-const EXAM_PASSAGE = {
-  id: "1",
-  title: "\u7236\u4EB2\u7684\u7231",
-  content: "\u5728\u6211\u7684\u8BB0\u5FC6\u4E2D\uFF0C\u7236\u4EB2\u662F\u4E00\u4E2A\u4E25\u8083\u800C\u6C89\u9ED8\u7684\u4EBA\u3002\u4ED6\u5F88\u5C11\u8BF4\u8BDD\uFF0C\u4F46\u4ED6\u7528\u884C\u52A8\u8868\u8FBE\u4ED6\u5BF9\u6211\u4EEC\u7684\u5173\u7231\u3002\u8BB0\u5F97\u6709\u4E00\u6B21\uFF0C\u6211\u5728\u5B66\u6821\u91CC\u611F\u5230\u5F88\u6CA5\u4E27\uFF0C\u56E0\u4E3A\u6211\u7684\u6210\u7EE9\u4E0D\u592A\u7406\u60F3\u3002\u6211\u6709\u70B9\u513F\u5BB3\u6015\u544A\u8BC9\u7236\u4EB2\u8FD9\u4E2A\u574F\u6D88\u606F\u3002\u4F46\u662F\uFF0C\u5F53\u6211\u9F13\u8D77\u52C7\u6C14\u5411\u4ED6\u5766\u767D\u65F6\uFF0C\u4ED6\u6CA1\u6709\u8D23\u9A82\u6211\uFF0C\u53CD\u800C\u7ED9\u4E86\u6211\u9F13\u52B1\u548C\u652F\u6301\u3002\u4ED6\u8BF4\uFF1A\u201C\u4E00\u65F6\u7684\u5931\u8D25\u4E0D\u4EE3\u8868\u6C38\u4E45\u7684\u5931\u8D25\uFF0C\u91CD\u8981\u7684\u662F\u4F60\u8981\u5B66\u4F1A\u4ECE\u5931\u8D25\u4E2D\u7AD9\u8D77\u6765\u3002\u201D\u8FD9\u4E2A\u6559\u8BAD\u6211\u4E00\u76F4\u8BB0\u5F97\u3002\u4ECE\u90A3\u4EE5\u540E\uFF0C\u6BCF\u5F53\u6211\u9047\u5230\u56F0\u96BE\u7684\u65F6\u5019\uFF0C\u6211\u90FD\u4F1A\u60F3\u8D77\u7236\u4EB2\u8BF4\u8FC7\u7684\u8BDD\u3002\u4ED6\u6559\u4F1A\u4E86\u6211\u575A\u5F3A\u548C\u52C7\u6562\u3002\u867D\u7136\u4ED6\u4E0D\u5584\u4E8E\u7528\u8BED\u8A00\u8868\u8FBE\u611F\u60C5\uFF0C\u4F46\u4ED6\u7684\u7231\u4E00\u76F4\u5728\u6211\u8EAB\u8FB9\u3002\u7236\u4EB2\u7528\u4ED6\u81EA\u5DF1\u7684\u65B9\u5F0F\u544A\u8BC9\u6211\uFF1A\u771F\u6B63\u7684\u529B\u91CF\u4E0D\u5728\u4E8E\u4ECE\u4E0D\u8DCC\u5012\uFF0C\u800C\u5728\u4E8E\u6BCF\u6B21\u8DCC\u5012\u540E\u90FD\u80FD\u91CD\u65B0\u7AD9\u8D77\u6765\u3002\u73B0\u5728\u6211\u957F\u5927\u4E86\uFF0C\u8D8A\u6765\u8D8A\u7406\u89E3\u7236\u4EB2\u5F53\u5E74\u7684\u7528\u5FC3\u3002\u6211\u60F3\u5BF9\u4ED6\u8BF4\u4E00\u58F0\uFF1A\u8C22\u8C22\u60A8\uFF0C\u7238\u7238\u3002",
-};
-
 // ============================================================
 // Component config
 // ============================================================
-
-type ExamMode = "legacy" | "current";
 
 // 15 minutes of preparation before the exam (real PSC gives 15 min)
 const PREP_TIME_SECONDS = 15 * 60;
@@ -155,18 +145,17 @@ interface ExamRunnerProps {
 export function ExamRunner({ character, characters, words, quizQuestions, passage, topics }: ExamRunnerProps) {
   const { showAchievementToasts } = useAchievementToast();
 
-  const passageSource = passage ?? EXAM_PASSAGE;
-  const passageScope = scopeOfficialReadingPassage(passageSource.content);
-  const activePassage = { ...passageSource, content: passageScope.text };
+  const activePassage = useMemo(
+    () =>
+      passage
+        ? { ...passage, content: scopeOfficialReadingPassage(passage.content).text }
+        : undefined,
+    [passage]
+  );
   const [examPhase, setExamPhase] = useState<ExamPhase>("start");
-  const examMode = "current" as ExamMode;
-  const scoreVersion: MockExamScoreVersion = examMode === "current"
-    ? CURRENT_PSC_MOCK_SCORE_VERSION
-    : LEGACY_FIVE_COMPONENT_SCORE_VERSION;
-  const activeComponents = examMode === "current"
-    ? CURRENT_PSC_MOCK_COMPONENTS
-    : LEGACY_FIVE_COMPONENTS;
-  const legacyQuizQuestions = useMemo(() => {
+  const scoreVersion: MockExamScoreVersion = CURRENT_PSC_MOCK_SCORE_VERSION;
+  const activeComponents = CURRENT_PSC_MOCK_COMPONENTS;
+  const examQuizQuestions = useMemo(() => {
     const questions = quizQuestions ?? EXAM_QUIZ_QUESTIONS;
     return questions
       .map(withConfiguredAcceptedAnswers)
@@ -215,9 +204,10 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
 
   // Enter the prep phase from the start screen
   const beginPreparation = useCallback(() => {
+    if (!activePassage) return;
     setExamPhase("prep");
     prepTimer.start();
-  }, [prepTimer]);
+  }, [activePassage, prepTimer]);
 
   // Cutover prep → exam (manual "Start Exam Now"). Notes stop being rendered here.
   const beginExam = useCallback(() => {
@@ -309,7 +299,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
       if (raw.componentNumber === 3) {
         // C3: Quiz scoring (no API call needed)
         const answers = raw.quizAnswers ?? [];
-        const quizResults = legacyQuizQuestions.map((q, i) => ({
+        const quizResults = examQuizQuestions.map((q, i) => ({
           question: q,
           selectedIndex: answers[i] ?? -1,
           isCorrect: isAcceptedQuizAnswer(q, answers[i] ?? -1),
@@ -317,7 +307,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
 
         // Weighted scoring
         let rawScore = 0;
-        legacyQuizQuestions.forEach((q, i) => {
+        examQuizQuestions.forEach((q, i) => {
           if (quizResults[i].isCorrect) {
             rawScore += q.type === "word-choice" ? 0.25 : 0.5;
           }
@@ -447,7 +437,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
     setComponentResults(results);
     saveAllProgress(results);
     setExamPhase("results");
-  }, [legacyQuizQuestions, saveAllProgress, scoreVersion]);
+  }, [examQuizQuestions, saveAllProgress, scoreVersion]);
 
   // ---- Component complete handler ----
   const handleComponentDone = useCallback((rawData: ComponentRawData) => {
@@ -581,7 +571,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           <div className="rounded-lg border-2 border-primary bg-accent p-3">
             <p className="font-medium text-base">Current PSC-format mock</p>
             <p className="text-base text-muted-foreground">
-              C1/C2/C3/C4 · 10/20/30/40 points. Results are XiYouQuest formative feedback, not an official PSC result.
+              C1/C2/C3/C4/C5 · 10/20/10/30/30 points. Results are XiYouQuest formative feedback, not an official PSC result.
             </p>
           </div>
 
@@ -607,9 +597,15 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           </div>
 
           <div className="flex justify-center">
-            <Button size="lg" onClick={beginPreparation}>
-              Begin 15-min Preparation
-            </Button>
+            {activePassage ? (
+              <Button size="lg" onClick={beginPreparation}>
+                Begin 15-min Preparation
+              </Button>
+            ) : (
+              <p role="alert" className="max-w-xl text-center text-sm text-muted-foreground">
+                The formal mock needs a school-provided C4 reading passage. Add a verified 2021 PSC reading-work source record before starting; standalone C4 practice remains available.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -688,9 +684,12 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
     );
   }
 
+  if (!activePassage) {
+    return null;
+  }
+
   // ---- Preparation Screen (15 min, shows all questions + notes) ----
   if (examPhase === "prep") {
-    const showQuiz = examMode === "legacy";
     return (
       <div className="space-y-4">
         {/* Sticky prep header with countdown */}
@@ -765,28 +764,25 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
           </CardContent>
         </Card>
 
-        {/* C3: Quiz questions (full mode only) */}
-        {showQuiz && (
-          <Card>
-            <CardContent className="pt-4 space-y-2">
-              <h3 className="text-sm font-medium">选择判断 · Vocabulary &amp; Grammar ({legacyQuizQuestions.length})</h3>
-              <div className="max-h-[260px] overflow-y-auto rounded-lg border bg-muted/30 p-3 space-y-2">
-                {legacyQuizQuestions.map((q, idx) => (
-                  <div key={q.id} className="text-sm">
-                    <p className="font-medium">{idx + 1}. {q.prompt}</p>
-                    <p className="text-muted-foreground font-chinese">
-                      {q.options.map((o, i) => `${String.fromCharCode(65 + i)}. ${o}`).join("   ")}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardContent className="pt-4 space-y-2">
+            <h3 className="text-sm font-medium">选择判断 · Selection &amp; Judgment ({examQuizQuestions.length})</h3>
+            <div className="max-h-[260px] overflow-y-auto rounded-lg border bg-muted/30 p-3 space-y-2">
+              {examQuizQuestions.map((q, idx) => (
+                <div key={q.id} className="text-sm">
+                  <p className="font-medium">{idx + 1}. {q.prompt}</p>
+                  <p className="text-muted-foreground font-chinese">
+                    {q.options.map((o, i) => `${String.fromCharCode(65 + i)}. ${o}`).join("   ")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardContent className="pt-4 space-y-2">
-            <h3 className="text-sm font-medium">朗读短文 · {examMode === "current" ? "C3 Passage" : "C4 Passage"} — {activePassage.title}</h3>
+            <h3 className="text-sm font-medium">朗读短文 · C4 Passage — {activePassage.title}</h3>
             <div className="max-h-[260px] overflow-y-auto rounded-lg border bg-muted/30 p-3">
               <p className="text-base leading-loose font-chinese">{activePassage.content}</p>
             </div>
@@ -795,7 +791,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
 
         <Card>
           <CardContent className="pt-4 space-y-2">
-            <h3 className="text-sm font-medium">命题说话 · {examMode === "current" ? "C4 Prompted Speaking" : "C5 Prompted Speaking"} — choose 1 of {examTopicChoices.length} in the exam</h3>
+            <h3 className="text-sm font-medium">命题说话 · C5 Prompted Speaking — choose 1 of {examTopicChoices.length} in the exam</h3>
             <div className="grid grid-cols-2 gap-3">
               {examTopicChoices.map((topic, idx) => (
                 <div key={idx} className="rounded-lg border-2 border-border p-4 text-center">
@@ -876,7 +872,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
       <Card>
         <CardContent className="pt-4 sm:pt-6 space-y-4 sm:space-y-6">
           <div className="text-center space-y-4">
-            <h2 className="font-pixel text-sm">Grading Your Exam</h2>
+            <h2 className="font-pixel text-sm">Analyzing Your Practice</h2>
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
             <p className="text-muted-foreground">
               Analyzing your pronunciation and answers...
@@ -1041,7 +1037,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
       )}
       {currentComp.sourceComponentNumber === 3 && (
         <QuizComponent
-          questions={legacyQuizQuestions}
+          questions={examQuizQuestions}
           timeLimitSeconds={currentComp.timeLimitSeconds}
           onComplete={handleComponentDone}
         />
@@ -1246,7 +1242,7 @@ function C5DetailCard({ detail }: { detail: NonNullable<ComponentResult["c5Detai
           {detail.totalScore}/30
         </p>
         <p className="text-sm text-muted-foreground">XiYouQuest speaking practice signal (命题说话)</p>
-        <p className="text-xs text-muted-foreground mt-1">Normalized for XiYouQuest practice only; not an official PSC Component 4 score.</p>
+        <p className="text-xs text-muted-foreground mt-1">Normalized for XiYouQuest practice only; not an official PSC Component 5 score.</p>
       </div>
 
       {/* Pronunciation */}

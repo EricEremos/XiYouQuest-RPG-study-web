@@ -6,11 +6,11 @@ const ProfileClient = dynamic(() => import("./profile-client"));
 const COMPONENT_NAMES: Record<number, { name: string; chinese: string }> = {
   1: { name: "Monosyllabic Characters", chinese: "读单音节字词" },
   2: { name: "Multisyllabic Words", chinese: "读多音节词语" },
-  3: { name: "Supplementary Vocabulary & Grammar", chinese: "选择判断" },
-  4: { name: "Component 3: Passage Reading", chinese: "朗读短文" },
-  5: { name: "Component 4: Prompted Speaking", chinese: "命题说话" },
-  6: { name: "Cantonese Mistakes", chinese: "易错字词练习" },
-  7: { name: "Polyphonic Characters", chinese: "多音字练习" },
+  3: { name: "Selection & Judgment", chinese: "选择判断" },
+  4: { name: "Passage Reading", chinese: "朗读短文" },
+  5: { name: "Prompted Speaking", chinese: "命题说话" },
+  6: { name: "Supplementary Cantonese Mistakes", chinese: "易错字词练习" },
+  7: { name: "Supplementary Polyphonic Characters", chinese: "多音字练习" },
 };
 
 export default async function ProfilePage() {

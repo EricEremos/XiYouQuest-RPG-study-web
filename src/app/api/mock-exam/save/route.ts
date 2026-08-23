@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
 import {
+  CURRENT_PSC_MOCK_SCORE_VERSION,
   hasConsistentMockExamTotal,
   normalizeMockExamResult,
 } from "@/lib/psc/mock-exam-contract";
@@ -10,12 +11,12 @@ import { z } from "zod";
 const insertSchema = z.object({
   totalScore: z.number().min(0).max(100),
   practiceBand: z.string().max(20),
-  scoreVersion: z.enum(["psc-2021-v1", "legacy-five-component-v1"]),
+  scoreVersion: z.literal(CURRENT_PSC_MOCK_SCORE_VERSION),
   componentScores: z.array(z.object({
     componentNumber: z.number().int().min(1).max(5),
     score: z.number().min(0).max(100),
     points: z.number().min(0).max(100),
-    scoreVersion: z.enum(["psc-2021-v1", "legacy-five-component-v1"]),
+    scoreVersion: z.literal(CURRENT_PSC_MOCK_SCORE_VERSION),
   })).min(1).max(5),
   durationSeconds: z.number().int().min(0),
   totalXp: z.number().int().min(0),

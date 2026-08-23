@@ -1,4 +1,7 @@
-export type MockExamScoreVersion = "psc-2021-v1" | "legacy-five-component-v1";
+export type MockExamScoreVersion =
+  | "psc-2021-v2"
+  | "psc-2021-v1"
+  | "legacy-five-component-v1";
 
 export interface MockExamComponentScore {
   componentNumber: number;
@@ -16,6 +19,13 @@ export interface NormalizedMockExamResult {
 }
 
 const COMPONENTS: Record<MockExamScoreVersion, readonly MockExamComponent[]> = {
+  "psc-2021-v2": [
+    { number: 1, points: 10 },
+    { number: 2, points: 20 },
+    { number: 3, points: 10 },
+    { number: 4, points: 30 },
+    { number: 5, points: 30 },
+  ],
   "psc-2021-v1": [
     { number: 1, points: 10 },
     { number: 2, points: 20 },

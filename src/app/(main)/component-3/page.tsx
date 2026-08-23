@@ -126,10 +126,10 @@ export default async function Component3Page({
     <div className="space-y-4">
       <div>
         <h1 className="font-pixel text-base text-primary pixel-glow leading-relaxed">
-          Supplementary Diagnostic: Vocabulary &amp; Grammar
+          Component 3: Selection &amp; Judgment
         </h1>
         <p className="text-muted-foreground">
-          <span className="font-chinese">选择判断</span> — Choose the correct or more standard Putonghua vocabulary and grammar. This diagnostic is not part of the current four-component PSC mock score.
+          <span className="font-chinese">选择判断</span> — Practice word choice, measure-word matching, and sentence-order judgment. The formal mock uses all three forms for its 3-minute C3 practice component; XiYouQuest feedback is not an official PSC result.
         </p>
       </div>
 
