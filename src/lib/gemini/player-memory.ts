@@ -4,9 +4,9 @@ import { AFFECTION_LEVELS } from "@/types/gamification";
 const COMPONENT_NAMES: Record<number, string> = {
   1: "C1 (Monosyllabic)",
   2: "C2 (Multisyllabic)",
-  3: "C3 (Vocabulary & Grammar)",
-  4: "C4 (Passage Reading)",
-  5: "C5 (Prompted Speaking)",
+  3: "Supplementary C3 (Vocabulary & Grammar)",
+  4: "C3 (Passage Reading)",
+  5: "C4 (Prompted Speaking)",
   6: "C6 (Cantonese Mistakes)",
   7: "C7 (Polyphonic)",
 };

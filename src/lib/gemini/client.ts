@@ -413,9 +413,9 @@ export type CurriculumInput = PhaseGenerationInput;
 const COMPONENT_LABELS: Record<number, string> = {
   1: "C1 单音节字词 (Single-syllable words)",
   2: "C2 多音节词语 (Multi-syllable words)",
-  3: "C3 朗读短文 (Passage reading)",
-  4: "C4 选择判断 (Multiple choice)",
-  5: "C5 命题说话 (Prompted speaking)",
+  3: "Supplementary C3 选择判断 (Vocabulary & grammar)",
+  4: "C3 朗读短文 (Passage reading)",
+  5: "C4 命题说话 (Prompted speaking)",
   6: "C6 声调辨识 (Tone identification)",
   7: "C7 拼音拼读 (Pinyin reading)",
 };

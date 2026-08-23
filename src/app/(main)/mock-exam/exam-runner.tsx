@@ -159,7 +159,7 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
   const passageScope = scopeOfficialReadingPassage(passageSource.content);
   const activePassage = { ...passageSource, content: passageScope.text };
   const [examPhase, setExamPhase] = useState<ExamPhase>("start");
-  const [examMode, setExamMode] = useState<ExamMode>("current");
+  const examMode = "current" as ExamMode;
   const scoreVersion: MockExamScoreVersion = examMode === "current"
     ? CURRENT_PSC_MOCK_SCORE_VERSION
     : LEGACY_FIVE_COMPONENT_SCORE_VERSION;
@@ -578,28 +578,11 @@ export function ExamRunner({ character, characters, words, quizQuestions, passag
             </p>
           </div>
 
-          <div className="space-y-2">
-            <h3 className="text-base font-bold text-muted-foreground uppercase">Exam Format</h3>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setExamMode("current")}
-                className={`rounded-lg border-2 p-3 text-left transition-colors cursor-pointer ${
-                  examMode === "current" ? "border-primary bg-accent" : "border-border hover:border-primary/50"
-                }`}
-              >
-                <p className="font-medium text-base">Current PSC practice (4 components)</p>
-                <p className="text-base text-muted-foreground">C1/C2/C3/C4 · 10/20/30/40 points.</p>
-              </button>
-              <button
-                onClick={() => setExamMode("legacy")}
-                className={`rounded-lg border-2 p-3 text-left transition-colors cursor-pointer ${
-                  examMode === "legacy" ? "border-primary bg-accent" : "border-border hover:border-primary/50"
-                }`}
-              >
-                <p className="font-medium text-base">Legacy XiYouQuest diagnostic</p>
-                <p className="text-base text-muted-foreground">Historical 5-section practice. Not the current PSC mock.</p>
-              </button>
-            </div>
+          <div className="rounded-lg border-2 border-primary bg-accent p-3">
+            <p className="font-medium text-base">Current PSC-format mock</p>
+            <p className="text-base text-muted-foreground">
+              C1/C2/C3/C4 · 10/20/30/40 points. Results are XiYouQuest formative feedback, not an official PSC result.
+            </p>
           </div>
 
           <div className="space-y-3">

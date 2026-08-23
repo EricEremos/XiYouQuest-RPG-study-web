@@ -70,7 +70,7 @@ interface PracticeHistoryClientProps {
 const COMPONENT_NAMES: Record<number, string> = {
   1: "C1",
   2: "C2",
-  3: "Extra 1",
+  3: "Extra C3",
   4: "C3",
   5: "C4",
   6: "Extra 2",
@@ -101,9 +101,9 @@ const FILTER_TABS = [
   { value: "all", label: "All" },
   { value: "1", label: "C1" },
   { value: "2", label: "C2" },
-  { value: "3", label: "C3" },
-  { value: "4", label: "C4" },
-  { value: "5", label: "C5" },
+  { value: "3", label: "Extra C3" },
+  { value: "4", label: "C3" },
+  { value: "5", label: "C4" },
   { value: "6", label: "C6" },
   { value: "7", label: "C7" },
 ];

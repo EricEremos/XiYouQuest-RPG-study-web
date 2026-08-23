@@ -948,7 +948,7 @@ function MiniExamPassage({
       <CardContent className="pt-6 space-y-4">
         <div className="flex items-center justify-between">
           <Badge variant="outline" className="font-pixel text-base px-3 py-1">
-            C4: Passage Reading
+            C3: Passage Reading
           </Badge>
           <Badge variant={timer.isRunning && timer.timeRemaining <= 30 ? "destructive" : "secondary"}>
             {timer.isRunning ? timer.formatTime : formatTimerDisplay(timeLimitSeconds)}
@@ -1105,7 +1105,7 @@ function MiniExamSpeaking({
     return (
       <Card>
         <CardContent className="pt-6 space-y-4 text-center">
-          <Badge variant="outline" className="font-pixel text-base px-3 py-1">C5: Prompted Speaking</Badge>
+          <Badge variant="outline" className="font-pixel text-base px-3 py-1">C4: Prompted Speaking</Badge>
           <p className="font-chinese text-lg font-bold">{selectedTopic}</p>
           <p className="text-5xl sm:text-6xl font-bold text-primary animate-pulse">{countdown}</p>
           <p className="text-base text-muted-foreground">Get ready to speak...</p>
@@ -1121,7 +1121,7 @@ function MiniExamSpeaking({
       <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="flex items-center justify-between">
-            <Badge variant="outline" className="font-pixel text-base px-3 py-1">C5: Prompted Speaking</Badge>
+            <Badge variant="outline" className="font-pixel text-base px-3 py-1">C4: Prompted Speaking</Badge>
             <Badge variant={timer.timeRemaining <= 30 ? "destructive" : "secondary"} className="text-3xl px-4 py-2">
               {timer.formatTime}
             </Badge>
@@ -1149,7 +1149,7 @@ function MiniExamSpeaking({
       <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="flex items-center justify-between">
-            <Badge variant="outline" className="font-pixel text-base px-3 py-1">C5: Prompted Speaking</Badge>
+            <Badge variant="outline" className="font-pixel text-base px-3 py-1">C4: Prompted Speaking</Badge>
             <Badge variant="secondary" className="text-3xl px-4 py-2">
               {formatTimerDisplay(timeLimitSeconds)}
             </Badge>
@@ -1178,7 +1178,7 @@ function MiniExamSpeaking({
     <Card>
       <CardContent className="pt-6 space-y-4">
         <div className="flex items-center justify-between">
-          <Badge variant="outline" className="font-pixel text-base px-3 py-1">C5: Prompted Speaking</Badge>
+          <Badge variant="outline" className="font-pixel text-base px-3 py-1">C4: Prompted Speaking</Badge>
           <Badge variant="secondary">
             {formatTimerDisplay(timeLimitSeconds)}
           </Badge>
