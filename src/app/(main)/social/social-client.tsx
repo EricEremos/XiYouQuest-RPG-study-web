@@ -319,6 +319,10 @@ export function SocialClient({
   }, []);
 
   const fetchRequests = useCallback(async () => {
+    // Retry must visibly re-enter the loading state and issue a fresh request
+    // instead of leaving the previous error on screen.
+    setRequestsLoading(true);
+    setRequestsError(null);
     try {
       const res = await fetch("/api/social/requests");
       if (!res.ok) throw new Error("Failed to load requests");
@@ -336,6 +340,8 @@ export function SocialClient({
   }, []);
 
   const fetchFriends = useCallback(async () => {
+    setFriendsLoading(true);
+    setFriendsError(null);
     try {
       const res = await fetch("/api/social/friends");
       if (!res.ok) throw new Error("Failed to load friends");

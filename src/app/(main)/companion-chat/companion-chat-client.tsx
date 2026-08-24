@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   MessageCircle,
   History,
@@ -90,6 +91,8 @@ const CATEGORY_LABELS: Record<string, { zh: string; en: string }> = {
   modern_daily: { zh: "现代生活", en: "Modern Daily Life" },
   psc_exam: { zh: "PSC考试练习", en: "PSC Exam Practice" },
 };
+
+const COMPANION_RECORDING_LIMIT_SECONDS = 60;
 
 // ── Component ──
 
@@ -368,19 +371,11 @@ export default function CompanionChatClient({
 
       // Generate image every 4 user turns (non-blocking)
       if (newTurnCount > 0 && newTurnCount % 3 === 0) {
-        // Build conversation summary from last 8 messages (use ref for latest state)
-        const recentMsgs = messagesRef.current.slice(-8).map(m =>
-          `${m.role === "user" ? "User" : selectedCharacter.name}: ${m.content}`
-        ).join("\n");
-
         fetchWithRetry("/api/chat/generate-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sessionId,
-            conversationSummary: recentMsgs,
-            characterName: selectedCharacter.name,
-            scenarioTitle: selectedScenario?.title,
           }),
         }).then(async (imgRes) => {
           if (imgRes.ok) {
@@ -403,7 +398,7 @@ export default function CompanionChatClient({
     } finally {
       setIsProcessing(false);
     }
-  }, [sessionId, selectedCharacter, selectedScenario, playTTS, showBackgroundImage, softLimitDismissed, filterOffTopic]);
+  }, [sessionId, selectedCharacter, playTTS, showBackgroundImage, softLimitDismissed, filterOffTopic]);
 
   // ── Reset to start ──
   const handleNewChat = useCallback(() => {
@@ -889,11 +884,29 @@ export default function CompanionChatClient({
 
   // Phase: Select Companion
   if (phase === "select_companion") {
+    const hasUnlockedCompanion = characters.some((char) => char.isUnlocked);
     return (
       <div className="mx-auto max-w-2xl space-y-4">
         {renderTabBar()}
         <h2 className="font-pixel text-sm text-foreground">Choose Your Companion</h2>
         <p className="font-chinese text-sm text-muted-foreground">选择你的同伴</p>
+        {!hasUnlockedCompanion && (
+          <div className="pixel-border bg-card p-4 space-y-2 text-center">
+            <p className="text-base text-foreground">
+              You need an unlocked companion before you can chat.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Visit the Characters page to unlock your first companion, then
+              come back here to start a conversation.
+            </p>
+            <Link
+              href="/characters"
+              className="inline-block pixel-btn bg-primary text-primary-foreground px-4 py-2 font-pixel text-sm hover:brightness-110 transition-all"
+            >
+              Go to Characters
+            </Link>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           {characters.map((char) => {
             const affInfo = getAffectionLevel(char.affectionXP);
@@ -1319,6 +1332,7 @@ export default function CompanionChatClient({
           <AudioRecorder
             onRecordingComplete={handleRecordingComplete}
             disabled={isProcessing}
+            maxDurationSeconds={COMPANION_RECORDING_LIMIT_SECONDS}
           />
           {isProcessing && (
             <p className="text-center text-sm text-muted-foreground mt-2 font-pixel animate-pulse">

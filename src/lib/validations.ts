@@ -14,10 +14,25 @@ export const friendRespondSchema = z.object({
   action: z.enum(["accept", "reject"]),
 });
 
+// --- Profile API Schemas ---
+
+export const profileSettingsSchema = z
+  .object({
+    display_name: z.string().trim().min(1).max(15).optional(),
+    audio_volume: z.number().min(0).max(1).optional(),
+    tts_volume: z.number().min(0).max(1).optional(),
+    audio_muted: z.boolean().optional(),
+  })
+  .refine(
+    (v) => Object.values(v).some((field) => field !== undefined),
+    { message: "At least one field is required" },
+  );
+
 // --- Progress API Schemas ---
 
 export const progressUpdateSchema = z.object({
   characterId: uuid,
+  attemptId: uuid.optional(),
   component: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7)]),
   score: z.number().min(0).max(100),
   xpEarned: z.number().min(0),
@@ -25,7 +40,7 @@ export const progressUpdateSchema = z.object({
   questionsAttempted: z.number().int().min(0).optional().default(0),
   questionsCorrect: z.number().int().min(0).optional().default(0),
   bestStreak: z.number().int().min(0).optional().default(0),
-});
+}).strict();
 
 // --- AI API Schemas ---
 
@@ -99,7 +114,15 @@ export const ttsSpeakSchema = z.object({
 });
 
 export const ttsCompanionSchema = z.object({
-  voiceId: z.string().min(1),
+  // Bound the voice id to the iFlytek id shape (e.g. `x_xiaoyan`,
+  // `x4_lingfeizhe_assist`) and a sane length instead of accepting an arbitrary
+  // string. Companion voices are a broader set than ttsSpeak's fixed allowlist,
+  // so we constrain the format rather than pin an exact list.
+  voiceId: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-z0-9_]+$/i, { message: "Invalid voice ID" }),
   text: z.string().min(1).max(500),
 });
 
@@ -137,10 +160,7 @@ export const chatResumeSchema = z.object({
 
 export const chatGenerateImageSchema = z.object({
   sessionId: uuid,
-  conversationSummary: z.string().min(1).max(2000),
-  characterName: z.string().max(100).optional(),
-  scenarioTitle: z.string().max(200).optional(),
-});
+}).strict();
 
 export const chatHistoryQuerySchema = z.object({
   sessionId: uuid.optional(),

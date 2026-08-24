@@ -43,6 +43,10 @@ import { useExamTimer } from "@/hooks/use-exam-timer";
 import type { QuizQuestion } from "@/types/practice";
 import type { LearningPlan, LearningNode, LearningCheckpoint } from "@/types/database";
 import type { UnlockedAchievement } from "@/lib/achievements/types";
+import { getXiYouQuestPracticeBand } from "@/lib/psc/practice-band";
+import { assessC4Passage } from "@/lib/psc/c4-passage-assessment";
+import { requestC5Assessment } from "@/lib/psc/c5-assessment";
+import { isAcceptedQuizAnswer, withConfiguredAcceptedAnswers } from "@/lib/quiz-answers";
 
 // ============================================================
 // Types
@@ -83,7 +87,7 @@ type ViewState =
 const COMPONENT_INFO: Record<number, { name: string; chineseName: string; short: string }> = {
   1: { name: "Monosyllabic Characters", chineseName: "读单音节字词", short: "C1" },
   2: { name: "Multisyllabic Words", chineseName: "读多音节词语", short: "C2" },
-  3: { name: "Vocabulary & Grammar", chineseName: "选择判断", short: "C3" },
+  3: { name: "Selection & Judgment", chineseName: "选择判断", short: "C3" },
   4: { name: "Passage Reading", chineseName: "朗读短文", short: "C4" },
   5: { name: "Prompted Speaking", chineseName: "命题说话", short: "C5" },
   6: { name: "Tone Drills", chineseName: "声调练习", short: "C6" },
@@ -93,16 +97,6 @@ const COMPONENT_INFO: Record<number, { name: string; chineseName: string; short:
 const PSC_WEIGHTS: Record<string, number> = {
   c1: 0.1, c2: 0.2, c3: 0.1, c4: 0.3, c5: 0.3,
 };
-
-function getPSCGrade(score: number): { grade: string; description: string } {
-  if (score >= 97) return { grade: "一级甲等", description: "First Class, Grade A" };
-  if (score >= 92) return { grade: "一级乙等", description: "First Class, Grade B" };
-  if (score >= 87) return { grade: "二级甲等", description: "Second Class, Grade A" };
-  if (score >= 80) return { grade: "二级乙等", description: "Second Class, Grade B" };
-  if (score >= 70) return { grade: "三级甲等", description: "Third Class, Grade A" };
-  if (score >= 60) return { grade: "三级乙等", description: "Third Class, Grade B" };
-  return { grade: "不达标", description: "Below Standard" };
-}
 
 function calculateWeightedScore(scores: Record<string, number>): number {
   let total = 0;
@@ -218,7 +212,11 @@ function useRawRecording() {
 }
 
 /** Grade a single component's recording immediately (fire-and-forget style). */
-function gradeComponent(raw: AssessmentRawData): Promise<{ key: string; score: number }> {
+type GradingResult =
+  | { key: string; score: number }
+  | { key: string; unavailable: true };
+
+function gradeComponent(raw: AssessmentRawData, signal?: AbortSignal): Promise<GradingResult> {
   const key = `c${raw.componentNumber}`;
 
   // Quiz — instant, no API call
@@ -257,7 +255,7 @@ function gradeComponent(raw: AssessmentRawData): Promise<{ key: string; score: n
         }
         return { key, score: Math.round(data.pronunciationScore ?? 0) };
       } catch {
-        return { key, score: 0 };
+        return { key, unavailable: true };
       }
     })();
   }
@@ -266,20 +264,26 @@ function gradeComponent(raw: AssessmentRawData): Promise<{ key: string; score: n
   if (raw.componentNumber === 4) {
     return (async () => {
       try {
-        const formData = new FormData();
-        formData.append("audio", raw.audioBlob!, "recording.wav");
-        formData.append("referenceText", raw.referenceText ?? "");
-        formData.append("category", "read_chapter");
+        const assessment = await assessC4Passage(
+          raw.audioBlob!,
+          raw.referenceText ?? "",
+          async (audioBlob, referenceText, category) => {
+            const formData = new FormData();
+            formData.append("audio", audioBlob, "recording.wav");
+            formData.append("referenceText", referenceText);
+            formData.append("category", category);
 
-        const res = await fetchWithRetry("/api/speech/assess", {
-          method: "POST",
-          body: formData,
-        });
-        if (!res.ok) throw new Error("Assessment failed");
-        const data = await res.json();
-        return { key, score: Math.round(data.pronunciationScore ?? 0) };
+            const response = await fetchWithRetry("/api/speech/assess", {
+              method: "POST",
+              body: formData,
+            });
+            if (!response.ok) throw new Error("Assessment failed");
+            return response.json();
+          },
+        );
+        return { key, score: assessment.score };
       } catch {
-        return { key, score: 0 };
+        return { key, unavailable: true };
       }
     })();
   }
@@ -287,27 +291,21 @@ function gradeComponent(raw: AssessmentRawData): Promise<{ key: string; score: n
   // C5 prompted speaking
   return (async () => {
     try {
-      const formData = new FormData();
-      formData.append("audio", raw.audioBlob!, "recording.wav");
-      formData.append("topic", raw.selectedTopic ?? "");
-      formData.append("spokenDurationSeconds", String(raw.spokenDurationSeconds ?? 0));
-
-      const res = await fetchWithRetry("/api/speech/c5-assess", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error("C5 assessment failed");
-      const data = await res.json();
-      return { key, score: Math.round(data.normalizedScore ?? 0) };
+      const data = await requestC5Assessment(
+        raw.audioBlob!,
+        raw.selectedTopic ?? "",
+        signal,
+      );
+      return { key, score: Math.round(data.normalizedScore) };
     } catch {
-      return { key, score: 0 };
+      return { key, unavailable: true };
     }
   })();
 }
 
 /** Collect all in-flight grading promises and return final scores. */
 async function collectGradingResults(
-  promises: Promise<{ key: string; score: number }>[],
+  promises: Promise<GradingResult>[],
   setProgress: (p: number) => void,
 ): Promise<Record<string, number>> {
   const scores: Record<string, number> = {};
@@ -315,15 +313,23 @@ async function collectGradingResults(
   let completed = 0;
 
   // Race each promise to update progress as they resolve
-  await Promise.all(
+  const results = await Promise.all(
     promises.map(p =>
-      p.then(({ key, score }) => {
-        scores[key] = score;
+      p.then(result => {
         completed++;
         setProgress(Math.round((completed / Math.max(total, 1)) * 100));
+        return result;
       })
     )
   );
+
+  if (results.some((result) => "unavailable" in result)) {
+    throw new Error("Practice assessment unavailable");
+  }
+
+  for (const result of results) {
+    if ("score" in result) scores[result.key] = result.score;
+  }
 
   for (const c of [1, 2, 3, 4, 5]) {
     if (scores[`c${c}`] === undefined) scores[`c${c}`] = 0;
@@ -369,7 +375,7 @@ export default function LearningPathClient({
   const [checkpointScores, setCheckpointScores] = useState<Record<string, number>>({});
   const [checkpointResult, setCheckpointResult] = useState<{
     feedback: string;
-    predictedGrade: string;
+    practiceBand: string;
     scoreDeltas: Record<string, number>;
   } | null>(null);
   const [checkpointLoading, setCheckpointLoading] = useState(false);
@@ -422,7 +428,7 @@ export default function LearningPathClient({
 
       setCheckpointResult({
         feedback: data.feedback,
-        predictedGrade: data.predictedGrade,
+        practiceBand: data.practiceBand,
         scoreDeltas: data.scoreDeltas,
       });
 
@@ -638,9 +644,11 @@ function MiniExamFlow({
   const { setLearningActive } = useBGM();
   const [phase, setPhase] = useState<AssessmentPhase>("c1_recording");
   const [assessProgress, setAssessProgress] = useState(0);
+  const [assessmentError, setAssessmentError] = useState<string | null>(null);
   const processingRef = useRef(false);
+  const gradingAbortRef = useRef(new AbortController());
   // Background grading: fire each component's grading immediately when done recording
-  const gradingPromisesRef = useRef<Promise<{ key: string; score: number }>[]>([]);
+  const gradingPromisesRef = useRef<Promise<GradingResult>[]>([]);
 
   // Duck BGM during active assessment phases
   useEffect(() => {
@@ -649,8 +657,14 @@ function MiniExamFlow({
     return () => setLearningActive(false);
   }, [phase, setLearningActive]);
 
+  useEffect(() => {
+    return () => gradingAbortRef.current.abort();
+  }, []);
+
   const randomizedQuiz = useMemo(() => {
-    return (assessmentData.quizQuestions ?? []).map(randomizeAnswerPositions);
+    return (assessmentData.quizQuestions ?? [])
+      .map(withConfiguredAcceptedAnswers)
+      .map(randomizeAnswerPositions);
   }, [assessmentData.quizQuestions]);
 
   const currentIndex = ASSESSMENT_PHASE_ORDER.indexOf(phase);
@@ -664,7 +678,7 @@ function MiniExamFlow({
 
   const advancePhase = useCallback((data: AssessmentRawData) => {
     // Start grading this component immediately in the background
-    gradingPromisesRef.current.push(gradeComponent(data));
+    gradingPromisesRef.current.push(gradeComponent(data, gradingAbortRef.current.signal));
 
     setPhase(prev => {
       let idx = ASSESSMENT_PHASE_ORDER.indexOf(prev);
@@ -681,10 +695,25 @@ function MiniExamFlow({
   useEffect(() => {
     if (phase !== "assessing" || processingRef.current) return;
     processingRef.current = true;
-    collectGradingResults(gradingPromisesRef.current, setAssessProgress).then(onComplete);
+    void collectGradingResults(gradingPromisesRef.current, setAssessProgress)
+      .then(onComplete)
+      .catch(() => setAssessmentError("The practice assessment service was unavailable. No result or learning plan was saved."));
   }, [phase, onComplete]);
 
   if (phase === "assessing") {
+    if (assessmentError) {
+      return (
+        <div className="pixel-border chinese-corner bg-card p-4 sm:p-6 space-y-4 text-center">
+          <AlertTriangle className="h-12 w-12 mx-auto text-amber-500" />
+          <h2 className="font-pixel text-lg sm:text-xl text-foreground leading-relaxed">Practice Assessment Unavailable</h2>
+          <p className="text-base text-muted-foreground">{assessmentError}</p>
+          <div className="flex justify-center">
+            <Button onClick={() => window.location.reload()}>Restart Assessment</Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="pixel-border chinese-corner bg-card p-4 sm:p-6 space-y-4 sm:space-y-6">
         <div className="text-center space-y-4">
@@ -1128,7 +1157,7 @@ function MiniExamSpeaking({
           <div className="text-center space-y-2">
             <p className="text-base text-muted-foreground">Your topic:</p>
             <p className="font-chinese text-xl font-bold text-foreground">{selectedTopic}</p>
-            <p className="text-base text-muted-foreground">Speak for 2-3 minutes. A 3-second countdown will start.</p>
+            <p className="text-base text-muted-foreground">Speak for 3 minutes. A 3-second countdown will start.</p>
           </div>
           <div className="flex justify-center gap-3">
             <Button variant="outline" onClick={() => { setSelectedTopic(null); selectedTopicRef.current = null; setSpeakPhase("choosing"); }}>
@@ -1157,7 +1186,7 @@ function MiniExamSpeaking({
         <p className="font-chinese text-lg sm:text-xl text-center text-muted-foreground">命题说话</p>
 
         <p className="text-base sm:text-xl text-center text-muted-foreground">
-          Choose a topic, then speak for 2-3 minutes:
+          Choose a topic, then speak for 3 minutes:
         </p>
         <div className="space-y-2">
           {topicChoices.map((topic, i) => (
@@ -1195,7 +1224,7 @@ function QuizAssessment({
     if (currentQ + 1 >= questions.length) {
       let correct = 0;
       questions.forEach((question, i) => {
-        if (newAnswers[i] === question.correctIndex) correct++;
+        if (isAcceptedQuizAnswer(question, newAnswers[i] ?? -1)) correct++;
       });
       const score = questions.length > 0
         ? Math.round((correct / questions.length) * 100)
@@ -1221,7 +1250,7 @@ function QuizAssessment({
     <Card>
       <CardContent className="pt-6 space-y-4">
         <div className="flex items-center justify-between">
-          <Badge variant="outline" className="font-pixel text-base px-3 py-1">C3: Vocabulary & Grammar</Badge>
+          <Badge variant="outline" className="font-pixel text-base px-3 py-1">C3: Selection & Judgment</Badge>
           <span className="font-pixel text-xl text-muted-foreground">
             {currentQ + 1} / {questions.length}
           </span>
@@ -1258,7 +1287,7 @@ function AssessmentResultsView({
   onContinue: () => void;
 }) {
   const weightedScore = calculateWeightedScore(scores);
-  const gradeInfo = getPSCGrade(weightedScore);
+  const practiceBand = getXiYouQuestPracticeBand(weightedScore);
 
   return (
     <div className="pixel-border chinese-corner bg-card p-4 sm:p-6 space-y-4 sm:space-y-6">
@@ -1278,9 +1307,10 @@ function AssessmentResultsView({
           variant={weightedScore >= 80 ? "default" : weightedScore >= 60 ? "secondary" : "destructive"}
           className="mt-2 text-base px-3 py-0.5"
         >
-          {gradeInfo.grade}
+          {practiceBand.label}
         </Badge>
-        <p className="text-base text-muted-foreground mt-1">{gradeInfo.description}</p>
+        <p className="text-base text-muted-foreground mt-1">{practiceBand.description}</p>
+        <p className="text-xs text-muted-foreground mt-1">XiYouQuest practice estimate, not an official PSC result.</p>
       </div>
 
       {/* Per-component scores */}
@@ -1922,7 +1952,7 @@ function CurriculumRoadmap({
                       <div className="flex-1 min-w-0">
                         <span className="text-base font-medium">Mock Exam {examNum}</span>
                         <p className="text-sm text-muted-foreground">
-                          Full PSC simulation (C1–C5) · ~30min
+                          Formal PSC-format practice simulation (C1–C5) · ~29min incl. prep
                         </p>
                       </div>
                       <Lock className="h-4 w-4 text-muted-foreground/40 shrink-0" />
@@ -2158,7 +2188,7 @@ function NodeSessionView({
     const quizQuestions: QuizQuestion[] = (questions as Array<{
       id: string;
       content: string;
-      metadata: { type: string; options: string[]; correctIndex: number; explanation: string };
+      metadata: { type: string; options: string[]; correctIndex: number; explanation: string; acceptedAnswers?: string[] };
     }>)
       .filter((q) => q.metadata && q.metadata.options)
       .map((q) => ({
@@ -2168,12 +2198,16 @@ function NodeSessionView({
         options: q.metadata.options,
         correctIndex: q.metadata.correctIndex,
         explanation: q.metadata.explanation,
+        acceptedAnswers: q.metadata.acceptedAnswers,
       }))
+      .map(withConfiguredAcceptedAnswers)
       .map(randomizeAnswerPositions);
 
     if (quizQuestions.length === 0) {
       // Fallback: use assessment quiz questions if no drill questions
-      const fallback = (assessmentData.quizQuestions ?? []).map(randomizeAnswerPositions);
+      const fallback = (assessmentData.quizQuestions ?? [])
+        .map(withConfiguredAcceptedAnswers)
+        .map(randomizeAnswerPositions);
       return (
         <DrillQuizSession
           questions={fallback.length > 0 ? fallback : []}
@@ -2322,7 +2356,7 @@ function DrillQuizSession({
       if (currentQ + 1 >= questions.length) {
         let correct = 0;
         questions.forEach((question, i) => {
-          if (newAnswers[i] === question.correctIndex) correct++;
+          if (isAcceptedQuizAnswer(question, newAnswers[i] ?? -1)) correct++;
         });
         const score = Math.round((correct / questions.length) * 100);
         setFinalScore(score);
@@ -2358,8 +2392,8 @@ function DrillQuizSession({
             {q.options.map((opt, i) => {
               let style = "border-border hover:border-primary/50";
               if (showResult) {
-                if (i === q.correctIndex) style = "border-green-500 bg-green-50 dark:bg-green-950/30";
-                else if (i === selected && i !== q.correctIndex) style = "border-red-500 bg-red-50 dark:bg-red-950/30";
+                if (isAcceptedQuizAnswer(q, i)) style = "border-green-500 bg-green-50 dark:bg-green-950/30";
+                else if (i === selected) style = "border-red-500 bg-red-50 dark:bg-red-950/30";
               } else if (i === selected) {
                 style = "border-primary bg-primary/10";
               }
@@ -2408,10 +2442,12 @@ function PronunciationDrillSession({
   const [phase, setPhase] = useState<"recording" | "assessing" | "feedback">("recording");
   const [finalScore, setFinalScore] = useState(0);
   const [wordScores, setWordScores] = useState<WordScoreItem[]>([]);
+  const [assessmentError, setAssessmentError] = useState<string | null>(null);
   const recorderRef = useRef<AudioRecorderHandle>(null);
   const info = COMPONENT_INFO[component];
 
   const handleRecordingComplete = useCallback(async (audioBlob: Blob) => {
+    setAssessmentError(null);
     setPhase("assessing");
 
     try {
@@ -2497,13 +2533,32 @@ function PronunciationDrillSession({
       setFinalScore(Math.round(data.pronunciationScore ?? 0));
     } catch {
       setWordScores(items.map((word) => ({ word, score: null })));
-      setFinalScore(65);
+      setAssessmentError("The practice assessment service was unavailable. No score was recorded.");
     } finally {
       setPhase("feedback");
     }
   }, [component, items]);
 
   if (phase === "feedback") {
+    if (assessmentError) {
+      return (
+        <div className="pixel-border bg-card p-4 sm:p-6 space-y-4 text-center">
+          <AlertTriangle className="h-10 w-10 mx-auto text-amber-500" />
+          <h2 className="font-pixel text-lg text-foreground">Practice Assessment Unavailable</h2>
+          <p className="text-base text-muted-foreground">{assessmentError}</p>
+          <div className="flex justify-center gap-3">
+            <Button onClick={() => {
+              setWordScores([]);
+              setFinalScore(0);
+              setAssessmentError(null);
+              setPhase("recording");
+            }}>Try Again</Button>
+            <Button variant="outline" onClick={onCancel}>Back</Button>
+          </div>
+        </div>
+      );
+    }
+
     const validScores = wordScores.filter((w) => w.score !== null).map((w) => w.score!);
     const avgScore = validScores.length > 0 ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length) : 0;
     const toneScores = wordScores.filter((w) => w.toneScore !== undefined).map((w) => w.toneScore!);
@@ -2650,9 +2705,11 @@ function PassageDrillSession({
   const [assessing, setAssessing] = useState(false);
   const [done, setDone] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
+  const [assessmentError, setAssessmentError] = useState<string | null>(null);
 
   const handleRecordingComplete = useCallback(async (audioBlob: Blob) => {
     if (!passage) return;
+    setAssessmentError(null);
     setAssessing(true);
 
     try {
@@ -2670,7 +2727,7 @@ function PassageDrillSession({
       const data = await res.json();
       setFinalScore(Math.round(data.pronunciationScore ?? 0));
     } catch {
-      setFinalScore(65);
+      setAssessmentError("The practice assessment service was unavailable. No score was recorded.");
     } finally {
       setAssessing(false);
       setDone(true);
@@ -2681,15 +2738,30 @@ function PassageDrillSession({
     return (
       <div className="pixel-border bg-card p-4 sm:p-6 space-y-4 text-center">
         <p className="text-muted-foreground">No passage available.</p>
-        <div className="flex justify-center gap-3">
-          <Button variant="outline" onClick={onCancel}>Back</Button>
-          <Button onClick={() => onComplete(70)}>Complete</Button>
-        </div>
+        <div className="flex justify-center"><Button variant="outline" onClick={onCancel}>Back</Button></div>
       </div>
     );
   }
 
   if (done) {
+    if (assessmentError) {
+      return (
+        <div className="pixel-border bg-card p-4 sm:p-6 space-y-4 text-center">
+          <AlertTriangle className="h-10 w-10 mx-auto text-amber-500" />
+          <h2 className="font-pixel text-lg text-foreground">Practice Assessment Unavailable</h2>
+          <p className="text-base text-muted-foreground">{assessmentError}</p>
+          <div className="flex justify-center gap-3">
+            <Button onClick={() => {
+              setDone(false);
+              setFinalScore(0);
+              setAssessmentError(null);
+            }}>Try Again</Button>
+            <Button variant="outline" onClick={onCancel}>Back</Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="pixel-border chinese-corner bg-card p-4 sm:p-6 space-y-4 sm:space-y-5">
         <div className="text-center space-y-2">
@@ -2756,41 +2828,59 @@ function SpeakingDrillSession({
   const [assessing, setAssessing] = useState(false);
   const [done, setDone] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
-  const recordStartRef = useRef<number>(0);
+  const [assessmentError, setAssessmentError] = useState<string | null>(null);
+  const assessmentAbortRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
 
-  const handleRecordingStart = useCallback(() => {
-    recordStartRef.current = Date.now();
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      assessmentAbortRef.current?.abort();
+      assessmentAbortRef.current = null;
+    };
   }, []);
 
   const handleRecordingComplete = useCallback(async (audioBlob: Blob) => {
     if (!selectedTopic) return;
+    setAssessmentError(null);
     setAssessing(true);
-
-    const durationSec = Math.round((Date.now() - recordStartRef.current) / 1000);
+    const controller = new AbortController();
+    assessmentAbortRef.current = controller;
 
     try {
-      const formData = new FormData();
-      formData.append("audio", audioBlob, "recording.wav");
-      formData.append("topic", selectedTopic);
-      formData.append("spokenDurationSeconds", String(durationSec));
-
-      const res = await fetchWithRetry("/api/speech/c5-assess", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error("C5 assessment failed");
-      const data = await res.json();
-      setFinalScore(Math.round(data.normalizedScore ?? 0));
+      const data = await requestC5Assessment(audioBlob, selectedTopic, controller.signal);
+      if (!isMountedRef.current) return;
+      setFinalScore(Math.round(data.normalizedScore));
     } catch {
-      setFinalScore(65);
+      if (!isMountedRef.current) return;
+      setAssessmentError("The practice assessment service was unavailable. No score was recorded.");
     } finally {
+      if (assessmentAbortRef.current === controller) assessmentAbortRef.current = null;
+      if (!isMountedRef.current) return;
       setAssessing(false);
       setDone(true);
     }
   }, [selectedTopic]);
 
   if (done) {
+    if (assessmentError) {
+      return (
+        <div className="pixel-border bg-card p-4 sm:p-6 space-y-4 text-center">
+          <AlertTriangle className="h-10 w-10 mx-auto text-amber-500" />
+          <h2 className="font-pixel text-lg text-foreground">Practice Assessment Unavailable</h2>
+          <p className="text-base text-muted-foreground">{assessmentError}</p>
+          <div className="flex justify-center gap-3">
+            <Button onClick={() => {
+              setDone(false);
+              setFinalScore(0);
+              setAssessmentError(null);
+            }}>Try Again</Button>
+            <Button variant="outline" onClick={onCancel}>Back</Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="pixel-border chinese-corner bg-card p-4 sm:p-6 space-y-4 sm:space-y-5">
         <div className="text-center space-y-2">
@@ -2864,11 +2954,11 @@ function SpeakingDrillSession({
           <div className="text-center">
             <p className="text-base text-muted-foreground">Your topic:</p>
             <p className="font-chinese text-xl font-bold text-foreground py-2">{selectedTopic}</p>
-            <p className="text-base text-muted-foreground">Speak for 2-3 minutes</p>
+            <p className="text-base text-muted-foreground">Speak for 2-3 minutes. Recording ends automatically at 3:00.</p>
           </div>
           <AudioRecorder
             onRecordingComplete={handleRecordingComplete}
-            onRecordingStart={handleRecordingStart}
+            maxDurationSeconds={180}
           />
         </CardContent>
       </Card>
@@ -2943,7 +3033,7 @@ function CheckpointReportView({
   scores: Record<string, number>;
   result: {
     feedback: string;
-    predictedGrade: string;
+    practiceBand: string;
     scoreDeltas: Record<string, number>;
   } | null;
   onContinue: () => void;
@@ -2993,16 +3083,16 @@ function CheckpointReportView({
           })}
         </div>
 
-        {/* Predicted grade */}
-        {result?.predictedGrade && (
+        {result?.practiceBand && (
           <div className="text-center py-2">
-            <p className="text-base text-muted-foreground">Predicted PSC Grade:</p>
+            <p className="text-base text-muted-foreground">XiYouQuest Practice Band:</p>
             <Badge variant="default" className="text-lg px-4 py-1 mt-1">
-              {result.predictedGrade}
+              {result.practiceBand}
             </Badge>
             <p className="text-base text-muted-foreground mt-1">
               Weighted: {Math.round(weightedScore)}
             </p>
+            <p className="text-xs text-muted-foreground mt-1">Not an official PSC result.</p>
           </div>
         )}
 
@@ -3077,7 +3167,7 @@ function FinalReportView({
     : initialScores;
   const initialWeighted = calculateWeightedScore(initialScores);
   const finalWeighted = calculateWeightedScore(latestScores);
-  const gradeInfo = getPSCGrade(finalWeighted);
+  const practiceBand = getXiYouQuestPracticeBand(finalWeighted);
 
   return (
     <div className="space-y-4">
@@ -3093,16 +3183,16 @@ function FinalReportView({
           </p>
         </div>
 
-        {/* Final grade */}
         <div className="text-center py-3">
           <p className={`text-4xl sm:text-5xl font-bold ${scoreColor(finalWeighted)}`}>
             {Math.round(finalWeighted)}
           </p>
-          <p className="text-base text-muted-foreground">Final Predicted Score</p>
+          <p className="text-base text-muted-foreground">Final XiYouQuest Practice Score</p>
           <Badge variant="default" className="text-lg px-4 py-1 mt-2">
-            {gradeInfo.grade}
+            {practiceBand.label}
           </Badge>
-          <p className="text-base text-muted-foreground mt-1">{gradeInfo.description}</p>
+          <p className="text-base text-muted-foreground mt-1">{practiceBand.description}</p>
+          <p className="text-xs text-muted-foreground mt-1">XiYouQuest practice estimate, not an official PSC result.</p>
         </div>
 
         {/* Growth trajectory */}

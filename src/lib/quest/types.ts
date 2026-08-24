@@ -41,6 +41,7 @@ export interface QuestMCQ {
   options: string[];
   /** Index of the correct answer in options[] */
   correctIndex: number;
+  acceptedAnswers?: string[];
   /** Highlighted character (for polyphonic questions) */
   highlightedChar?: string;
 }

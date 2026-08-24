@@ -9,19 +9,23 @@ import { AudioRecorder } from "@/components/practice/audio-recorder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { calculateXP } from "@/lib/gamification/xp";
 import { fetchWithRetry } from "@/lib/fetch-retry";
+import { assessC4Passage } from "@/lib/psc/c4-passage-assessment";
 import { getDialogue } from "@/lib/dialogue";
+import { ChineseText } from "@/components/shared/chinese-text";
 import { useAudioSettings } from "@/components/shared/audio-settings";
 import { useAchievementToast } from "@/components/shared/achievement-toast";
 import type { ExpressionName } from "@/types/character";
 import type { ComponentNumber } from "@/types/practice";
+import type { ReadingPassageSource } from "@/lib/psc/reading-passage-source";
 
 interface Passage {
   id: string;
   title: string;
   content: string;
   passageNumber: number | null;
+  syllableCount: number;
+  source: ReadingPassageSource;
 }
 
 interface ReadingSessionProps {
@@ -74,6 +78,8 @@ export function ReadingSession({ passages, character, characterId, component, lp
   const [sentenceScores, setSentenceScores] = useState<SentenceScore[]>([]);
   const [totalXPEarned, setTotalXPEarned] = useState(0);
   const [, setFeedbackText] = useState("");
+  const [progressSaveError, setProgressSaveError] = useState<string | null>(null);
+  const [progressSaveAttempt, setProgressSaveAttempt] = useState(0);
   const hasPlayedGreeting = useRef(false);
 
   // Background overlay ref for passage images (DOM-managed on body)
@@ -155,40 +161,49 @@ export function ReadingSession({ passages, character, characterId, component, lp
 
   // Save progress when reading assessment completes
   const hasSavedProgress = useRef(false);
+  const hasRecordedProgress = useRef(false);
+  const progressAttemptId = useRef<string | null>(null);
+  const isSavingProgress = useRef(false);
   useEffect(() => {
-    if (phase !== "feedback" || overallScore === null || !characterId || hasSavedProgress.current) return;
-    hasSavedProgress.current = true;
+    if (
+      phase !== "feedback" ||
+      overallScore === null ||
+      !characterId ||
+      hasSavedProgress.current ||
+      isSavingProgress.current
+    ) return;
+    isSavingProgress.current = true;
+    let cancelled = false;
 
     const saveProgress = async () => {
       try {
-        const res = await fetchWithRetry("/api/progress/update", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            characterId,
-            component,
-            score: overallScore,
-            xpEarned: totalXPEarned,
-            durationSeconds: 0,
-            questionsAttempted: 1,
-            questionsCorrect: overallScore >= 60 ? 1 : 0,
-            bestStreak: overallScore >= 60 ? 1 : 0,
-          }),
-        });
-        if (res.ok) {
+        if (!hasRecordedProgress.current) {
+          progressAttemptId.current ??= crypto.randomUUID();
+          const res = await fetchWithRetry("/api/progress/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              characterId,
+              attemptId: progressAttemptId.current,
+              component,
+              score: overallScore,
+              xpEarned: totalXPEarned,
+              durationSeconds: 0,
+              questionsAttempted: 1,
+              questionsCorrect: overallScore >= 60 ? 1 : 0,
+              bestStreak: overallScore >= 60 ? 1 : 0,
+            }),
+          }, { maxRetries: 0 });
+          if (!res.ok) throw new Error(`Progress update failed (${res.status})`);
           const data = await res.json();
+          hasRecordedProgress.current = true;
           if (data.newAchievements?.length > 0) {
             showAchievementToasts(data.newAchievements);
           }
         }
-      } catch (err) {
-        console.error("Failed to save progress:", err);
-      }
 
-      // Complete learning path node if launched from learning path
-      if (lpNodeId) {
-        try {
-          await fetchWithRetry("/api/learning/node/complete", {
+        if (lpNodeId) {
+          const nodeResponse = await fetchWithRetry("/api/learning/node/complete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -197,16 +212,28 @@ export function ReadingSession({ passages, character, characterId, component, lp
               xpEarned: totalXPEarned,
             }),
           });
-        } catch (err) {
-          console.error("Failed to complete LP node:", err);
+          if (!nodeResponse.ok) throw new Error(`Learning Path update failed (${nodeResponse.status})`);
         }
-        router.push("/learning-path");
-        return;
+
+        if (cancelled) return;
+        hasSavedProgress.current = true;
+        setProgressSaveError(null);
+        if (lpNodeId) router.push("/learning-path");
+      } catch (err) {
+        console.error("Failed to save C4 progress:", err);
+        if (!cancelled) {
+          setProgressSaveError("Your assessment is ready, but progress could not be saved. Retry before leaving this page.");
+        }
+      } finally {
+        isSavingProgress.current = false;
       }
     };
 
-    saveProgress();
-  }, [phase, overallScore]); // eslint-disable-line react-hooks/exhaustive-deps
+    void saveProgress();
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, overallScore, progressSaveAttempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Play the entire passage as a model reading (sentence-by-sentence to avoid Vercel timeout)
   const playModelReading = useCallback(async () => {
@@ -369,71 +396,25 @@ export function ReadingSession({ passages, character, characterId, component, lp
     setDialogue(getDialogue(character.name, "c4_analyzing"));
 
     try {
-      // Send audio to speech assessment API
-      const formData = new FormData();
-      formData.append("audio", audioBlob, "recording.wav");
-      formData.append("referenceText", selectedPassage.content);
-      formData.append("category", "read_chapter");
+      const assessment = await assessC4Passage(
+        audioBlob,
+        selectedPassage.content,
+        async (blob, referenceText, category) => {
+          const formData = new FormData();
+          formData.append("audio", blob, "recording.wav");
+          formData.append("referenceText", referenceText);
+          formData.append("category", category);
 
-      const assessResponse = await fetchWithRetry("/api/speech/assess", {
-        method: "POST",
-        body: formData,
-      });
-
-      let pronunciationScore = 0;
-      let sentenceResults: SentenceScore[] = [];
-
-      if (!assessResponse.ok) {
-        const errBody = await assessResponse.json().catch(() => ({}));
-        console.error("[C4] Assessment API error:", assessResponse.status, errBody);
-        throw new Error(`Assessment failed (${assessResponse.status})`);
-      }
-
-      const assessResult = await assessResponse.json();
-      pronunciationScore = assessResult.pronunciationScore ?? 0;
-
-      // Prefer ISE sentence-level scores (returned by read_chapter/read_sentence)
-      if (assessResult.sentences && assessResult.sentences.length > 0) {
-        // Map ISE sentence scores back to our UI sentences by matching content
-        for (const sentence of sentences) {
-          const rawSentence = sentence.replace(/[。！？；，、：""''（）《》\s]/g, "");
-          // Find the ISE sentence whose content best matches this UI sentence
-          const match = assessResult.sentences.find((s: { content: string; score: number }) => {
-            const rawIse = s.content.replace(/[。！？；，、：""''（）《》\s]/g, "");
-            return rawIse === rawSentence || rawSentence.includes(rawIse) || rawIse.includes(rawSentence);
+          const response = await fetchWithRetry("/api/speech/assess", {
+            method: "POST",
+            body: formData,
           });
-          sentenceResults.push({ sentence, score: match?.score ?? pronunciationScore });
-        }
-      } else if (assessResult.words && assessResult.words.length > 0) {
-        // Fallback: reconstruct sentence scores from word-level data
-        let wordIndex = 0;
-        for (const sentence of sentences) {
-          const rawSentence = sentence.replace(/[。！？；，、：""''（）《》\s]/g, "");
-          let consumed = 0;
-          let sentenceTotal = 0;
-          let sentenceWordCount = 0;
-
-          while (consumed < rawSentence.length && wordIndex < assessResult.words.length) {
-            const wordResult = assessResult.words[wordIndex];
-            if (consumed + wordResult.word.length > rawSentence.length + 1) break;
-            consumed += wordResult.word.length;
-            sentenceTotal += wordResult.accuracyScore ?? 0;
-            sentenceWordCount++;
-            wordIndex++;
-          }
-
-          const avgScore = sentenceWordCount > 0 ? Math.round(sentenceTotal / sentenceWordCount) : 0;
-          sentenceResults.push({ sentence, score: avgScore });
-        }
-      }
-
-      // If no sentence-level data, create from overall score
-      if (sentenceResults.length === 0) {
-        sentenceResults = sentences.map((sentence) => ({
-          sentence,
-          score: pronunciationScore,
-        }));
-      }
+          if (!response.ok) throw new Error(`Assessment failed (${response.status})`);
+          return response.json();
+        },
+      );
+      const pronunciationScore = assessment.score;
+      const sentenceResults = assessment.sentenceScores;
 
       setOverallScore(pronunciationScore);
       setSentenceScores(sentenceResults);
@@ -441,13 +422,7 @@ export function ReadingSession({ passages, character, characterId, component, lp
       const isGood = pronunciationScore >= 60;
       const isPerfect = pronunciationScore >= 90;
 
-      // Calculate XP
-      const xpResult = calculateXP({
-        pronunciationScore,
-        isCorrect: isGood,
-        currentStreak: isGood ? 1 : 0,
-      });
-      setTotalXPEarned(xpResult.totalXP);
+      setTotalXPEarned(assessment.xpEarned);
 
       // Get AI character feedback
       setPhase("feedback");
@@ -497,7 +472,7 @@ export function ReadingSession({ passages, character, characterId, component, lp
 
       // Companion voice disabled
     } catch {
-      setPhase("feedback");
+      setPhase("ready");
       setExpression("surprised");
       setDialogue(getDialogue(character.name, "c4_error"));
       setOverallScore(null);
@@ -544,6 +519,10 @@ export function ReadingSession({ passages, character, characterId, component, lp
     setSentenceScores([]);
     setTotalXPEarned(0);
     setFeedbackText("");
+    setProgressSaveError(null);
+    hasSavedProgress.current = false;
+    hasRecordedProgress.current = false;
+    progressAttemptId.current = null;
 
     setExpression("neutral");
     setDialogue(getDialogue(character.name, "c4_initial"));
@@ -576,8 +555,7 @@ export function ReadingSession({ passages, character, characterId, component, lp
               {passages.map((passage) => (
                 <Card
                   key={passage.id}
-                  className="cursor-pointer transition-all hover:border-primary hover:shadow-md h-fit relative overflow-hidden"
-                  onClick={() => handleSelectPassage(passage)}
+                  className="transition-all hover:border-primary hover:shadow-md focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/50 h-fit relative overflow-hidden"
                 >
                   {passage.passageNumber && (
                     <div
@@ -588,12 +566,23 @@ export function ReadingSession({ passages, character, characterId, component, lp
                   <CardContent className="pt-6 relative">
                     <h3 className="text-lg font-bold font-chinese mb-2 drop-shadow-md [text-shadow:_0_1px_3px_rgb(255_255_255_/_80%)]">{passage.title}</h3>
                     <p className="text-sm font-medium text-foreground/80 font-chinese line-clamp-3 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
-                      {passage.content}
+                      <ChineseText text={passage.content} />
                     </p>
                     <p className="mt-2 text-sm font-medium text-foreground/70 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
-                      {passage.content.length} characters
+                      {passage.syllableCount} scoped Han characters · XiYouQuest practice scope: first 400
+                    </p>
+                    <p className="mt-1 text-xs text-foreground/60 [text-shadow:_0_1px_2px_rgb(255_255_255_/_60%)]">
+                      {passage.source.label}
                     </p>
                   </CardContent>
+                  {/* Native button covering the card: one Tab stop with a
+                      stable name, Enter/Space activation, focus ring above. */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectPassage(passage)}
+                    aria-label={`Practice passage: ${passage.title}`}
+                    className="absolute inset-0 z-10 cursor-pointer focus:outline-none"
+                  />
                 </Card>
               ))}
             </div>
@@ -622,14 +611,47 @@ export function ReadingSession({ passages, character, characterId, component, lp
 
             <div className="flex flex-col gap-2">
               {lpNodeId ? (
-                <p className="text-sm text-muted-foreground animate-pulse text-center">Returning to Learning Path...</p>
+                progressSaveError ? (
+                  <>
+                    <p role="alert" className="text-sm text-destructive text-center">{progressSaveError}</p>
+                    <Button
+                      onClick={() => {
+                        setProgressSaveError(null);
+                        setProgressSaveAttempt((attempt) => attempt + 1);
+                      }}
+                      className="w-full"
+                    >
+                      Retry Saving Progress
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground animate-pulse text-center">Saving progress and returning to Learning Path...</p>
+                )
               ) : (
                 <>
+                  {progressSaveError && (
+                    <>
+                      <p role="alert" className="text-sm text-destructive text-center">{progressSaveError}</p>
+                      <Button
+                        onClick={() => {
+                          setProgressSaveError(null);
+                          setProgressSaveAttempt((attempt) => attempt + 1);
+                        }}
+                        className="w-full"
+                      >
+                        Retry Saving Progress
+                      </Button>
+                    </>
+                  )}
                   <Button onClick={() => {
                     setPhase("ready");
                     setOverallScore(null);
                     setSentenceScores([]);
                     setFeedbackText("");
+                    setProgressSaveError(null);
+                    hasSavedProgress.current = false;
+                    hasRecordedProgress.current = false;
+                    progressAttemptId.current = null;
                     setExpression("neutral");
                     setDialogue(getDialogue(character.name, "c4_retry"));
                   }} className="w-full">
@@ -782,6 +804,9 @@ export function ReadingSession({ passages, character, characterId, component, lp
             <CardContent className="py-6 space-y-4">
               {/* Passage header */}
               <h2 className="text-xl font-bold font-chinese">{selectedPassage?.title}</h2>
+              <p className="text-xs text-muted-foreground">
+                {selectedPassage?.source.label}
+              </p>
 
               {/* Click hint / Stop button */}
               <div className="flex items-center justify-between gap-2">
@@ -803,14 +828,20 @@ export function ReadingSession({ passages, character, characterId, component, lp
                 )}
               </div>
 
-              {/* Passage content with clickable sentences */}
+              {/* Passage content with per-sentence playback. Each sentence is
+                  a native button: one Tab stop, Enter/Space plays audio, and
+                  aria-pressed exposes which sentence is playing. */}
               <div className="rounded-lg border bg-muted/30 p-4 sm:p-6 leading-relaxed max-h-[60vh] overflow-y-auto">
                 {sentences.map((sentence, index) => (
-                  <span
+                  <button
                     key={index}
+                    type="button"
                     onClick={() => playSentence(sentence, index)}
+                    aria-label={`Play sentence ${index + 1}: ${sentence}`}
+                    aria-pressed={playingSentenceIndex === index}
                     className={`
-                      cursor-pointer transition-all duration-200 rounded-md px-1 py-0.5
+                      inline cursor-pointer text-left transition-all duration-200 rounded-md px-1 py-0.5
+                      focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2
                       ${playingSentenceIndex === index
                         ? "bg-primary/30 text-primary font-medium shadow-sm scale-105"
                         : "hover:bg-primary/10 hover:shadow-sm hover:scale-[1.02]"
@@ -819,7 +850,7 @@ export function ReadingSession({ passages, character, characterId, component, lp
                     title="🔊 Click to hear this sentence"
                   >
                     <span className="text-lg leading-loose font-chinese">{sentence}</span>
-                  </span>
+                  </button>
                 ))}
               </div>
 

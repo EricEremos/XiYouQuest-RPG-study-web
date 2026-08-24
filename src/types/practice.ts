@@ -23,6 +23,7 @@ export interface QuizQuestion {
   prompt: string;
   options: string[];
   correctIndex: number;
+  acceptedAnswers?: string[];
   explanation: string;
 }
 

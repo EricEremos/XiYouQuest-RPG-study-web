@@ -81,7 +81,7 @@ export function MainQuestClient({
     const state = createBattleState(selectedStage, isRetry, unlockedCharacters);
     setBattleState({ ...state, invincible });
     setScreen("battle");
-  }, [selectedStage, getAttempts, unlockedCharacters]);
+  }, [selectedStage, getAttempts, unlockedCharacters, invincible]);
 
   const handleBattleVictory = useCallback((finalState: BattleState) => {
     setBattleState(finalState);

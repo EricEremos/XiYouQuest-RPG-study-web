@@ -6,6 +6,7 @@ import {
 } from "@/lib/gemini/client";
 import type { PhaseGenerationInput } from "@/lib/gemini/client";
 import { checkAndUnlockAchievements } from "@/lib/achievements/check";
+import { getXiYouQuestPracticeBand } from "@/lib/psc/practice-band";
 import { z } from "zod";
 
 const checkpointBodySchema = z.object({
@@ -21,16 +22,6 @@ const PSC_WEIGHTS: Record<string, number> = {
   c4: 0.3,
   c5: 0.3,
 };
-
-function getPSCGrade(weightedScore: number): string {
-  if (weightedScore >= 97) return "一级甲等";
-  if (weightedScore >= 92) return "一级乙等";
-  if (weightedScore >= 87) return "二级甲等";
-  if (weightedScore >= 80) return "二级乙等";
-  if (weightedScore >= 70) return "三级甲等";
-  if (weightedScore >= 60) return "三级乙等";
-  return "不达标";
-}
 
 function calculateWeightedScore(scores: Record<string, number>): number {
   let total = 0;
@@ -107,9 +98,8 @@ export async function POST(request: NextRequest) {
       focusArea: n.focus_area as string,
     }));
 
-    // Calculate weighted PSC grade
     const weightedScore = calculateWeightedScore(scores);
-    const predictedGrade = getPSCGrade(weightedScore);
+    const practiceBand = getXiYouQuestPracticeBand(weightedScore).label;
 
     // Generate checkpoint feedback via LLM
     const feedback = await generateCheckpointFeedback({
@@ -128,7 +118,7 @@ export async function POST(request: NextRequest) {
         scores,
         score_deltas: scoreDeltas,
         llm_feedback: feedback,
-        predicted_grade: predictedGrade,
+        predicted_grade: practiceBand,
       });
 
     if (checkpointError) {
@@ -314,7 +304,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       feedback,
-      predictedGrade,
+      practiceBand,
       scoreDeltas,
       nextPhaseAnalysis,
       updatedNodes: updatedNodes ?? [],

@@ -40,12 +40,12 @@
 - [Practice Components](#practice-components)
   - [C1: Monosyllabic Characters](#c1-monosyllabic-characters-读单音节字词)
   - [C2: Multisyllabic Words](#c2-multisyllabic-words-读多音节词语)
-  - [C3: Vocabulary & Grammar](#c3-vocabulary--grammar-judgment-选择判断)
+  - [C3: Selection & Judgment](#c3-selection--judgment-选择判断)
   - [C4: Passage Reading](#c4-passage-reading-朗读短文)
   - [C5: Prompted Speaking](#c5-prompted-speaking-命题说话)
-  - [C6: Cantonese Mistakes Drill](#c6-cantonese-mistakes-drill-易错字词练习)
-  - [C7: Polyphonic Characters Quiz](#c7-polyphonic-characters-quiz-多音字练习)
-  - [Mock Exam](#mock-exam-full-psc-simulation)
+  - [Supplementary C6: Cantonese Mistakes Drill](#supplementary-c6-cantonese-mistakes-drill-易错字词练习)
+  - [Supplementary C7: Polyphonic Characters Quiz](#supplementary-c7-polyphonic-characters-quiz-多音字练习)
+- [Mock Exam](#mock-exam-psc-format-xiyouquest-practice)
 - [Main Quest RPG](#main-quest-rpg)
 - [Companion Chat](#companion-chat)
 - [Personalized Learning Path](#personalized-learning-path)
@@ -71,7 +71,7 @@
 
 ## Overview
 
-XiYouQuest transforms Putonghua Proficiency Test (PSC / 普通话水平测试) preparation into a gamified, AI-driven adventure. Inspired by the classic Chinese novel *Journey to the West*, players travel alongside Sun Wukong and companions through a 7-stage RPG campaign — defeating bosses with their pronunciation skills while mastering all 5 official PSC exam components.
+XiYouQuest transforms Putonghua Proficiency Test (PSC / 普通话水平测试) preparation into a gamified, AI-driven adventure. Inspired by the classic Chinese novel *Journey to the West*, players travel alongside Sun Wukong and companions through a 7-stage RPG campaign while practicing a formal five-component PSC-format mock (C1–C5) and two XiYouQuest supplementary drills (C6–C7).
 
 Every practice session flows through a multi-service pipeline:
 
@@ -85,15 +85,15 @@ Record -> WAV Encode -> iFlytek ISE -> XML Parse -> Gemini Feedback -> XP Award 
 
 | Feature | Description |
 |---------|-------------|
-| **7 Practice Components** | All 5 official PSC components + 2 supplementary drills (Cantonese mistakes, polyphonic characters) |
+| **7 Practice Components** | Five PSC-format mock components (C1–C5) plus two XiYouQuest supplementary drills (C6–C7) |
 | **Main Quest RPG** | 7-stage Journey to the West campaign with turn-based pronunciation battles against mythical bosses |
 | **Companion Chat** | Voice-driven conversations with AI companions — real-time pronunciation scoring, image generation, and scenario-based dialogue |
-| **Personalized Learning Path** | AI-generated adaptive curriculum with multi-phase study plans, checkpoint assessments, and predicted PSC grade tracking |
+| **Personalized Learning Path** | AI-generated adaptive curriculum with multi-phase study plans, checkpoint assessments, and formative progress tracking |
 | **Real-time Speech Scoring** | Phone-level accuracy, tone analysis, fluency metrics via iFlytek Intelligent Speech Evaluation |
 | **AI Companions** | 4 Journey to the West characters with unique personalities, expressions, voice lines, and conversation styles |
 | **AI Feedback** | Character-personalized, context-aware study tips powered by DeepSeek V4 Flash via OpenRouter |
 | **AI Image Generation** | Context-aware pixel-art scene images auto-generated every 3 chat turns via Gemini 2.5 Flash Image |
-| **Full Mock Exam** | Timed 5-component simulation with official PSC grade mapping (一级甲等 to 三级乙等) and AI feedback reports |
+| **Full Mock Exam** | Timed five-component PSC-format practice simulation (C1–C5; 10/20/10/30/30 points) with XiYouQuest formative feedback |
 | **TTS Playback** | Native Putonghua model audio for every word, sentence, and passage via iFlytek TTS |
 | **Practice History** | Detailed session history with score trends, radar charts, component breakdowns, and AI-generated insights |
 | **40 Achievements** | 4-tier achievement system (Common/Uncommon/Rare/Epic) with toast notifications and friend activity feed |
@@ -182,7 +182,7 @@ Same architecture as C1 with key differences:
 | XML Parsing | Per-syllable scores | `<word total_score>` with syllable breakdown |
 | Tone Analysis | Single tone per character | Multi-tone per word (weighted average) |
 
-### C3: Vocabulary & Grammar Judgment (选择判断)
+### C3: Selection & Judgment (选择判断)
 
 Multiple-choice quiz testing vocabulary accuracy and grammatical judgment — no audio recording.
 
@@ -192,7 +192,7 @@ Multiple-choice quiz testing vocabulary accuracy and grammatical judgment — no
 | **measure-word** (量词搭配) | Choose the correct measure word | 一___书 -> 本/个/条/只 |
 | **sentence-order** (语序判断) | Select the grammatically correct sentence | Reordered sentence options |
 
-5 questions per type = 15 total. Answer positions randomized via `useMemo`. Correct -> 10 XP + static explanation. Wrong -> 2 XP + AI-generated explanation.
+10 word-choice questions, 10 measure-word questions, and 5 sentence-order questions form the 25-question formal mock section. Answer positions are randomized via `useMemo`. Correct -> 10 XP + static explanation. Wrong -> 2 XP + AI-generated explanation.
 
 ### C4: Passage Reading (朗读短文)
 
@@ -219,14 +219,14 @@ Step 2: Parallel Assessment (Promise.all)
   +-- ISE Pronunciation (read_chapter, auto-chunked if >90s)
   +-- Gemini Content Analysis (vocabularyLevel, fluencyLevel, contentRelevance)
 
-Step 3: calculateC5Score() - Official PSC rubric (30 pts -> normalized 0-100)
+Step 3: calculateC5Score() - XiYouQuest formative practice rubric (30 internal pts -> normalized 0-100)
   +-- Pronunciation (20 pts): error count + dialect detection
   +-- Vocabulary/Grammar (5 pts): Gemini level 1-3
   +-- Fluency (5 pts): 3-tier ISE/Gemini fallback
   +-- Time penalty: -1/sec under 3 minutes
 ```
 
-### C6: Cantonese Mistakes Drill (易错字词练习)
+### Supplementary C6: Cantonese Mistakes Drill (易错字词练习)
 
 Supplementary pronunciation drill for common Cantonese-speaker errors:
 
@@ -238,35 +238,23 @@ Supplementary pronunciation drill for common Cantonese-speaker errors:
 
 2 groups x 5 words x 3 categories = 30 words across 6 rounds. Uses ISE `read_word` category.
 
-### C7: Polyphonic Characters Quiz (多音字练习)
+### Supplementary C7: Polyphonic Characters Quiz (多音字练习)
 
 Supplementary MCQ testing polyphonic characters (多音字) — characters with multiple valid pronunciations. Reuses C3 `QuizSession`. Questions show sentences with the target character **highlighted**; options are pinyin readings. 15 questions per session.
 
-### Mock Exam: Full PSC Simulation
+### Mock Exam: PSC-format XiYouQuest Practice
 
-Timed, sequential assessment of all 5 official components with AI-generated feedback reports:
+Timed, sequential practice of the five current PSC-format components with XiYouQuest formative feedback:
 
 | Component | Time Limit | Weight | Method |
 |-----------|-----------|--------|--------|
-| C1 Monosyllabic | 3:30 | 10% | ISE `read_syllable` |
-| C2 Multisyllabic | 2:30 | 20% | ISE `read_word` |
-| C3 Judgment | 3:00 | 10% | Local quiz scoring |
-| C4 Passage | 4:00 | 30% | ISE `read_chapter` |
-| C5 Speaking | 3:00 | 30% | 3-step C5 pipeline |
+| C1 Monosyllabic | 3:30 | 10 pts | ISE `read_syllable` |
+| C2 Multisyllabic | 2:30 | 20 pts | ISE `read_word` |
+| C3 Selection & Judgment | 3:00 | 10 pts | 10 word-choice, 10 measure-word, 5 sentence-order questions |
+| C4 Passage Reading | 4:00 | 30 pts | ISE `read_chapter`; only a verified school-provided public-use source is eligible |
+| C5 Prompted Speaking | 3:00 | 30 pts | XiYouQuest formative speaking-practice pipeline |
 
-Results are persisted to `mock_exam_results` with component-level score breakdowns. An AI feedback report analyzes performance, identifies weak components, and suggests targeted drills.
-
-**PSC Grade Mapping:**
-
-| Score | Grade | Chinese |
-|-------|-------|---------|
-| 97+ | First Class, Grade A | 一级甲等 |
-| 92-96 | First Class, Grade B | 一级乙等 |
-| 87-91 | Second Class, Grade A | 二级甲等 |
-| 80-86 | Second Class, Grade B | 二级乙等 |
-| 70-79 | Third Class, Grade A | 三级甲等 |
-| 60-69 | Third Class, Grade B | 三级乙等 |
-| <60 | Below Standard | 不达标 |
+Results are persisted to `mock_exam_results` with component-level score breakdowns. An AI feedback report identifies practice priorities and suggests targeted drills. Every automated result is XiYouQuest formative feedback, never an official PSC grade, certification result, pass/fail decision, or prediction.
 
 ---
 
@@ -361,13 +349,13 @@ An AI-powered adaptive curriculum that assesses proficiency, generates a multi-p
 ### Pipeline
 
 ```
-Initial Assessment (C1-C5 quick quizzes)
+Initial XiYouQuest diagnostic (available practice components)
   -> AI Curriculum Generation (edge function)
      -> Multi-phase plan with learning nodes (drills + mock exams)
         -> Node completion (practice specific focus areas)
            -> Mid-checkpoint assessment + LLM feedback
               -> Phase progression
-                 -> Final report with predicted PSC grade
+                 -> Final formative XiYouQuest progress review
 ```
 
 ### Key Features
@@ -375,7 +363,7 @@ Initial Assessment (C1-C5 quick quizzes)
 - **AI-generated curriculum** — DeepSeek V4 Flash analyzes initial scores and creates a personalized multi-phase plan
 - **Learning nodes** — drill and mock_exam type nodes targeting specific components and focus areas
 - **Checkpoint assessments** — mid-plan quizzes with score delta tracking and AI-written progress feedback
-- **Predicted grade trajectory** — shows expected PSC grade at each checkpoint
+- **Formative progress trajectory** — shows XiYouQuest progress at each checkpoint; it is not an official PSC result or prediction
 - **Seeded question banks** — fallback character banks (100 monosyllabic, 50 multisyllabic) if DB questions unavailable
 
 ### Achievements
@@ -503,7 +491,7 @@ Input:
 
 ### C5 Content Analysis
 
-For prompted speaking, Gemini returns structured JSON with `vocabularyLevel` (1-3), `fluencyLevel` (1-3), `contentRelevance`, and detailed notes — feeding directly into the official PSC C5 scoring formula.
+For prompted speaking, Gemini returns structured JSON with `vocabularyLevel` (1-3), `fluencyLevel` (1-3), `contentRelevance`, and detailed notes — feeding the XiYouQuest formative speaking-practice rubric.
 
 ### AI Insights
 
@@ -910,7 +898,7 @@ src/
 |   +-- chat/                             # Companion chat prompt building, helpers
 |   +-- achievements/                     # 40 achievement definitions + event-driven checks
 |   +-- gamification/                     # XP, levels, streaks, affection calculations
-|   +-- scoring/                          # C5 official PSC scoring rubric
+|   +-- scoring/                          # XiYouQuest prompted-speaking practice rubric
 |   +-- edge-routing.ts                   # Dynamic edge function URL resolution
 |   +-- *.ts                              # Pinyin, audio utils, character images, env, validation
 +-- types/                                # TypeScript interfaces (database, character, practice, gamification)
@@ -945,7 +933,7 @@ public/img/                               # Sprites, backgrounds, boss art
 | Method | Endpoint | Input | Output |
 |--------|----------|-------|--------|
 | POST | `/api/speech/assess` | FormData: `audio`, `referenceText`, `category` | Per-word scores + aggregates |
-| POST | `/api/speech/c5-assess` | FormData: `audio`, `topic`, `spokenDurationSeconds` | C5 score breakdown (pronunciation, vocab, fluency, time) |
+| POST | `/api/speech/c5-assess` | FormData: canonical PCM WAV `audio`, `topic` | Prompted-speaking practice breakdown; the server derives duration from the WAV payload |
 | POST | `/api/tts/speak` | JSON: `{ voiceId, text }` | `audio/wav` (LRU cached) |
 | POST | `/api/tts/companion` | JSON: `{ voiceId, text }` | `audio/wav` |
 

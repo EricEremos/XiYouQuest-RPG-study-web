@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import type { StageNumber } from "@/lib/quest/types";
 import { STAGE_STORIES } from "@/lib/quest/story-text";
@@ -23,18 +23,6 @@ export function StoryScreen({ stage, onContinue, onBack }: StoryScreenProps) {
     if (allShown) return;
     setVisibleParagraphs((prev) => Math.min(prev + 1, story.intro.length));
   }, [allShown, story.intro.length]);
-
-  // Keyboard to advance paragraphs
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Tab" || e.key === "Shift") return;
-      if (allShown) return;
-      advance();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [allShown, advance]);
 
   return (
     <div
@@ -73,8 +61,12 @@ export function StoryScreen({ stage, onContinue, onBack }: StoryScreenProps) {
           </p>
         </div>
 
-        {/* Story paragraphs */}
-        <div className="space-y-4 w-full max-h-[60vh] sm:max-h-[50vh] overflow-y-auto px-1">
+        {/* Story paragraphs. aria-live announces each newly revealed
+            paragraph to screen readers as the reader advances. */}
+        <div
+          aria-live="polite"
+          className="space-y-4 w-full max-h-[60vh] sm:max-h-[50vh] overflow-y-auto px-1"
+        >
           {story.intro.slice(0, visibleParagraphs).map((text, i) => (
             <p
               key={i}
@@ -96,14 +88,23 @@ export function StoryScreen({ stage, onContinue, onBack }: StoryScreenProps) {
               }}
               size="lg"
               className="font-pixel text-sm"
+              autoFocus
             >
               Enter Battle 进入战斗
             </Button>
           </div>
         ) : (
-          <p className="font-retro text-sm text-amber-300/60 animate-blink mt-2">
+          <button
+            type="button"
+            autoFocus
+            onClick={(e) => {
+              e.stopPropagation();
+              advance();
+            }}
+            className="font-retro text-sm text-amber-300/60 animate-blink mt-2 p-2 min-h-[44px] cursor-pointer hover:text-amber-300 focus-visible:text-amber-300 focus-visible:outline-2 focus-visible:outline-amber-300 focus-visible:outline-offset-2"
+          >
             Tap to continue...
-          </p>
+          </button>
         )}
       </div>
     </div>

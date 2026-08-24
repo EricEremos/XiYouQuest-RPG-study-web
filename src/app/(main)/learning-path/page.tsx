@@ -4,6 +4,9 @@ import { shuffle } from "@/lib/utils";
 import type { QuizQuestion } from "@/types/practice";
 import type { LearningPlan, LearningNode, LearningCheckpoint } from "@/types/database";
 import LearningPathClient from "./learning-path-client";
+import { withConfiguredAcceptedAnswers } from "@/lib/quiz-answers";
+import { scopeOfficialReadingPassage } from "@/lib/psc/reading-scope";
+import { OFFICIAL_PSC_SPEAKING_TOPICS } from "@/lib/psc/official-speaking-topics";
 
 // Fallbacks if DB has no questions (100 monosyllabic characters for C1)
 const FALLBACK_CHARACTERS = [
@@ -43,7 +46,6 @@ export default async function LearningPathPage() {
     { data: c2Questions },
     { data: c3Questions },
     { data: c4Passages },
-    { data: c5Topics },
   ] = await Promise.all([
     loadSelectedCharacter(supabase, userId),
     supabase
@@ -74,11 +76,6 @@ export default async function LearningPathPage() {
       .select("id, content, metadata")
       .eq("component", 4)
       .limit(50),
-    supabase
-      .from("question_banks")
-      .select("content")
-      .eq("component", 5)
-      .limit(150),
   ]);
 
   // C1: shuffle and pick 10 characters (30% of mock exam's 100)
@@ -96,14 +93,16 @@ export default async function LearningPathPage() {
   if (c3Questions && c3Questions.length > 0) {
     const allParsed = c3Questions
       .filter((row: { metadata: unknown }) => row.metadata && typeof row.metadata === "object")
-      .map((row: { id: string; content: string; metadata: { type: string; options: string[]; correctIndex: number; explanation: string } }) => ({
+      .map((row: { id: string; content: string; metadata: { type: string; options: string[]; correctIndex: number; explanation: string; acceptedAnswers?: string[] } }) => ({
         id: row.id,
         type: row.metadata.type as QuizQuestion["type"],
         prompt: row.content,
         options: row.metadata.options,
         correctIndex: row.metadata.correctIndex,
         explanation: row.metadata.explanation,
-      }));
+        acceptedAnswers: row.metadata.acceptedAnswers,
+      }))
+      .map(withConfiguredAcceptedAnswers);
     const wc = shuffle(allParsed.filter(q => q.type === "word-choice")).slice(0, 3);
     const mw = shuffle(allParsed.filter(q => q.type === "measure-word")).slice(0, 3);
     const so = shuffle(allParsed.filter(q => q.type === "sentence-order")).slice(0, 2);
@@ -114,14 +113,12 @@ export default async function LearningPathPage() {
   let assessmentPassage: { id: string; title: string; content: string } | undefined;
   if (c4Passages && c4Passages.length > 0) {
     const picked = shuffle(c4Passages)[0] as { id: string; content: string; metadata: { title: string } };
-    assessmentPassage = { id: picked.id, title: picked.metadata.title ?? "Untitled", content: picked.content };
+    const scope = scopeOfficialReadingPassage(picked.content);
+    assessmentPassage = { id: picked.id, title: picked.metadata.title ?? "Untitled", content: scope.text };
   }
 
   // C5: Pick 6 random topics
-  let assessmentTopics: string[] | undefined;
-  if (c5Topics && c5Topics.length > 0) {
-    assessmentTopics = shuffle(c5Topics.map((q: { content: string }) => q.content)).slice(0, 6);
-  }
+  const assessmentTopics = shuffle([...OFFICIAL_PSC_SPEAKING_TOPICS]).slice(0, 6);
 
   // If there's an active plan, fetch its nodes and checkpoints in parallel
   let nodes: LearningNode[] = [];

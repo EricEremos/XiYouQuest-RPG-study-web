@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
-import { transcribeAudio } from "@/lib/iflytek-speech/asr-client";
+import {
+  COMPANION_MAX_PCM_BYTES,
+  isCompanionAudioWithinLimit,
+  transcribeAudio,
+} from "@/lib/iflytek-speech/asr-client";
 import { assessPronunciation } from "@/lib/iflytek-speech/client";
 import { chatConversation, type ChatTurnMessage } from "@/lib/gemini/client";
 import { buildChatSystemPrompt } from "@/lib/chat/build-system-prompt";
 import { isValidUUID } from "@/lib/validations";
 import { getAffectionLevel } from "@/lib/gamification/xp";
+import { XP_VALUES } from "@/types/gamification";
 
 const AFFECTION_PER_TURN = 3;
 
@@ -28,9 +33,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing sessionId or audio" }, { status: 400 });
     }
 
-    // Validate file size (10MB max for chat messages)
-    if (audio.size > 10 * 1024 * 1024) {
-      return NextResponse.json({ error: "Audio too large (max 10MB)" }, { status: 400 });
+    if (audio.size > COMPANION_MAX_PCM_BYTES + 44) {
+      return NextResponse.json({ error: "Audio exceeds the 60-second Companion limit" }, { status: 400 });
     }
 
     // Verify session belongs to user
@@ -62,6 +66,9 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await audio.arrayBuffer());
+    if (!isCompanionAudioWithinLimit(buffer)) {
+      return NextResponse.json({ error: "Audio must contain no more than 60 seconds of speech" }, { status: 400 });
+    }
 
     // Step 1: ASR transcription
     console.log("[Chat] Step 1: Transcribing audio...");
@@ -173,12 +180,20 @@ export async function POST(request: NextRequest) {
     if (overallScore >= 90) xpEarned = 10; // perfect
     else if (overallScore >= 60) xpEarned = 5; // good
 
-    // Award XP to profile atomically via RPC (prevents race conditions)
-    await supabase.rpc("update_profile_with_streak", {
+    // Award per-turn XP atomically via RPC. The daily bonus base rides along
+    // because the first activity of a user's day can be a chat turn; the
+    // function's same-day branch guarantees the bonus is granted at most once
+    // per day. (The previous p_xp/p_streak arguments did not match the
+    // function signature, so per-turn XP was silently never awarded.)
+    const { error: xpError } = await supabase.rpc("update_profile_with_streak", {
       p_user_id: user.id,
-      p_xp: xpEarned,
-      p_streak: 0,
+      p_today: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Hong_Kong" }),
+      p_xp_to_add: xpEarned,
+      p_daily_bonus_base: XP_VALUES.daily_login,
     });
+    if (xpError) {
+      console.error("[chat/respond] XP award failed:", xpError);
+    }
 
     // Award affection atomically via raw SQL increment
     const { data: userChar } = await supabase

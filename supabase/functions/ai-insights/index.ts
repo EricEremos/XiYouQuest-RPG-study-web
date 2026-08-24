@@ -3,7 +3,6 @@ import {
   jsonResponse,
   errorResponse,
 } from "../_shared/cors.ts";
-import { createSupabaseClient } from "../_shared/supabase.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
 import { quickCompletion } from "../_shared/ai-client.ts";
 import { aiInsightsSchema } from "../_shared/validations.ts";
@@ -11,7 +10,6 @@ import { aiInsightsSchema } from "../_shared/validations.ts";
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return corsResponse();
 
-  const supabase = createSupabaseClient(req);
   const user = await verifyUser(req);
   if (!user) return errorResponse("Unauthorized", 401);
 
@@ -31,13 +29,13 @@ PERFORMANCE OVERVIEW
 2-3 sentences. Hit rates, trends, which components are untouched. Actual percentages.
 
 DIAGNOSIS
-2-3 sentences. Root causes behind weak areas. Cross-reference patterns. PSC grade impact (C4+C5 = 60% of score).
+2-3 sentences. Root causes behind weak areas. Cross-reference patterns. Explain XiYouQuest practice-score weighting without predicting an official PSC outcome.
 
 RECOMMENDED STRATEGY
 2-3 sentences. Prioritized action plan with specific drills and sub-skills to target.
 
-Rules: English only. No emojis. No bullet points. Keep it tight — every sentence must add value. Reference C1-C7 by full name. Use actual numbers.
-C1=Monosyllabic Characters C2=Multisyllabic Words C3=Vocabulary & Grammar C4=Passage Reading C5=Prompted Speaking C6=Cantonese Mistakes C7=Polyphonic Characters`;
+Rules: English only. No emojis. No bullet points. Keep it tight â€” every sentence must add value. Reference C1-C7 by full name. Use actual numbers. This is XiYouQuest practice feedback only: never claim, predict, or imply an official PSC result, grade, certification, eligibility, or policy decision.
+C1=Monosyllabic Characters C2=Multisyllabic Words C3=Selection & Judgment C4=Passage Reading C5=Prompted Speaking C6=Supplementary Cantonese Mistakes C7=Supplementary Polyphonic Characters`;
 
     const dataStr = JSON.stringify({
       progress,
@@ -59,7 +57,7 @@ C1=Monosyllabic Characters C2=Multisyllabic Words C3=Vocabulary & Grammar C4=Pas
     );
     return jsonResponse({
       insights:
-        "• Keep practicing your weakest components regularly.\n• Focus on C1 and C2 pronunciation drills for the biggest score impact.\n• Try completing at least one practice session per day to build consistency.",
+        "â€¢ Keep practicing your weakest components regularly.\nâ€¢ Focus on C1 and C2 pronunciation drills for the biggest score impact.\nâ€¢ Try completing at least one practice session per day to build consistency.",
     });
   }
 });

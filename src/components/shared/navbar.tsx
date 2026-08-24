@@ -86,12 +86,12 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
         {/* Left: Back + Logo */}
         <div className="flex items-center gap-2 sm:gap-3">
           {showBackToHub && (
-            <Link href={backHref}>
-              <Button variant="ghost" size="sm" className="gap-1.5">
+            <Button asChild variant="ghost" size="sm" className="gap-1.5">
+              <Link href={backHref}>
                 <ArrowLeft className="h-4 w-4" />
                 <span className="hidden sm:inline">{backLabel}</span>
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           )}
           <Link
             href="/dashboard"
@@ -107,51 +107,60 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
           </Link>
         </div>
 
-        {/* Center: Desktop nav links */}
-        <div className="hidden md:flex items-center gap-1.5">
+        {/* Center: Desktop nav links. One anchor per destination (Button with
+            asChild renders the Link itself), so keyboard users get exactly one
+            focus stop and no button-inside-link nesting. The full-width nav
+            needs ~1300px including the profile cluster, so it only appears at
+            xl and above; below that the drawer covers every destination. */}
+        <div className="hidden xl:flex items-center gap-1 2xl:gap-1.5">
           {NAV_LINKS.map((link) => {
             const isActive = pathname === link.href;
             return (
-              <Link key={link.href} href={link.href}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`gap-2 font-pixel text-sm px-3 py-2 transition-colors ${
-                    isActive
-                      ? "text-primary bg-primary/15 pixel-border"
-                      : "text-foreground/80 hover:text-primary hover:bg-primary/10"
-                  }`}
+              <Button
+                key={link.href}
+                asChild
+                variant="ghost"
+                size="sm"
+                className={`gap-1.5 font-pixel text-sm px-2 2xl:px-3 py-2 transition-colors ${
+                  isActive
+                    ? "text-primary bg-primary/15 pixel-border"
+                    : "text-foreground/80 hover:text-primary hover:bg-primary/10"
+                }`}
+              >
+                <Link
+                  href={link.href}
+                  aria-current={isActive ? "page" : undefined}
                 >
                   <link.icon className="h-4 w-4" />
                   {link.label}
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             );
           })}
         </div>
 
-        {/* Right: XP + Hamburger (mobile) + Profile */}
-        <div className="flex items-center gap-1.5 sm:gap-2 md:gap-4">
+        {/* Right: XP + Hamburger (below xl) + Profile */}
+        <div className="flex items-center gap-1.5 sm:gap-2 2xl:gap-4">
           <XPBar totalXP={totalXP} />
 
-          {/* Mobile hamburger */}
+          {/* Hamburger for every width where the desktop nav is hidden */}
           <Button
             variant="ghost"
             size="sm"
-            className="md:hidden p-1.5"
+            className="xl:hidden p-1.5"
             onClick={() => setMobileMenuOpen(true)}
             aria-label="Open navigation menu"
           >
             <Menu className="h-5 w-5" />
           </Button>
 
-          {/* Desktop profile dropdown — hidden on mobile */}
+          {/* Desktop profile dropdown, hidden while the drawer is in use */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="hidden md:flex items-center gap-1.5"
+                className="hidden xl:flex items-center gap-1.5"
               >
                 {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -165,7 +174,11 @@ export function Navbar({ totalXP, displayName, avatarUrl, pendingRequestCount }:
                 ) : (
                   <User className="h-4 w-4" />
                 )}
-                <span>{displayName || "Profile"}</span>
+                {/* Cap long display names so the header cannot overflow at
+                    the xl breakpoint. */}
+                <span className="max-w-[9rem] truncate">
+                  {displayName || "Profile"}
+                </span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[10rem] p-2">

@@ -36,7 +36,12 @@ export function LoginForm() {
   return (
     <div className="w-full max-w-md pixel-border chinese-corner bg-card p-6 space-y-6">
       <div className="text-center space-y-2">
-        <h2 className="font-pixel text-base text-primary pixel-glow">Continue</h2>
+        {/* No pixel-glow here: the red text-shadow behind red text drops the
+            measured contrast below WCAG AA. */}
+        <h1 className="font-pixel text-base text-primary">
+          Continue
+          <span className="sr-only">: sign in to XiYouQuest</span>
+        </h1>
         <p className="text-muted-foreground">
           Sign in with your HKUST account to begin.
         </p>
@@ -49,7 +54,20 @@ export function LoginForm() {
         </div>
       )}
 
+      <noscript>
+        {/* Without JavaScript the OAuth flow cannot start; hide the button so
+            it does not look actionable and explain the requirement. */}
+        <style>{`#hkust-signin-button { display: none; }`}</style>
+        <div className="flex items-start gap-2 border-2 border-destructive bg-destructive/10 p-3">
+          <p className="text-sm text-destructive">
+            JavaScript is required to sign in. Please enable JavaScript in your
+            browser and reload this page.
+          </p>
+        </div>
+      </noscript>
+
       <Button
+        id="hkust-signin-button"
         type="button"
         className="w-full"
         onClick={handleHkustSignIn}

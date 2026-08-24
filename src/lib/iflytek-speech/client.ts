@@ -449,7 +449,7 @@ const NON_ERHUA_PREFIXES = new Set([
  * Keeps 儿 when it's a full syllable: word-initial (儿子, 儿童) or in known
  * non-erhua words (女儿, 婴儿, etc.).
  */
-function normalizeErhua(text: string): string {
+export function normalizeErhua(text: string): string {
   return text.replace(
     /([\u4e00-\u9fff])儿/g,
     (match, precedingChar: string) => {

@@ -130,8 +130,9 @@ export const STAGE_QUESTIONS: Record<StageNumber, StageQuestions> = {
       },
       {
         prompt: "下面哪个说法是普通话正确说法？",
-        options: ["你听得懂不懂？", "你听不听得懂？", "你听得吗？"],
+        options: ["你听得懂不懂？", "你听不听得懂？", "你能听懂吗？"],
         correctIndex: 1,
+        acceptedAnswers: ["你听不听得懂？", "你能听懂吗？"],
       },
       {
         prompt: "下面哪个说法是普通话正确说法？",
@@ -217,6 +218,7 @@ export const STAGE_QUESTIONS: Record<StageNumber, StageQuestions> = {
         prompt: "一（ ）狗",
         options: ["条", "只", "头", "个", "匹"],
         correctIndex: 0,
+        acceptedAnswers: ["条", "只"],
       },
       {
         prompt: "一（ ）花",

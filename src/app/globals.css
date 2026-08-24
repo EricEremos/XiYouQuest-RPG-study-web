@@ -67,7 +67,9 @@
   --secondary: #F5E6CC;
   --secondary-foreground: #1C1917;
   --muted: #F5E6CC;
-  --muted-foreground: #78716C;
+  /* #57534E measures >= 4.5:1 on card (#FFF1D6), background (#FFF8E7), and
+     muted (#F5E6CC) surfaces; the previous #78716C was 4.29:1 (WCAG AA fail). */
+  --muted-foreground: #57534E;
   --accent: #C9A96E;
   --accent-foreground: #1C1917;
   --destructive: #DC2626;

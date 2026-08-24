@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CharacterDisplay } from "@/components/character/character-display";
@@ -10,13 +10,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { calculateXP } from "@/lib/gamification/xp";
-import { randomizeAnswerPositions } from "@/lib/utils";
 import { fetchWithRetry } from "@/lib/fetch-retry";
 import { useAchievementToast } from "@/components/shared/achievement-toast";
 import { useBGM } from "@/components/shared/bgm-provider";
 import type { ExpressionName } from "@/types/character";
 import type { QuizQuestion, QuestionResult, ComponentNumber } from "@/types/practice";
 import { getDialogue } from "@/lib/dialogue";
+import { getAcceptedOptionIndices, isAcceptedQuizAnswer } from "@/lib/quiz-answers";
 
 interface QuizSessionProps {
   questions: QuizQuestion[];
@@ -37,10 +37,11 @@ export function QuizSession({ questions, character, characterId, component, lpNo
   const router = useRouter();
   const { showAchievementToasts } = useAchievementToast();
   const { setLearningActive } = useBGM();
-  // Randomize answer positions on client side
-  const randomizedQuestions = useMemo(() => {
-    return questions.map(randomizeAnswerPositions);
-  }, [questions]);
+  // Answer positions are randomized ONCE on the server (see the page
+  // components). Re-randomizing here ran during both SSR and hydration with
+  // different Math.random() results, producing React error 418 (server/client
+  // text mismatch) on every fresh load.
+  const randomizedQuestions = questions;
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [phase, setPhase] = useState<SessionPhase>("answering");
@@ -136,7 +137,7 @@ export function QuizSession({ questions, character, characterId, component, lpNo
     setSelectedAnswer(answerIndex);
     setPhase("result");
 
-    const isCorrect = answerIndex === currentQuestion.correctIndex;
+    const isCorrect = isAcceptedQuizAnswer(currentQuestion, answerIndex);
 
     // Calculate XP
     const newStreak = isCorrect ? streak + 1 : 0;
@@ -269,11 +270,11 @@ export function QuizSession({ questions, character, characterId, component, lpNo
       return "border-2 border-border hover:border-primary hover:bg-accent/50 transition-all hover:shadow-sm";
     }
 
-    if (index === currentQuestion.correctIndex) {
+    if (getAcceptedOptionIndices(currentQuestion).includes(index)) {
       return "border-2 border-green-500 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 animate-in fade-in duration-300";
     }
 
-    if (index === selectedAnswer && index !== currentQuestion.correctIndex) {
+    if (index === selectedAnswer) {
       return "border-2 border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300";
     }
 
@@ -487,12 +488,12 @@ export function QuizSession({ questions, character, characterId, component, lpNo
                     </div>
 
                     {/* Show correct/incorrect indicators */}
-                    {phase === "result" && index === currentQuestion.correctIndex && (
+                    {phase === "result" && getAcceptedOptionIndices(currentQuestion).includes(index) && (
                       <span className="mt-2 block text-sm font-medium text-green-600">
                         Correct answer
                       </span>
                     )}
-                    {phase === "result" && index === selectedAnswer && index !== currentQuestion.correctIndex && (
+                    {phase === "result" && index === selectedAnswer && !getAcceptedOptionIndices(currentQuestion).includes(index) && (
                       <span className="mt-2 block text-sm font-medium text-red-600">
                         Your answer
                       </span>

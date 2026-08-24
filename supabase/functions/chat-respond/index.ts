@@ -3,9 +3,13 @@ import {
   jsonResponse,
   errorResponse,
 } from "../_shared/cors.ts";
-import { createSupabaseClient } from "../_shared/supabase.ts";
+import { createRequestClient } from "../_shared/supabase.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
 import { transcribeAudio } from "../_shared/iflytek-asr.ts";
+import {
+  COMPANION_MAX_PCM_BYTES,
+  isCompanionAudioWithinLimit,
+} from "../_shared/iflytek-asr-frames.ts";
 import { assessPronunciation } from "../_shared/iflytek-ise.ts";
 import {
   chatConversation,
@@ -47,9 +51,9 @@ function getAffectionLevel(
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return corsResponse();
 
-  const supabase = createSupabaseClient(req);
   const user = await verifyUser(req);
   if (!user) return errorResponse("Unauthorized", 401);
+  const supabase = createRequestClient(user);
 
   try {
     const formData = await req.formData();
@@ -61,9 +65,11 @@ Deno.serve(async (req: Request) => {
       return errorResponse("Missing sessionId or audio", 400);
     }
 
-    // Validate file size (10MB max)
-    if (audio.size > 10 * 1024 * 1024) {
-      return errorResponse("Audio too large (max 10MB)", 400);
+    if (audio.size > COMPANION_MAX_PCM_BYTES + 44) {
+      return errorResponse(
+        "Audio exceeds the 60-second Companion limit",
+        400,
+      );
     }
 
     // Verify session belongs to user
@@ -107,6 +113,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const audioData = new Uint8Array(await audio.arrayBuffer());
+    if (!isCompanionAudioWithinLimit(audioData)) {
+      return errorResponse(
+        "Audio must contain no more than 60 seconds of speech",
+        400,
+      );
+    }
 
     // Step 1: ASR transcription
     console.log("[chat-respond] Step 1: Transcribing audio...");
@@ -232,12 +244,21 @@ Deno.serve(async (req: Request) => {
     if (overallScore >= 90) xpEarned = 10;
     else if (overallScore >= 60) xpEarned = 5;
 
-    // Award XP atomically via RPC
-    await supabase.rpc("update_profile_with_streak", {
+    // Award per-turn XP atomically via RPC. The daily bonus base (25, mirrors
+    // XP_VALUES.daily_login in src/types/gamification.ts) rides along because
+    // the first activity of a user's day can be a chat turn; the function's
+    // same-day branch guarantees the bonus is granted at most once per day.
+    // (The previous p_xp/p_streak arguments did not match the function
+    // signature, so per-turn XP was silently never awarded.)
+    const { error: xpError } = await supabase.rpc("update_profile_with_streak", {
       p_user_id: user.id,
-      p_xp: xpEarned,
-      p_streak: 0,
+      p_today: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Hong_Kong" }),
+      p_xp_to_add: xpEarned,
+      p_daily_bonus_base: 25,
     });
+    if (xpError) {
+      console.error("[chat-respond] XP award failed:", xpError);
+    }
 
     // Award affection
     const { data: userChar } = await supabase

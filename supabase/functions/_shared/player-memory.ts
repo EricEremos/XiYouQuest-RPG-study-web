@@ -12,11 +12,11 @@ const AFFECTION_LEVEL_NAMES: Record<number, string> = {
 const COMPONENT_NAMES: Record<number, string> = {
   1: "C1 (Monosyllabic)",
   2: "C2 (Multisyllabic)",
-  3: "C3 (Vocabulary & Grammar)",
+  3: "C3 (Selection & Judgment)",
   4: "C4 (Passage Reading)",
   5: "C5 (Prompted Speaking)",
-  6: "C6 (Cantonese Mistakes)",
-  7: "C7 (Polyphonic)",
+  6: "Supplementary C6 (Cantonese Mistakes)",
+  7: "Supplementary C7 (Polyphonic Characters)",
 };
 
 /**

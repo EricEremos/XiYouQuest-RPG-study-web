@@ -1,5 +1,4 @@
 import { createClient, getSessionUser } from "@/lib/supabase/server";
-import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -10,6 +9,9 @@ import { Lock, Heart, Sparkles, Swords } from "lucide-react";
 import { STAGE_CONFIGS } from "@/lib/quest/stage-config";
 
 import { CHARACTER_IMAGES } from "@/lib/character-images";
+import { CharacterPortrait } from "./character-portrait";
+import { PageLoadMetric } from "@/components/shared/page-load-metric";
+import { measureServerQuery } from "@/lib/server/load-metrics";
 
 export default async function CharactersPage() {
   const supabase = await createClient();
@@ -18,21 +20,56 @@ export default async function CharactersPage() {
   const userId = user!.id;
 
   // Fetch all data in parallel
-  const [{ data: characters }, { data: userCharacters }, , { data: questProgress }] =
+  const [charactersQuery, userCharactersQuery, profileQuery, questProgressQuery] =
     await Promise.all([
-      supabase
-        .from("characters")
-        .select(`
-          *,
-          character_expressions (*),
-          character_skins (*)
-        `)
-        .order("is_default", { ascending: false })
-        .order("unlock_stage", { ascending: true, nullsFirst: true }),
-      supabase.from("user_characters").select("*").eq("user_id", userId),
-      supabase.from("profiles").select("total_xp").eq("id", userId).single(),
-      supabase.from("quest_progress").select("stage, is_cleared").eq("user_id", userId),
+      measureServerQuery(
+        "Characters.catalog",
+        supabase
+          .from("characters")
+          .select(`
+            *,
+            character_expressions (*),
+            character_skins (*)
+          `)
+          .order("is_default", { ascending: false })
+          .order("unlock_stage", { ascending: true, nullsFirst: true })
+      ),
+      measureServerQuery(
+        "Characters.user_characters",
+        supabase.from("user_characters").select("*").eq("user_id", userId)
+      ),
+      measureServerQuery(
+        "Characters.profile",
+        supabase.from("profiles").select("total_xp").eq("id", userId).single()
+      ),
+      measureServerQuery(
+        "Characters.quest_progress",
+        supabase.from("quest_progress").select("stage, is_cleared").eq("user_id", userId)
+      ),
     ]);
+
+  const charactersResult = charactersQuery.result;
+  const userCharactersResult = userCharactersQuery.result;
+  const profileResult = profileQuery.result;
+  const questProgressResult = questProgressQuery.result;
+  const serverDataMs = Math.max(
+    charactersQuery.durationMs,
+    userCharactersQuery.durationMs,
+    profileQuery.durationMs,
+    questProgressQuery.durationMs
+  );
+
+  const firstError = [
+    charactersResult.error,
+    userCharactersResult.error,
+    profileResult.error,
+    questProgressResult.error,
+  ].find(Boolean);
+  if (firstError) throw new Error(`Characters query failed: ${firstError.message}`);
+
+  const characters = charactersResult.data;
+  const userCharacters = userCharactersResult.data;
+  const questProgress = questProgressResult.data;
 
   const clearedStages = new Set(
     (questProgress ?? [])
@@ -50,6 +87,7 @@ export default async function CharactersPage() {
 
   return (
     <div className="space-y-6">
+      <PageLoadMetric name="Characters" serverDataMs={serverDataMs} />
       <div>
         <h1 className="font-pixel text-base text-primary pixel-glow">Characters</h1>
         <p className="text-muted-foreground mt-1">
@@ -135,20 +173,11 @@ export default async function CharactersPage() {
               <CardContent className="space-y-3">
                 {/* Character image */}
                 <div className="relative h-36 sm:h-48 w-full pixel-border bg-muted overflow-hidden">
-                  {(character.image_url || CHARACTER_IMAGES[character.name]) ? (
-                    <Image
-                      src={character.image_url || CHARACTER_IMAGES[character.name]}
-                      alt={character.name}
-                      fill
-                      className={`object-contain transition-all duration-300 ${
-                        !isUnlocked ? "blur-[2px] brightness-50" : ""
-                      }`}
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                      {character.name}
-                    </div>
-                  )}
+                  <CharacterPortrait
+                    src={character.image_url || CHARACTER_IMAGES[character.name]}
+                    name={character.name}
+                    isUnlocked={isUnlocked}
+                  />
 
                   {/* Locked overlay */}
                   {!isUnlocked && (

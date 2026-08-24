@@ -4,7 +4,7 @@ import {
   errorResponse,
 } from "../_shared/cors.ts";
 import {
-  createSupabaseClient,
+  createRequestClient,
   createAdminClient,
 } from "../_shared/supabase.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
@@ -21,9 +21,9 @@ function base64ToUint8Array(base64: string): Uint8Array {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return corsResponse();
 
-  const supabase = createSupabaseClient(req);
   const user = await verifyUser(req);
   if (!user) return errorResponse("Unauthorized", 401);
+  const supabase = createRequestClient(user);
 
   try {
     const body = await req.json();
@@ -31,7 +31,7 @@ Deno.serve(async (req: Request) => {
     if (!parsed.success) {
       return errorResponse("Invalid input", 400);
     }
-    const { sessionId, conversationSummary } = parsed.data;
+    const { sessionId } = parsed.data;
 
     // Verify session belongs to user
     const { data: session } = await supabase
@@ -65,7 +65,6 @@ Deno.serve(async (req: Request) => {
     const imageResult = await generateSceneImage({
       companionName: resolvedCharName,
       scenarioTitle: resolvedScenTitle,
-      conversationSummary,
     });
 
     if (!imageResult) {
@@ -132,8 +131,8 @@ Deno.serve(async (req: Request) => {
     }
 
     return jsonResponse({ imageUrl });
-  } catch (error) {
-    console.error("[chat-generate-image] Error:", error);
+  } catch {
+    console.error("[chat-generate-image] Request failed");
     return errorResponse("Image generation failed", 500);
   }
 });

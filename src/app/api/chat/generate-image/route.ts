@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
-    const { sessionId, conversationSummary } = parsed.data;
+    const { sessionId } = parsed.data;
 
     // Verify session belongs to user
     const { data: session } = await supabase
@@ -46,7 +46,6 @@ export async function POST(request: NextRequest) {
     const imageResult = await generateSceneImage({
       companionName: resolvedCharName,
       scenarioTitle: resolvedScenTitle,
-      conversationSummary,
     });
 
     if (!imageResult) {
@@ -105,8 +104,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ imageUrl });
-  } catch (error) {
-    console.error("[ImageGen] Route error:", error);
+  } catch {
+    console.error("[ImageGen] Route failed");
     return NextResponse.json({ error: "Image generation failed" }, { status: 500 });
   }
 }

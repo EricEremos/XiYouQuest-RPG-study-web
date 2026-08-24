@@ -37,3 +37,14 @@ export function OPENROUTER_API_KEY() {
 export function SUPABASE_SERVICE_ROLE_KEY() {
   return requireEnv("SUPABASE_SERVICE_ROLE_KEY");
 }
+
+// --- Supabase (public project URL + anon key) ---
+// NEXT_PUBLIC_* are build-inlined on the client, but on the server these give a
+// clear fail-fast error instead of the opaque failure a bare `!` assertion
+// produces when a var is missing.
+export function SUPABASE_URL() {
+  return requireEnv("NEXT_PUBLIC_SUPABASE_URL");
+}
+export function SUPABASE_ANON_KEY() {
+  return requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+}

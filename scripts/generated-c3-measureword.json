@@ -16,7 +16,7 @@
   { "prompt": "一（　）路", "options": ["条", "段", "根", "道", "个"], "correctIndex": 0, "explanation": "路用「条」作量词。" },
   { "prompt": "一（　）伞", "options": ["把", "顶", "张", "个", "柄"], "correctIndex": 0, "explanation": "伞用「把」作量词。" },
   { "prompt": "一（　）棍子", "options": ["根", "条", "支", "段", "个"], "correctIndex": 0, "explanation": "棍子用「根」作量词。" },
-  { "prompt": "一（　）狗", "options": ["条", "只", "头", "个", "匹"], "correctIndex": 1, "explanation": "狗用「只」作量词，「条」不用于狗。" },
+  { "prompt": "一（　）狗", "options": ["条", "只", "头", "个", "匹"], "correctIndex": 1, "acceptedAnswers": ["条", "只"], "explanation": "「一条狗」和「一只狗」都可接受。" },
   { "prompt": "一（　）花", "options": ["朵", "枝", "束", "盆", "棵"], "correctIndex": 0, "explanation": "花用「朵」作量词。" },
   { "prompt": "一（　）毛巾", "options": ["条", "块", "张", "个", "方"], "correctIndex": 0, "explanation": "毛巾用「条」作量词。" },
   { "prompt": "一（　）尺子", "options": ["把", "根", "条", "个", "支"], "correctIndex": 0, "explanation": "尺子用「把」作量词。" },
