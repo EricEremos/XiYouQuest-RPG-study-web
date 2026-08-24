@@ -87,6 +87,45 @@ describe("mock exam result persistence", () => {
     },
   );
 
+  it("rejects a totalXp above what the normalized scores can award before it reaches Supabase", async () => {
+    const insert = vi.fn();
+    createClient.mockResolvedValue({ from: vi.fn(() => ({ insert })) });
+    getSessionUser.mockResolvedValue({ id: "verified-user" });
+
+    // Fixture scores derive an XP ceiling of 29 (10 + 5 + 10 + 2 + 2).
+    const response = await POST(request({
+      totalScore: 50,
+      practiceBand: "Mastery",
+      scoreVersion: "psc-2021-v2",
+      componentScores: currentComponentScores,
+      durationSeconds: 600,
+      totalXp: 30,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("persists a totalXp at the derived ceiling", async () => {
+    const single = vi.fn().mockResolvedValue({ data: { id: "saved-result" }, error: null });
+    const select = vi.fn(() => ({ single }));
+    const insert = vi.fn(() => ({ select }));
+    createClient.mockResolvedValue({ from: vi.fn(() => ({ insert })) });
+    getSessionUser.mockResolvedValue({ id: "verified-user" });
+
+    const response = await POST(request({
+      totalScore: 50,
+      practiceBand: "Mastery",
+      scoreVersion: "psc-2021-v2",
+      componentScores: currentComponentScores,
+      durationSeconds: 600,
+      totalXp: 29,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ total_xp: 29 }));
+  });
+
   it("derives persisted points, total, and practice band from the selected PSC contract", async () => {
     const single = vi.fn().mockResolvedValue({ data: { id: "saved-result" }, error: null });
     const select = vi.fn(() => ({ single }));

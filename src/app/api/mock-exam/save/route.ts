@@ -5,6 +5,7 @@ import {
   hasConsistentMockExamTotal,
   normalizeMockExamResult,
 } from "@/lib/psc/mock-exam-contract";
+import { calculateMockExamXpCeiling } from "@/lib/psc/mock-exam-xp";
 import { getXiYouQuestPracticeBand } from "@/lib/psc/practice-band";
 import { z } from "zod";
 
@@ -39,6 +40,12 @@ export async function POST(request: NextRequest) {
   const { totalScore, componentScores, durationSeconds, totalXp, scoreVersion } = parsed.data;
   const normalizedResult = normalizeMockExamResult(scoreVersion, componentScores);
   if (!normalizedResult || !hasConsistentMockExamTotal(totalScore, normalizedResult)) {
+    return NextResponse.json({ error: "Invalid scoring contract" }, { status: 400 });
+  }
+
+  // XP is client-computed but bounded server-side: a failed assessment may
+  // legitimately report less than the score-derived XP, never more.
+  if (totalXp > calculateMockExamXpCeiling(normalizedResult.componentScores)) {
     return NextResponse.json({ error: "Invalid scoring contract" }, { status: 400 });
   }
 
