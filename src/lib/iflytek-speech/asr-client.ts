@@ -11,6 +11,9 @@ import { segmentPcm, stripWavHeader } from "./asr-segments";
 export const ASR_PCM_BYTES_PER_SECOND = PCM_BYTES_PER_SECOND;
 export const ASR_MAX_PCM_BYTES = 200 * ASR_PCM_BYTES_PER_SECOND;
 export const COMPANION_MAX_PCM_BYTES = 60 * ASR_PCM_BYTES_PER_SECOND;
+// The recorder auto-stops on a setTimeout, so a legitimate recording can
+// overshoot the nominal cap by scheduling jitter (mirrors C5_DURATION_TOLERANCE_SECONDS).
+export const COMPANION_TOLERANCE_PCM_BYTES = 1 * ASR_PCM_BYTES_PER_SECOND;
 
 export interface AsrTranscriptionResult {
   transcript: string;
@@ -24,7 +27,10 @@ export function isCompanionAudioWithinLimit(
   audioData: Uint8Array,
 ): boolean {
   const pcmByteLength = getPcmByteLength(audioData);
-  return pcmByteLength > 0 && pcmByteLength <= COMPANION_MAX_PCM_BYTES;
+  return (
+    pcmByteLength > 0 &&
+    pcmByteLength <= COMPANION_MAX_PCM_BYTES + COMPANION_TOLERANCE_PCM_BYTES
+  );
 }
 
 export function calculateAsrTimeoutMs(pcmByteLength: number): number {

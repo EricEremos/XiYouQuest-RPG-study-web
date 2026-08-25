@@ -8,6 +8,7 @@ import { verifyUser } from "../_shared/verify-jwt.ts";
 import { transcribeAudio } from "../_shared/iflytek-asr.ts";
 import {
   COMPANION_MAX_PCM_BYTES,
+  COMPANION_TOLERANCE_PCM_BYTES,
   isCompanionAudioWithinLimit,
 } from "../_shared/iflytek-asr-frames.ts";
 import { assessPronunciation } from "../_shared/iflytek-ise.ts";
@@ -65,7 +66,7 @@ Deno.serve(async (req: Request) => {
       return errorResponse("Missing sessionId or audio", 400);
     }
 
-    if (audio.size > COMPANION_MAX_PCM_BYTES + 44) {
+    if (audio.size > COMPANION_MAX_PCM_BYTES + COMPANION_TOLERANCE_PCM_BYTES + 44) {
       return errorResponse(
         "Audio exceeds the 60-second Companion limit",
         400,

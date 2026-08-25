@@ -62,6 +62,7 @@ vi.mock("ws", () => {
 import {
   ASR_MAX_PCM_BYTES as NODE_ASR_MAX_PCM_BYTES,
   COMPANION_MAX_PCM_BYTES as NODE_COMPANION_MAX_PCM_BYTES,
+  COMPANION_TOLERANCE_PCM_BYTES as NODE_COMPANION_TOLERANCE_PCM_BYTES,
   calculateAsrTimeoutMs as calculateNodeAsrTimeoutMs,
   isCompanionAudioWithinLimit as isNodeCompanionAudioWithinLimit,
   transcribeAudio as transcribeNodeAudio,
@@ -69,6 +70,7 @@ import {
 import {
   ASR_MAX_PCM_BYTES as EDGE_ASR_MAX_PCM_BYTES,
   COMPANION_MAX_PCM_BYTES as EDGE_COMPANION_MAX_PCM_BYTES,
+  COMPANION_TOLERANCE_PCM_BYTES as EDGE_COMPANION_TOLERANCE_PCM_BYTES,
   calculateAsrTimeoutMs as calculateEdgeAsrTimeoutMs,
   createAsrAudioFrames,
   isCompanionAudioWithinLimit as isEdgeCompanionAudioWithinLimit,
@@ -138,22 +140,39 @@ describe("iFLYTEK ASR streaming protocol", () => {
     ).toThrow("200-second limit");
   });
 
-  it("enforces the 60-second Companion limit in both runtimes", () => {
+  it("enforces the 60-second Companion limit with auto-stop tolerance in both runtimes", () => {
     const wavHeader = Buffer.alloc(44);
     wavHeader.write("RIFF");
     const atLimit = Buffer.concat([
       wavHeader,
       Buffer.alloc(NODE_COMPANION_MAX_PCM_BYTES),
     ]);
-    const overLimit = Buffer.concat([atLimit, Buffer.alloc(1)]);
+    // A recording the app's own setTimeout auto-stop overshot by one
+    // ScriptProcessor chunk must still be accepted.
+    const withinTolerance = Buffer.concat([atLimit, Buffer.alloc(1)]);
+    const atTolerance = Buffer.concat([
+      wavHeader,
+      Buffer.alloc(
+        NODE_COMPANION_MAX_PCM_BYTES + NODE_COMPANION_TOLERANCE_PCM_BYTES,
+      ),
+    ]);
+    const overTolerance = Buffer.concat([atTolerance, Buffer.alloc(1)]);
 
     expect(EDGE_COMPANION_MAX_PCM_BYTES).toBe(
       NODE_COMPANION_MAX_PCM_BYTES,
     );
+    expect(EDGE_COMPANION_TOLERANCE_PCM_BYTES).toBe(
+      NODE_COMPANION_TOLERANCE_PCM_BYTES,
+    );
+    expect(NODE_COMPANION_TOLERANCE_PCM_BYTES).toBeGreaterThan(0);
     expect(isNodeCompanionAudioWithinLimit(atLimit)).toBe(true);
     expect(isEdgeCompanionAudioWithinLimit(atLimit)).toBe(true);
-    expect(isNodeCompanionAudioWithinLimit(overLimit)).toBe(false);
-    expect(isEdgeCompanionAudioWithinLimit(overLimit)).toBe(false);
+    expect(isNodeCompanionAudioWithinLimit(withinTolerance)).toBe(true);
+    expect(isEdgeCompanionAudioWithinLimit(withinTolerance)).toBe(true);
+    expect(isNodeCompanionAudioWithinLimit(atTolerance)).toBe(true);
+    expect(isEdgeCompanionAudioWithinLimit(atTolerance)).toBe(true);
+    expect(isNodeCompanionAudioWithinLimit(overTolerance)).toBe(false);
+    expect(isEdgeCompanionAudioWithinLimit(overTolerance)).toBe(false);
   });
 
   it("rejects a header-only WAV before opening a WebSocket", async () => {

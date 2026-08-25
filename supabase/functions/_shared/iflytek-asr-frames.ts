@@ -4,6 +4,9 @@ export const ASR_PCM_BYTES_PER_SECOND = 32_000;
 export const ASR_MAX_PCM_BYTES = 200 * ASR_PCM_BYTES_PER_SECOND;
 export const COMPANION_MAX_PCM_BYTES =
   60 * ASR_PCM_BYTES_PER_SECOND;
+// The recorder auto-stops on a setTimeout, so a legitimate recording can
+// overshoot the nominal cap by scheduling jitter (mirrors C5_DURATION_TOLERANCE_SECONDS).
+export const COMPANION_TOLERANCE_PCM_BYTES = 1 * ASR_PCM_BYTES_PER_SECOND;
 
 export type AsrAudioFrame =
   | { status: 0 | 1; audio: Uint8Array }
@@ -23,7 +26,10 @@ export function isCompanionAudioWithinLimit(
   audioData: Uint8Array,
 ): boolean {
   const pcmByteLength = getPcmByteLength(audioData);
-  return pcmByteLength > 0 && pcmByteLength <= COMPANION_MAX_PCM_BYTES;
+  return (
+    pcmByteLength > 0 &&
+    pcmByteLength <= COMPANION_MAX_PCM_BYTES + COMPANION_TOLERANCE_PCM_BYTES
+  );
 }
 
 export function calculateAsrTimeoutMs(pcmByteLength: number): number {

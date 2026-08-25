@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
 import {
   COMPANION_MAX_PCM_BYTES,
+  COMPANION_TOLERANCE_PCM_BYTES,
   isCompanionAudioWithinLimit,
   transcribeAudio,
 } from "@/lib/iflytek-speech/asr-client";
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing sessionId or audio" }, { status: 400 });
     }
 
-    if (audio.size > COMPANION_MAX_PCM_BYTES + 44) {
+    if (audio.size > COMPANION_MAX_PCM_BYTES + COMPANION_TOLERANCE_PCM_BYTES + 44) {
       return NextResponse.json({ error: "Audio exceeds the 60-second Companion limit" }, { status: 400 });
     }
 
