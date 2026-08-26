@@ -2,11 +2,46 @@ import crypto from "crypto";
 import WebSocket from "ws";
 import { IFLYTEK_APP_ID, IFLYTEK_API_KEY, IFLYTEK_API_SECRET } from "@/lib/env";
 import { ASR_TIMEOUT_MS } from "@/lib/constants";
-import { getAsrProviderConfig } from "./asr-config";
+import {
+  getAsrProviderConfig,
+  PCM_BYTES_PER_SECOND,
+} from "./asr-config";
 import { segmentPcm, stripWavHeader } from "./asr-segments";
+
+export const ASR_PCM_BYTES_PER_SECOND = PCM_BYTES_PER_SECOND;
+export const ASR_MAX_PCM_BYTES = 200 * ASR_PCM_BYTES_PER_SECOND;
+export const COMPANION_MAX_PCM_BYTES = 60 * ASR_PCM_BYTES_PER_SECOND;
+// The recorder auto-stops on a setTimeout, so a legitimate recording can
+// overshoot the nominal cap by scheduling jitter (mirrors C5_DURATION_TOLERANCE_SECONDS).
+export const COMPANION_TOLERANCE_PCM_BYTES = 1 * ASR_PCM_BYTES_PER_SECOND;
 
 export interface AsrTranscriptionResult {
   transcript: string;
+}
+
+export function getPcmByteLength(audioData: Uint8Array): number {
+  return stripWavHeader(audioData).length;
+}
+
+export function isCompanionAudioWithinLimit(
+  audioData: Uint8Array,
+): boolean {
+  const pcmByteLength = getPcmByteLength(audioData);
+  return (
+    pcmByteLength > 0 &&
+    pcmByteLength <= COMPANION_MAX_PCM_BYTES + COMPANION_TOLERANCE_PCM_BYTES
+  );
+}
+
+export function calculateAsrTimeoutMs(pcmByteLength: number): number {
+  if (pcmByteLength <= 0) {
+    throw new Error("iFlytek ASR: empty PCM audio");
+  }
+  if (pcmByteLength > ASR_MAX_PCM_BYTES) {
+    throw new Error("iFlytek ASR: audio exceeds 200-second limit");
+  }
+
+  return ASR_TIMEOUT_MS;
 }
 
 // ---------- Auth ----------
@@ -212,10 +247,7 @@ export async function transcribeAudio(
   audioBuffer: Buffer
 ): Promise<AsrTranscriptionResult> {
   const pcmData = stripWavHeader(audioBuffer);
-
-  if (pcmData.length === 0) {
-    throw new Error("iFlytek ASR: empty PCM audio");
-  }
+  calculateAsrTimeoutMs(pcmData.length);
 
   const { maxSegmentBytes } = getAsrProviderConfig();
   const chunks = segmentPcm(pcmData, maxSegmentBytes);

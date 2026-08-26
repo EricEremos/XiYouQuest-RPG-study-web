@@ -2,7 +2,7 @@
 
 **App:** XiYouQuest / PCSWebTool (Next.js, Better Auth self-hosted).
 **Entra app (staff tenant):** client `ce4cb5e3-47d6-4b1c-87cc-e83fc7cabb29`,
-tenant `c917f3e2-9322-4926-9bb3-daca730413ca` (shared with CLE-Meli).
+tenant `c917f3e2-9322-4926-9bb3-daca730413ca`.
 **Discovery URL:** `https://login.microsoftonline.com/c917f3e2-9322-4926-9bb3-daca730413ca/v2.0/.well-known/openid-configuration`
 
 ## Callback pattern (Better Auth 1.6.x generic-oauth)
@@ -11,16 +11,13 @@ tenant `c917f3e2-9322-4926-9bb3-daca730413ca` (shared with CLE-Meli).
 {origin}/api/auth/oauth2/callback/{providerId}
 ```
 
-Verified against better-auth installed source + docs in the Meli repo
-(`cle/docs/oidc-redirect-uris.md`) — same library, same basePath default.
+The deployed XiYouQuest provider is configured for Better Auth's generic OAuth callback convention. Confirm the exact registered URI through a controlled XiYouQuest sign-in before treating this record as production evidence.
 
 ## providerId decision: `hkust`
 
 - **providerId = `hkust`** → callback `.../api/auth/oauth2/callback/hkust`.
-- Rationale: CLE/ITSO registered the sibling Meli app with `.../callback/hkust`
-  (confirmed by email 2026-07 and a working production login). Both apps were
-  registered in the same ITSO batch; per project owner's decision (2026-07-10)
-  XiYouQuest assumes the same pattern.
+- Rationale: `src/lib/auth.ts` configures the XiYouQuest provider with
+  `providerId: "hkust"`; Better Auth therefore uses the callback above.
 - **Probe caveat:** direct authorize-endpoint probing cannot confirm the
   registered URI — Entra (as of 2026-07) renders the sign-in page for ANY
   redirect_uri, including known-bogus controls, and only validates after
@@ -34,10 +31,10 @@ Verified against better-auth installed source + docs in the Meli repo
 |-------|--------------|
 | Prod  | `https://cle-xyq.hkust.edu.hk/api/auth/oauth2/callback/hkust` |
 | Dev   | `https://cle-xyq-dev.hkust.edu.hk/api/auth/oauth2/callback/hkust` |
-| Local | `http://localhost:3000/api/auth/oauth2/callback/hkust` (Meli lesson: ITSO may have registered only the bare origin — local SSO then fails until the full path is added; does not affect prod/dev) |
+| Local | `http://localhost:3000/api/auth/oauth2/callback/hkust` (the full callback path must be registered for local SSO) |
 
 ## Known external gates
 
 - `AADSTS50105` (assignment required): ITSO must assign pilot users/groups to
-  the XYQ app, same as they did for Meli.
+  the XYQ app.
 - Client secret: issued by ITSO (expires 2028-06-28); stored only in env vars.

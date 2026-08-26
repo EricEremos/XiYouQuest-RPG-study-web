@@ -211,9 +211,19 @@ function scoreFluency(
 
 // ---------- Time penalty ----------
 
-function calculateTimePenalty(spokenDurationSeconds: number): number {
+/**
+ * A three-minute XiYouQuest practice-duration heuristic. Learner-facing results
+ * remain practice feedback and never represent a current PSC Component 5 grade.
+ */
+export function calculateTimePenalty(spokenDurationSeconds: number): number {
   if (spokenDurationSeconds >= 180) return 0;
-  return Math.min(30, 180 - Math.floor(spokenDurationSeconds));
+  if (spokenDurationSeconds >= 160) return 1;
+  if (spokenDurationSeconds >= 140) return 2;
+  if (spokenDurationSeconds >= 120) return 3;
+  if (spokenDurationSeconds >= 90) return 4;
+  if (spokenDurationSeconds >= 60) return 5;
+  if (spokenDurationSeconds > 30) return 6;
+  return 30;
 }
 
 // ---------- Main scoring function ----------

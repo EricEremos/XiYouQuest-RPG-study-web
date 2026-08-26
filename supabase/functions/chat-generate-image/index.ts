@@ -31,7 +31,7 @@ Deno.serve(async (req: Request) => {
     if (!parsed.success) {
       return errorResponse("Invalid input", 400);
     }
-    const { sessionId, conversationSummary } = parsed.data;
+    const { sessionId } = parsed.data;
 
     // Verify session belongs to user
     const { data: session } = await supabase
@@ -65,7 +65,6 @@ Deno.serve(async (req: Request) => {
     const imageResult = await generateSceneImage({
       companionName: resolvedCharName,
       scenarioTitle: resolvedScenTitle,
-      conversationSummary,
     });
 
     if (!imageResult) {
@@ -132,8 +131,8 @@ Deno.serve(async (req: Request) => {
     }
 
     return jsonResponse({ imageUrl });
-  } catch (error) {
-    console.error("[chat-generate-image] Error:", error);
+  } catch {
+    console.error("[chat-generate-image] Request failed");
     return errorResponse("Image generation failed", 500);
   }
 });

@@ -23,13 +23,13 @@ const MENU_ITEMS = [
     href: "/practice",
     icon: BookOpen,
     label: "Practice Session",
-    description: "Train all 5 PSC components + supplementary drills",
+    description: "Train the 4 current PSC components + supplementary drills",
   },
   {
     href: "/mock-exam",
     icon: ClipboardCheck,
     label: "Mock Exam",
-    description: "Full 5-component exam simulation",
+    description: "Current 4-component PSC practice simulation",
   },
   {
     href: "/learning-path",

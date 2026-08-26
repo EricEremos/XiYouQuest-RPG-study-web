@@ -81,10 +81,7 @@ export const chatStartSchema = z.object({
 
 export const chatGenerateImageSchema = z.object({
   sessionId: uuid,
-  conversationSummary: z.string().min(1).max(2000),
-  characterName: z.string().max(100).optional(),
-  scenarioTitle: z.string().max(200).optional(),
-});
+}).strict();
 
 // --- Helpers ---
 

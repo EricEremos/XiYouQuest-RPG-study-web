@@ -6,7 +6,7 @@
   { "prompt": "选择正确的句子", "options": ["我有看过那本书", "那本书我有看", "那本书我看过"], "correctIndex": 2, "explanation": "「那本书我看过」是普通话标准完成式。" },
   { "prompt": "选择正确的句子", "options": ["给多我一点", "给多一点我", "再多给我一点"], "correctIndex": 2, "explanation": "「再多给我一点」语序正确，其余语序不当。" },
   { "prompt": "选择正确的句子", "options": ["你吃饭头先", "你吃饭先", "你先吃饭"], "correctIndex": 2, "explanation": "「你先吃饭」是普通话标准语序，副词「先」放在动词前。" },
-  { "prompt": "选择正确的句子", "options": ["你听得懂不懂？", "你听不听得懂？", "你听得懂吗？"], "correctIndex": 1, "explanation": "「你听不听得懂？」是普通话标准正反问句式。" },
+  { "prompt": "选择正确的句子", "options": ["你听得懂不懂？", "你听不听得懂？", "你能听懂吗？"], "correctIndex": 1, "acceptedAnswers": ["你听不听得懂？", "你能听懂吗？"], "explanation": "「你听不听得懂？」和「你能听懂吗？」都是规范表达。" },
   { "prompt": "选择正确的句子", "options": ["我比他三岁大", "我大他三岁", "我比他大三岁"], "correctIndex": 2, "explanation": "「我比他大三岁」是普通话标准比较句式。" },
   { "prompt": "选择正确的句子", "options": ["他有来没有？", "他来没来？", "他有没有来？"], "correctIndex": 1, "explanation": "「他来没来？」是普通话标准正反问句式。" },
   { "prompt": "选择正确的句子", "options": ["坐一会儿再", "坐一下子再", "再坐一会儿"], "correctIndex": 2, "explanation": "「再坐一会儿」是普通话标准语序。" },

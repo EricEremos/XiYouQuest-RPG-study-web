@@ -5,16 +5,16 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
 const COMPONENTS = [
-  { number: 1, name: "Monosyllabic Characters", chinese: "读单音节字词", path: "/component-1" },
-  { number: 2, name: "Multisyllabic Words", chinese: "读多音节词语", path: "/component-2" },
-  { number: 3, name: "Judgment", chinese: "选择判断", path: "/component-3" },
-  { number: 4, name: "Passage Reading", chinese: "朗读短文", path: "/component-4" },
-  { number: 5, name: "Prompted Speaking", chinese: "命题说话", path: "/component-5" },
+  { number: 1, sourceComponentNumber: 1, name: "Monosyllabic Characters", chinese: "读单音节字词", path: "/component-1" },
+  { number: 2, sourceComponentNumber: 2, name: "Multisyllabic Words", chinese: "读多音节词语", path: "/component-2" },
+  { number: 3, sourceComponentNumber: 3, name: "Selection & Judgment", chinese: "选择判断", path: "/component-3" },
+  { number: 4, sourceComponentNumber: 4, name: "Passage Reading", chinese: "朗读短文", path: "/component-4" },
+  { number: 5, sourceComponentNumber: 5, name: "Prompted Speaking", chinese: "命题说话", path: "/component-5" },
 ];
 
 const SUPPLEMENTARY = [
-  { number: 6, name: "Cantonese Mistakes", chinese: "易错字词练习", path: "/component-6" },
-  { number: 7, name: "Polyphonic Characters", chinese: "多音字练习", path: "/component-7" },
+  { id: "cantonese-mistakes", label: "Supplementary C6", sourceComponentNumber: 6, name: "Cantonese Mistakes", chinese: "易错字词练习", path: "/component-6" },
+  { id: "polyphonic-characters", label: "Supplementary C7", sourceComponentNumber: 7, name: "Polyphonic Characters", chinese: "多音字练习", path: "/component-7" },
 ];
 
 function getAccuracyColor(accuracy: number): string {
@@ -64,8 +64,8 @@ export default async function PracticePage() {
       </div>
       <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
         {COMPONENTS.map((comp) => {
-          const p = progressMap.get(comp.number) as { questions_attempted: number } | undefined;
-          const avgScore = avgScoreMap.get(comp.number) || 0;
+          const p = progressMap.get(comp.sourceComponentNumber) as { questions_attempted: number } | undefined;
+          const avgScore = avgScoreMap.get(comp.sourceComponentNumber) || 0;
           const attempts = p?.questions_attempted || 0;
 
           return (
@@ -104,17 +104,17 @@ export default async function PracticePage() {
       </div>
       <div className="grid gap-2 md:grid-cols-2">
         {SUPPLEMENTARY.map((comp) => {
-          const p = progressMap.get(comp.number) as { questions_attempted: number } | undefined;
-          const avgScore = avgScoreMap.get(comp.number) || 0;
+          const p = progressMap.get(comp.sourceComponentNumber) as { questions_attempted: number } | undefined;
+          const avgScore = avgScoreMap.get(comp.sourceComponentNumber) || 0;
           const attempts = p?.questions_attempted || 0;
 
           return (
-            <Link key={comp.number} href={comp.path} className="group">
+            <Link key={comp.id} href={comp.path} className="group">
               <Card className="h-full py-4 gap-0 hover:pixel-border-primary transition-all cursor-pointer">
                 <CardContent className="px-5 py-2.5">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-xl font-bold leading-none">
-                      Extra {comp.number - 5}
+                      {comp.label}
                     </CardTitle>
                     <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>

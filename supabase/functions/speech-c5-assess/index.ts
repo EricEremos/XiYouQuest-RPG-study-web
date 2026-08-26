@@ -12,42 +12,39 @@ import {
 import { analyzeC5Speaking } from "../_shared/ai-client.ts";
 import {
   calculateC5Score,
-  type C5AssessmentResult,
 } from "../_shared/c5-scoring.ts";
+import { createRequestClient } from "../_shared/supabase.ts";
+import { getPcmWavDurationSeconds } from "../_shared/c5-wav.ts";
+import {
+  getSupplementarySpeakingTopics,
+  OFFICIAL_PSC_SPEAKING_TOPICS,
+} from "../_shared/official-speaking-topics.ts";
 
 // ISE read_chapter max audio duration. 90s with margin.
 // PCM 16kHz 16-bit mono = 32000 bytes/s.
 const ISE_MAX_SECONDS = 90;
 const ISE_MAX_PCM_BYTES = ISE_MAX_SECONDS * 32000;
+const C5_MAX_RECORDING_SECONDS = 180;
+const C5_DURATION_TOLERANCE_SECONDS = 1;
 
-const EMPTY_RESULT: C5AssessmentResult = {
-  pronunciation: {
-    score: 0,
-    deduction: 20,
-    level: 6,
-    label: "å…­æ¡£",
-    notes: "No speech detected",
-  },
-  vocabGrammar: {
-    score: 0,
-    deduction: 5,
-    level: 3,
-    label: "ä¸‰æ¡£",
-    notes: "No speech detected",
-  },
-  fluency: {
-    score: 0,
-    deduction: 5,
-    level: 3,
-    label: "ä¸‰æ¡£",
-    notes: "No speech detected",
-  },
-  timePenalty: 30,
-  totalScore: 0,
-  normalizedScore: 0,
-  transcript: "",
-  errorCount: 0,
-};
+async function isControlledSpeakingTopic(
+  topic: string,
+  user: { id: string },
+): Promise<boolean> {
+  if (OFFICIAL_PSC_SPEAKING_TOPICS.some((officialTopic) => officialTopic === topic)) return true;
+
+  const supabase = createRequestClient(user);
+  const { data, error } = await supabase
+    .from("question_banks")
+    .select("content")
+    .eq("component", 5)
+    .limit(150);
+  if (error) return false;
+
+  return getSupplementarySpeakingTopics(
+    (data ?? []).map((question: { content: string }) => question.content),
+  ).includes(topic);
+}
 
 // ---------- Buffer helpers ----------
 
@@ -123,11 +120,8 @@ async function assessFullAudio(
         chunkText,
         "zh-CN",
         "read_chapter",
-      ).catch((err) => {
-        console.error(
-          `[C5] ISE chunk ${i + 1}/${chunkCount} failed:`,
-          err,
-        );
+      ).catch(() => {
+        console.warn(`[C5] ISE chunk ${i + 1}/${chunkCount} unavailable`);
         return null;
       }),
     );
@@ -138,8 +132,8 @@ async function assessFullAudio(
     (r): r is PronunciationAssessmentResult => r !== null,
   );
 
-  if (results.length === 0) {
-    throw new Error("All ISE chunks failed");
+  if (results.length !== chunkCount) {
+    throw new Error("One or more ISE chunks failed");
   }
 
   console.log(
@@ -183,13 +177,10 @@ Deno.serve(async (req: Request) => {
 
   try {
     const formData = await req.formData();
-    const audio = formData.get("audio") as File;
-    const topic = formData.get("topic") as string;
-    const spokenDurationStr = formData.get(
-      "spokenDurationSeconds",
-    ) as string;
+    const audio = formData.get("audio");
+    const topic = formData.get("topic");
 
-    if (!audio || !topic) {
+    if (!(audio instanceof File) || typeof topic !== "string" || !topic) {
       return errorResponse("Missing audio or topic", 400);
     }
 
@@ -199,8 +190,22 @@ Deno.serve(async (req: Request) => {
       return errorResponse("Audio file too large (max 25MB)", 400);
     }
 
-    const spokenDurationSeconds = parseFloat(spokenDurationStr) || 0;
     const audioData = new Uint8Array(await audio.arrayBuffer());
+    const measuredDurationSeconds = getPcmWavDurationSeconds(audioData);
+    if (
+      measuredDurationSeconds === null ||
+      measuredDurationSeconds > C5_MAX_RECORDING_SECONDS + C5_DURATION_TOLERANCE_SECONDS
+    ) {
+      return errorResponse("Invalid C5 recording. Please record again.", 400);
+    }
+
+    if (!(await isControlledSpeakingTopic(topic, user))) {
+      return errorResponse("Selected topic is not available for C5 practice.", 400);
+    }
+    const spokenDurationSeconds = Math.min(
+      measuredDurationSeconds,
+      C5_MAX_RECORDING_SECONDS,
+    );
 
     // Step 1: ASR transcription
     console.log("[C5] Step 1: Transcribing audio...");
@@ -208,19 +213,16 @@ Deno.serve(async (req: Request) => {
     try {
       const asrResult = await transcribeAudio(audioData);
       transcript = asrResult.transcript.trim();
-    } catch (err) {
-      console.error("[C5] ASR transcription failed:", err);
-      return jsonResponse(EMPTY_RESULT);
+    } catch {
+      console.warn("[C5] ASR unavailable");
+      return errorResponse("Practice assessment unavailable. Please retry.", 503);
     }
 
     if (!transcript) {
-      console.log("[C5] Empty transcript â€” returning zeroed result");
-      return jsonResponse(EMPTY_RESULT);
+      return errorResponse("No recognizable speech detected. Please record again.", 422);
     }
 
-    console.log(
-      `[C5] Transcript (${transcript.length} chars): ${transcript.substring(0, 200)}...`,
-    );
+    console.info("[C5] Transcript received", { characters: transcript.length });
 
     // Step 2: ISE pronunciation scoring (chunked) + AI content analysis (in parallel)
     console.log("[C5] Step 2: Running ISE + AI in parallel...");
@@ -238,12 +240,14 @@ Deno.serve(async (req: Request) => {
       transcript,
     });
 
-    console.log(
-      `[C5] Final score: ${result.totalScore}/30 (normalized: ${result.normalizedScore}/100)`,
-    );
-    return jsonResponse(result);
-  } catch (error) {
-    console.error("[speech-c5-assess] Error:", error);
-    return errorResponse("C5 assessment failed", 500);
+    console.info("[C5] Practice assessment completed");
+    return jsonResponse({
+      ...result,
+      assessmentType: "xiyouquest_speaking_practice_signal",
+      assessmentVersion: "xiyouquest-speaking-practice-v2",
+    });
+  } catch {
+    console.error("[speech-c5-assess] Practice assessment unavailable");
+    return errorResponse("Practice assessment unavailable. Please retry.", 503);
   }
 });

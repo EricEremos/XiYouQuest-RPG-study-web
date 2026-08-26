@@ -80,11 +80,11 @@ const COMPONENT_NAMES: Record<number, string> = {
 const COMPONENT_FULL_NAMES: Record<number, string> = {
   1: "Monosyllabic",
   2: "Multisyllabic",
-  3: "Vocab & Grammar",
+  3: "Selection & Judgment",
   4: "Passage Reading",
   5: "Prompted Speaking",
-  6: "Cantonese Mistakes",
-  7: "Polyphonic",
+  6: "Supplementary Cantonese Mistakes",
+  7: "Supplementary Polyphonic Characters",
 };
 
 const COMPONENT_COLORS: Record<number, string> = {
@@ -807,4 +807,3 @@ export function PracticeHistoryClient({
     </div>
   );
 }
-

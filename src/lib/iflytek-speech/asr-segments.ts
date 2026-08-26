@@ -22,7 +22,7 @@ const SPLIT_SEARCH_BYTES = 3 * 32_000;
 
 export function hasWavHeader(audioData: Uint8Array): boolean {
   return (
-    audioData.length > WAV_HEADER_BYTES &&
+    audioData.length >= WAV_HEADER_BYTES &&
     audioData[0] === 0x52 && // R
     audioData[1] === 0x49 && // I
     audioData[2] === 0x46 && // F

@@ -92,6 +92,8 @@ const CATEGORY_LABELS: Record<string, { zh: string; en: string }> = {
   psc_exam: { zh: "PSC考试练习", en: "PSC Exam Practice" },
 };
 
+const COMPANION_RECORDING_LIMIT_SECONDS = 60;
+
 // ── Component ──
 
 export default function CompanionChatClient({
@@ -369,19 +371,11 @@ export default function CompanionChatClient({
 
       // Generate image every 4 user turns (non-blocking)
       if (newTurnCount > 0 && newTurnCount % 3 === 0) {
-        // Build conversation summary from last 8 messages (use ref for latest state)
-        const recentMsgs = messagesRef.current.slice(-8).map(m =>
-          `${m.role === "user" ? "User" : selectedCharacter.name}: ${m.content}`
-        ).join("\n");
-
         fetchWithRetry("/api/chat/generate-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sessionId,
-            conversationSummary: recentMsgs,
-            characterName: selectedCharacter.name,
-            scenarioTitle: selectedScenario?.title,
           }),
         }).then(async (imgRes) => {
           if (imgRes.ok) {
@@ -404,7 +398,7 @@ export default function CompanionChatClient({
     } finally {
       setIsProcessing(false);
     }
-  }, [sessionId, selectedCharacter, selectedScenario, playTTS, showBackgroundImage, softLimitDismissed, filterOffTopic]);
+  }, [sessionId, selectedCharacter, playTTS, showBackgroundImage, softLimitDismissed, filterOffTopic]);
 
   // ── Reset to start ──
   const handleNewChat = useCallback(() => {
@@ -1338,6 +1332,7 @@ export default function CompanionChatClient({
           <AudioRecorder
             onRecordingComplete={handleRecordingComplete}
             disabled={isProcessing}
+            maxDurationSeconds={COMPANION_RECORDING_LIMIT_SECONDS}
           />
           {isProcessing && (
             <p className="text-center text-sm text-muted-foreground mt-2 font-pixel animate-pulse">

@@ -11,6 +11,32 @@ function getHKTDate(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Hong_Kong" });
 }
 
+async function checkSessionAchievements(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  characterId: string,
+): Promise<unknown[]> {
+  try {
+    const { data: charData } = await supabase
+      .from("characters")
+      .select("name")
+      .eq("id", characterId)
+      .single();
+
+    if (!charData) {
+      return [];
+    }
+
+    return await checkAndUnlockAchievements(supabase, userId, {
+      type: "session_complete",
+      characterName: charData.name,
+    });
+  } catch (err) {
+    console.error("Session achievement check error:", err);
+    return [];
+  }
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const user = await getSessionUser();
@@ -26,6 +52,7 @@ export async function POST(request: NextRequest) {
     }
     const {
       characterId,
+      attemptId,
       component,
       score,
       xpEarned,
@@ -40,7 +67,54 @@ export async function POST(request: NextRequest) {
     const perQuestionCap = questionsAttempted > 0 ? questionsAttempted * 20 : MAX_XP_NO_QUESTIONS;
     const clampedXpEarned = Math.max(0, Math.min(Math.floor(xpEarned), perQuestionCap, MAX_XP_PER_SESSION));
 
-    // Anti-replay: reject duplicate submissions from same user+component within 10 seconds
+    if (attemptId) {
+      const { data: atomicResult, error: atomicError } = await supabase.rpc("record_practice_progress", {
+        p_user_id: user.id,
+        p_character_id: characterId,
+        p_client_attempt_id: attemptId,
+        p_component: component,
+        p_score: score,
+        p_xp_earned: clampedXpEarned,
+        p_duration_seconds: durationSeconds,
+        p_questions_attempted: questionsAttempted,
+        p_questions_correct: questionsCorrect,
+        p_best_streak: bestStreak,
+        p_today: getHKTDate(),
+        p_daily_bonus_base: XP_VALUES.daily_login,
+      });
+
+      const result = Array.isArray(atomicResult) ? atomicResult[0] : null;
+      if (atomicError || !result) {
+        console.error("Atomic progress record error:", atomicError);
+        return NextResponse.json({ error: "Failed to record practice attempt" }, { status: 500 });
+      }
+
+      if (result.already_recorded) {
+        return NextResponse.json({ alreadyRecorded: true, newAchievements: [] });
+      }
+
+      if (
+        typeof result.new_total_xp !== "number"
+        || typeof result.new_level !== "number"
+        || typeof result.new_affection_xp !== "number"
+        || typeof result.new_affection_level !== "number"
+        || typeof result.daily_bonus_awarded !== "number"
+      ) {
+        console.error("Atomic progress record returned an invalid result");
+        return NextResponse.json({ error: "Failed to record practice attempt" }, { status: 500 });
+      }
+
+      const newAchievements = await checkSessionAchievements(supabase, user.id, characterId);
+      return NextResponse.json({
+        totalXP: result.new_total_xp,
+        level: result.new_level,
+        affectionXP: result.new_affection_xp,
+        affectionLevel: result.new_affection_level,
+        dailyBonus: result.daily_bonus_awarded,
+        newAchievements,
+      });
+    }
+
     const { data: recentSession } = await supabase
       .from("practice_sessions")
       .select("id")
@@ -61,6 +135,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         character_id: characterId,
         component,
+        client_attempt_id: null,
         score,
         xp_earned: clampedXpEarned,
         duration_seconds: durationSeconds ?? 0,
@@ -147,24 +222,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 9. Check and unlock achievements
-    let newAchievements: unknown[] = [];
-    try {
-      const { data: charData } = await supabase
-        .from('characters')
-        .select('name')
-        .eq('id', characterId)
-        .single();
-
-      if (charData) {
-        newAchievements = await checkAndUnlockAchievements(supabase, user.id, {
-          type: 'session_complete',
-          characterName: charData.name,
-        });
-      }
-    } catch (err) {
-      console.error("Session achievement check error:", err);
-      newAchievements = [];
-    }
+    const newAchievements = await checkSessionAchievements(supabase, user.id, characterId);
 
     // 10. Return results
     return NextResponse.json({

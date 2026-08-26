@@ -15,12 +15,12 @@ import { encodeWAV } from "@/lib/audio-utils";
 import { shuffle } from "@/lib/utils";
 import { getSpeakingGuide } from "@/lib/speaking-guides";
 import { fetchWithRetry } from "@/lib/fetch-retry";
+import { requestC5Assessment, type C5AssessmentResponse } from "@/lib/psc/c5-assessment";
 import { useAchievementToast } from "@/components/shared/achievement-toast";
 import { useBGM } from "@/components/shared/bgm-provider";
 import type { ExpressionName } from "@/types/character";
 import type { ComponentNumber } from "@/types/practice";
 
-// 3 minutes in seconds
 const TOTAL_TIME = 180;
 
 // Number of topic choices offered (real CBT PSC offers 2)
@@ -49,15 +49,7 @@ type SessionPhase =
   | "feedback"
   | "complete";
 
-interface C5SpeakingAnalysis {
-  pronunciation: { score: number; deduction: number; level: number; label: string; notes: string };
-  vocabGrammar: { score: number; deduction: number; level: number; label: string; notes: string };
-  fluency: { score: number; deduction: number; level: number; label: string; notes: string };
-  timePenalty: number;
-  totalScore: number;
-  normalizedScore: number;
-  transcript: string;
-  errorCount: number;
+interface C5SpeakingAnalysis extends C5AssessmentResponse {
   overallFeedback: string;
 }
 
@@ -78,6 +70,8 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
   const [showTranscript, setShowTranscript] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [volume, setVolume] = useState(0);
+  const [progressSaveError, setProgressSaveError] = useState<string | null>(null);
+  const [progressSaveAttempt, setProgressSaveAttempt] = useState(0);
 
   // Structure + tips tailored to the selected topic's category
   const guide = selectedTopic ? getSpeakingGuide(selectedTopic) : null;
@@ -89,8 +83,14 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const limitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownResolveRef = useRef<(() => void) | null>(null);
+  const assessmentAbortRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(false);
   const hasPlayedGreeting = useRef(false);
   const handleRecordingCompleteRef = useRef<(blob: Blob) => void>(() => {});
+  const stopRecordingRef = useRef<() => void>(() => {});
 
   // Pick the topic choices on mount
   useEffect(() => {
@@ -122,9 +122,24 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
 
   // Cleanup audio context on unmount
   useEffect(() => {
+    isMountedRef.current = true;
+
     return () => {
+      isMountedRef.current = false;
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = 0;
+      if (limitTimeoutRef.current) {
+        clearTimeout(limitTimeoutRef.current);
+        limitTimeoutRef.current = null;
+      }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      countdownResolveRef.current?.();
+      countdownResolveRef.current = null;
+      assessmentAbortRef.current?.abort();
+      assessmentAbortRef.current = null;
       if (audioContextRef.current?.state !== "closed") {
         audioContextRef.current?.close();
       }
@@ -132,47 +147,57 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
       analyserRef.current = null;
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
+      setLearningActive(false);
     };
-  }, []);
+  }, [setLearningActive]);
 
   // Save progress when speaking assessment completes
   const hasSavedProgress = useRef(false);
+  const hasRecordedProgress = useRef(false);
+  const progressAttemptId = useRef<string | null>(null);
+  const isSavingProgress = useRef(false);
   useEffect(() => {
-    if (phase !== "feedback" || !analysis || !characterId || hasSavedProgress.current) return;
-    hasSavedProgress.current = true;
+    if (
+      phase !== "feedback" ||
+      !analysis ||
+      !characterId ||
+      hasSavedProgress.current ||
+      isSavingProgress.current
+    ) return;
+    let cancelled = false;
+    isSavingProgress.current = true;
 
     const saveProgress = async () => {
       const spokenTime = elapsedTimeRef.current;
 
       try {
-        const res = await fetchWithRetry("/api/progress/update", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            characterId,
-            component,
-            score: analysis.normalizedScore,
-            xpEarned: totalXPEarned,
-            durationSeconds: spokenTime,
-            questionsAttempted: 1,
-            questionsCorrect: analysis.normalizedScore >= 60 ? 1 : 0,
-            bestStreak: analysis.normalizedScore >= 60 ? 1 : 0,
-          }),
-        });
-        if (res.ok) {
+        if (!hasRecordedProgress.current) {
+          progressAttemptId.current ??= crypto.randomUUID();
+          const res = await fetchWithRetry("/api/progress/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              characterId,
+              attemptId: progressAttemptId.current,
+              component,
+              score: analysis.normalizedScore,
+              xpEarned: totalXPEarned,
+              durationSeconds: spokenTime,
+              questionsAttempted: 1,
+              questionsCorrect: analysis.normalizedScore >= 60 ? 1 : 0,
+              bestStreak: analysis.normalizedScore >= 60 ? 1 : 0,
+            }),
+          }, { maxRetries: 0 });
+          if (!res.ok) throw new Error(`Practice-progress update failed (${res.status})`);
           const data = await res.json();
+          hasRecordedProgress.current = true;
           if (data.newAchievements?.length > 0) {
             showAchievementToasts(data.newAchievements);
           }
         }
-      } catch (err) {
-        console.error("Failed to save progress:", err);
-      }
 
-      // Complete learning path node if launched from learning path
-      if (lpNodeId) {
-        try {
-          await fetchWithRetry("/api/learning/node/complete", {
+        if (lpNodeId) {
+          const completion = await fetchWithRetry("/api/learning/node/complete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -181,16 +206,29 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
               xpEarned: totalXPEarned,
             }),
           });
-        } catch (err) {
-          console.error("Failed to complete LP node:", err);
+          if (!completion.ok) throw new Error(`Learning-path completion failed (${completion.status})`);
         }
-        router.push("/learning-path");
-        return;
+
+        if (cancelled) return;
+        hasSavedProgress.current = true;
+        setProgressSaveError(null);
+        if (lpNodeId) {
+          router.push("/learning-path");
+        }
+      } catch {
+        if (!cancelled) {
+          setProgressSaveError("Your practice result is ready, but progress could not be saved. Retry before leaving.");
+        }
+      } finally {
+        isSavingProgress.current = false;
       }
     };
 
-    saveProgress();
-  }, [phase, analysis]); // eslint-disable-line react-hooks/exhaustive-deps
+    void saveProgress();
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, analysis, characterId, component, totalXPEarned, lpNodeId, router, showAchievementToasts, progressSaveAttempt]);
 
   // Timer logic — counts up (stopwatch)
   useEffect(() => {
@@ -249,6 +287,10 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, sampleRate: 16000 },
       });
+      if (!isMountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
 
       // Enter countdown phase
@@ -259,17 +301,24 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
 
       // 3-second countdown
       await new Promise<void>((resolve) => {
+        countdownResolveRef.current = resolve;
         let remaining = 3;
-        const countdownInterval = setInterval(() => {
+        countdownIntervalRef.current = setInterval(() => {
           remaining--;
           if (remaining <= 0) {
-            clearInterval(countdownInterval);
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current);
+              countdownIntervalRef.current = null;
+            }
+            countdownResolveRef.current = null;
             resolve();
           } else {
             setCountdown(remaining);
           }
         }, 1000);
       });
+
+      if (!isMountedRef.current || streamRef.current !== stream) return;
 
       // Set up audio context and start recording
       const audioContext = new AudioContext({ sampleRate: 16000 });
@@ -305,10 +354,28 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
       setIsRecording(true);
       setLearningActive(true);
       setPhase("recording");
+      elapsedTimeRef.current = 0;
       setElapsedTime(0);
       setExpression("listening");
       setDialogue(getDialogue(character.name, "c5_listening"));
+
+      limitTimeoutRef.current = setTimeout(() => {
+        elapsedTimeRef.current = TOTAL_TIME;
+        setElapsedTime(TOTAL_TIME);
+        stopRecordingRef.current();
+      }, TOTAL_TIME * 1000);
     } catch {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = 0;
+      if (audioContextRef.current?.state !== "closed") {
+        void audioContextRef.current?.close();
+      }
+      audioContextRef.current = null;
+      analyserRef.current = null;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      setLearningActive(false);
+      if (!isMountedRef.current) return;
       setExpression("surprised");
       setDialogue(getDialogue(character.name, "c5_mic_error"));
     }
@@ -319,6 +386,10 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
+    }
+    if (limitTimeoutRef.current) {
+      clearTimeout(limitTimeoutRef.current);
+      limitTimeoutRef.current = null;
     }
 
     if (!isRecording) return;
@@ -333,6 +404,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
     if (audioContextRef.current?.state !== "closed") {
       audioContextRef.current?.close();
     }
+    audioContextRef.current = null;
 
     // Stop mic stream
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -356,33 +428,27 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
     handleRecordingCompleteRef.current(wavBlob);
   }, [isRecording, setLearningActive]);
 
+  useEffect(() => {
+    stopRecordingRef.current = stopRecording;
+  }, [stopRecording]);
+
   // Handle completed recording
   const handleRecordingComplete = useCallback(async (audioBlob: Blob) => {
+    if (!isMountedRef.current) return;
     setPhase("assessing");
     setExpression("thinking");
     setDialogue(getDialogue(character.name, "c5_analyzing"));
 
     const spokenTime = elapsedTimeRef.current;
+    const assessmentAbortController = new AbortController();
 
     try {
-      // Send audio to C5 assessment API
-      const formData = new FormData();
-      formData.append("audio", audioBlob, "recording.wav");
-      formData.append("topic", selectedTopic ?? "");
-      formData.append("spokenDurationSeconds", String(spokenTime));
-
-      const assessResponse = await fetchWithRetry("/api/speech/c5-assess", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!assessResponse.ok) {
-        const errBody = await assessResponse.json().catch(() => ({}));
-        console.error("[C5] Assessment API error:", assessResponse.status, errBody);
-        throw new Error(`Assessment failed (${assessResponse.status})`);
-      }
-
-      const c5Result = await assessResponse.json();
+      assessmentAbortRef.current = assessmentAbortController;
+      const c5Result = await requestC5Assessment(
+        audioBlob,
+        selectedTopic ?? "",
+        assessmentAbortController.signal,
+      );
 
       // Calculate XP using normalized score
       const isGood = c5Result.normalizedScore >= 60;
@@ -403,7 +469,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
             characterId,
             component: 5,
             questionText: `Topic: "${selectedTopic}". Score: ${c5Result.totalScore}/30. Spoken for ${Math.floor(spokenTime / 60)}m ${spokenTime % 60}s.`,
-            userAnswer: c5Result.transcript || "Prompted speaking attempt",
+            userAnswer: "Prompted speaking attempt",
             pronunciationScore: c5Result.normalizedScore,
             isCorrect: isGood,
           }),
@@ -425,6 +491,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
           : "Keep practicing! Focus on pronunciation and speaking for the full duration.";
       }
 
+      if (!isMountedRef.current) return;
       setDialogue(overallFeedback);
       setAnalysis({ ...c5Result, overallFeedback });
       setPhase("feedback");
@@ -435,10 +502,15 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
         c5Result.normalizedScore >= 60 ? "happy" : "encouraging";
       setExpression(feedbackExpression);
     } catch {
+      if (!isMountedRef.current) return;
       setPhase("feedback");
       setExpression("surprised");
       setDialogue(getDialogue(character.name, "c5_error"));
       setAnalysis(null);
+    } finally {
+      if (assessmentAbortRef.current === assessmentAbortController) {
+        assessmentAbortRef.current = null;
+      }
     }
   }, [selectedTopic, characterId, character.name]);
 
@@ -455,9 +527,13 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
     setAnalysis(null);
     setTotalXPEarned(0);
     setShowTranscript(false);
+    setProgressSaveError(null);
+    setProgressSaveAttempt(0);
     setExpression("neutral");
     setDialogue(getDialogue(character.name, "c5_initial"));
     hasSavedProgress.current = false;
+    hasRecordedProgress.current = false;
+    progressAttemptId.current = null;
     const shuffled = shuffle(topics);
     setDisplayTopics(shuffled.slice(0, TOPIC_CHOICES));
   }, [topics, character.name]);
@@ -530,7 +606,9 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
 
             <div className="flex flex-col gap-2">
               {lpNodeId ? (
-                <p className="text-sm text-muted-foreground animate-pulse text-center">Returning to Learning Path...</p>
+                <p className={`text-sm text-center ${progressSaveError ? "text-amber-600" : "text-muted-foreground animate-pulse"}`}>
+                  {progressSaveError ? "Progress has not been saved yet." : "Saving progress..."}
+                </p>
               ) : (
                 <>
                   <Button onClick={() => {
@@ -540,6 +618,10 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                     setTotalXPEarned(0);
                     setShowTranscript(false);
                     hasSavedProgress.current = false;
+                    hasRecordedProgress.current = false;
+                    progressAttemptId.current = null;
+                    setProgressSaveError(null);
+                    setProgressSaveAttempt(0);
                     setExpression("encouraging");
                     setDialogue(`Let's try "${selectedTopic}" again! Remember to follow the structure.`);
                   }} className="w-full">
@@ -560,6 +642,22 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
           <div className="flex-1 md:w-[70%]">
             <Card className="h-full">
               <CardContent className="pt-6 space-y-4 max-h-[75vh] overflow-y-auto">
+            {progressSaveError && (
+              <div role="alert" className="rounded-lg border border-amber-500/50 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100">
+                <p>{progressSaveError}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => {
+                    setProgressSaveError(null);
+                    setProgressSaveAttempt((attempt) => attempt + 1);
+                  }}
+                >
+                  Retry saving progress
+                </Button>
+              </div>
+            )}
             <h2 className="font-pixel text-sm text-center">
               Speaking Assessment: <span className="font-chinese text-base">{selectedTopic}</span>
             </h2>
@@ -580,8 +678,9 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                     {analysis.totalScore}/30
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    PSC C5 Score (命题说话)
+                    XiYouQuest prompted-speaking practice feedback (命题说话)
                   </p>
+                  <p className="text-xs text-muted-foreground mt-1">Not an official PSC result.</p>
                 </div>
 
                 {/* XP and Time */}
@@ -743,7 +842,7 @@ export function SpeakingSession({ topics, character, characterId, component, lpN
                 elapsedTime >= TOTAL_TIME ? "text-green-600" : "text-orange-500"
               }`}>
                 {elapsedTime >= TOTAL_TIME
-                  ? "3 minutes reached! You can stop when ready."
+                  ? "3-minute practice limit reached. Recording will end automatically."
                   : `Speak for at least ${formatTime(TOTAL_TIME - elapsedTime)} more`}
               </p>
             </div>

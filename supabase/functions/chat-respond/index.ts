@@ -6,6 +6,11 @@ import {
 import { createRequestClient } from "../_shared/supabase.ts";
 import { verifyUser } from "../_shared/verify-jwt.ts";
 import { transcribeAudio } from "../_shared/iflytek-asr.ts";
+import {
+  COMPANION_MAX_PCM_BYTES,
+  COMPANION_TOLERANCE_PCM_BYTES,
+  isCompanionAudioWithinLimit,
+} from "../_shared/iflytek-asr-frames.ts";
 import { assessPronunciation } from "../_shared/iflytek-ise.ts";
 import {
   chatConversation,
@@ -61,9 +66,11 @@ Deno.serve(async (req: Request) => {
       return errorResponse("Missing sessionId or audio", 400);
     }
 
-    // Validate file size (10MB max)
-    if (audio.size > 10 * 1024 * 1024) {
-      return errorResponse("Audio too large (max 10MB)", 400);
+    if (audio.size > COMPANION_MAX_PCM_BYTES + COMPANION_TOLERANCE_PCM_BYTES + 44) {
+      return errorResponse(
+        "Audio exceeds the 60-second Companion limit",
+        400,
+      );
     }
 
     // Verify session belongs to user
@@ -107,6 +114,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const audioData = new Uint8Array(await audio.arrayBuffer());
+    if (!isCompanionAudioWithinLimit(audioData)) {
+      return errorResponse(
+        "Audio must contain no more than 60 seconds of speech",
+        400,
+      );
+    }
 
     // Step 1: ASR transcription
     console.log("[chat-respond] Step 1: Transcribing audio...");

@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ feedback });
-  } catch (error) {
-    console.error("AI feedback error:", error);
+  } catch {
+    console.error("AI feedback unavailable");
     const fallback = body?.isCorrect
       ? "做得好！继续加油！ Nice work, keep it up!"
       : "再试一次吧！Practice makes perfect!";

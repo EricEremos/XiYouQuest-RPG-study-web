@@ -5,6 +5,7 @@ import { buildPlayerMemory } from "@/lib/gemini/player-memory";
 import { randomizeAnswerPositions, shuffle } from "@/lib/utils";
 import { QUIZ_SIZES } from "@/lib/constants";
 import type { QuizQuestion } from "@/types/practice";
+import { withConfiguredAcceptedAnswers } from "@/lib/quiz-answers";
 
 const QuizSession = dynamic(() => import("./quiz-session").then(m => m.QuizSession), {
   loading: () => (
@@ -24,14 +25,14 @@ const FALLBACK_QUESTIONS: QuizQuestion[] = [
   { id: "4", type: "word-choice", prompt: "选择普通话词语", options: ["厨房", "灶下", "灶披", "灶房"], correctIndex: 0, explanation: "「厨房」是普通话标准说法。" },
   { id: "5", type: "word-choice", prompt: "选择普通话词语", options: ["吹大炮", "车大炮", "吹牛"], correctIndex: 2, explanation: "「吹牛」是普通话标准说法。" },
   { id: "6", type: "measure-word", prompt: "一（　）钥匙", options: ["把", "根", "条", "个", "串"], correctIndex: 0, explanation: "钥匙用「把」作量词。" },
-  { id: "7", type: "measure-word", prompt: "一（　）床", options: ["张", "架", "条", "铺", "个"], correctIndex: 0, explanation: "床用「张」作量词。" },
+  { id: "7", type: "measure-word", prompt: "一（　）狗", options: ["条", "只", "头", "个", "匹"], correctIndex: 0, explanation: "「一条狗」和「一只狗」都可接受。" },
   { id: "8", type: "measure-word", prompt: "一（　）树", options: ["棵", "颗", "株", "根", "条"], correctIndex: 0, explanation: "树用「棵」作量词。" },
   { id: "9", type: "measure-word", prompt: "一（　）鱼", options: ["条", "尾", "只", "个", "头"], correctIndex: 0, explanation: "鱼用「条」作量词。" },
   { id: "10", type: "measure-word", prompt: "一（　）花", options: ["朵", "枝", "束", "盆", "棵"], correctIndex: 0, explanation: "花用「朵」作量词。" },
   { id: "11", type: "sentence-order", prompt: "选择正确的句子", options: ["我先走", "我走先", "我走头先"], correctIndex: 0, explanation: "「我先走」是普通话标准语序。" },
   { id: "12", type: "sentence-order", prompt: "选择正确的句子", options: ["给本书我", "把本书我", "给我一本书"], correctIndex: 2, explanation: "「给我一本书」是普通话标准语序。" },
   { id: "13", type: "sentence-order", prompt: "选择正确的句子", options: ["他比我高", "他高过我", "他比我过高"], correctIndex: 0, explanation: "「他比我高」是普通话标准比较句式。" },
-  { id: "14", type: "sentence-order", prompt: "选择正确的句子", options: ["你吃饭头先", "你吃饭先", "你先吃饭"], correctIndex: 2, explanation: "「你先吃饭」是普通话标准语序。" },
+  { id: "14", type: "sentence-order", prompt: "选择正确的句子", options: ["你听得懂不懂？", "你听不听得懂？", "你能听懂吗？"], correctIndex: 1, explanation: "「你听不听得懂？」和「你能听懂吗？」都是规范表达。" },
   { id: "15", type: "sentence-order", prompt: "选择正确的句子", options: ["我买了西瓜两个", "我两个西瓜买了", "我买了两个西瓜"], correctIndex: 2, explanation: "「我买了两个西瓜」是普通话标准语序。" },
 ];
 
@@ -74,12 +75,13 @@ export default async function Component3Page({
       if (qData?.length) {
         const parsed = qData
           .filter((row: { metadata: unknown }) => row.metadata && typeof row.metadata === "object")
-          .map((row: { id: string; content: string; metadata: { type: string; options: string[]; correctIndex: number; explanation: string } }) => ({
+          .map((row: { id: string; content: string; metadata: { type: string; options: string[]; correctIndex: number; acceptedAnswers?: string[]; explanation: string } }) => ({
             id: row.id,
             type: row.metadata.type as QuizQuestion["type"],
             prompt: row.content,
             options: row.metadata.options,
             correctIndex: row.metadata.correctIndex,
+            acceptedAnswers: row.metadata.acceptedAnswers,
             explanation: row.metadata.explanation,
           }));
         if (parsed.length) lpQuizQuestions = parsed;
@@ -95,12 +97,13 @@ export default async function Component3Page({
     // Parse all questions (skip rows with missing metadata)
     const allParsed = dbQuestions
       .filter((row: { metadata: unknown }) => row.metadata && typeof row.metadata === "object")
-      .map((row: { id: string; content: string; metadata: { type: string; options: string[]; correctIndex: number; explanation: string } }) => ({
+      .map((row: { id: string; content: string; metadata: { type: string; options: string[]; correctIndex: number; acceptedAnswers?: string[]; explanation: string } }) => ({
         id: row.id,
         type: row.metadata.type as QuizQuestion["type"],
         prompt: row.content,
         options: row.metadata.options,
         correctIndex: row.metadata.correctIndex,
+        acceptedAnswers: row.metadata.acceptedAnswers,
         explanation: row.metadata.explanation,
       }));
 
@@ -117,16 +120,16 @@ export default async function Component3Page({
 
   // Randomize answer order on the server only. The client must never
   // re-shuffle: SSR and hydration would disagree and throw React error 418.
-  questions = questions.map(randomizeAnswerPositions);
+  questions = questions.map(withConfiguredAcceptedAnswers).map(randomizeAnswerPositions);
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="font-pixel text-base text-primary pixel-glow leading-relaxed">
-          Component 3: Vocabulary &amp; Grammar Judgment
+          Component 3: Selection &amp; Judgment
         </h1>
         <p className="text-muted-foreground">
-          <span className="font-chinese">选择判断</span> — Choose the correct or more standard Putonghua vocabulary and grammar.
+          <span className="font-chinese">选择判断</span> — Practice word choice, measure-word matching, and sentence-order judgment. The formal mock uses all three forms for its 3-minute C3 practice component; XiYouQuest feedback is not an official PSC result.
         </p>
       </div>
 

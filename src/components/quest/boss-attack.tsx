@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { QuestMCQ } from "@/lib/quest/types";
+import { getAcceptedOptionIndices, isAcceptedQuizAnswer } from "@/lib/quiz-answers";
 
 interface BossAttackProps {
   mcq: QuestMCQ;
@@ -58,14 +59,14 @@ export function BossAttack({
       setSelectedIndex(index);
       setShowResult(true);
 
-      const isCorrect = index === mcq.correctIndex;
+      const isCorrect = isAcceptedQuizAnswer(mcq, index);
 
       // Delay before calling onAnswer to show result
       setTimeout(() => {
         onAnswer(isCorrect);
       }, 1200);
     },
-    [mcq.correctIndex, onAnswer, showResult]
+    [mcq, onAnswer, showResult]
   );
 
   // Timer color
@@ -149,10 +150,10 @@ export function BossAttack({
             "w-full text-center px-3 py-2 sm:py-3 sm:px-4 font-chinese text-base sm:text-lg md:text-xl border-2 transition-all rounded-sm min-h-[44px] ";
 
           if (showResult) {
-            if (i === mcq.correctIndex) {
+            if (getAcceptedOptionIndices(mcq).includes(i)) {
               optionClass +=
                 "border-green-600 bg-green-100/60 text-green-800";
-            } else if (i === selectedIndex && i !== mcq.correctIndex) {
+            } else if (i === selectedIndex) {
               optionClass += "border-red-600 bg-red-100/60 text-red-800";
             } else {
               optionClass +=
@@ -182,7 +183,7 @@ export function BossAttack({
       {/* Result feedback */}
       {showResult && (
         <div className="text-center animate-fade-in-up">
-          {selectedIndex === mcq.correctIndex ? (
+          {selectedIndex !== null && selectedIndex >= 0 && isAcceptedQuizAnswer(mcq, selectedIndex) ? (
             <p className="font-pixel text-sm text-green-700">
               BLOCKED!
             </p>
