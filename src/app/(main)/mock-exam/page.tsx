@@ -2,6 +2,7 @@ import { createClient, getSessionUser } from "@/lib/supabase/server";
 import dynamic from "next/dynamic";
 import { loadSelectedCharacter } from "@/lib/character-loader";
 import { shuffle, sampleByTone } from "@/lib/utils";
+import { fetchQuestionSample } from "@/lib/question-bank";
 import type { QuizQuestion } from "@/types/practice";
 import { OFFICIAL_PSC_SPEAKING_TOPICS } from "@/lib/psc/official-speaking-topics";
 import { scopeOfficialReadingPassage } from "@/lib/psc/reading-scope";
@@ -50,19 +51,14 @@ export default async function MockExamPage() {
 
   const userId = user!.id;
 
-  // Fetch character and all component questions in parallel
-  const [character, { data: c1Questions }, { data: c2Questions }, { data: c3Questions }, { data: c4Passages }] = await Promise.all([
+  // Fetch character and all component questions in parallel. C1/C2 use the
+  // sample_question_bank RPC (server-side random sample — a plain .limit()
+  // without ORDER BY serves physical row order and starves newly inserted
+  // rows); C3/C4 still need their full metadata sets.
+  const [character, c1Questions, c2Questions, { data: c3Questions }, { data: c4Passages }] = await Promise.all([
     loadSelectedCharacter(supabase, userId),
-    supabase
-      .from("question_banks")
-      .select("content, pinyin")
-      .eq("component", 1)
-      .limit(1100),
-    supabase
-      .from("question_banks")
-      .select("content, pinyin")
-      .eq("component", 2)
-      .limit(600),
+    fetchQuestionSample(supabase, 1, 1100),
+    fetchQuestionSample(supabase, 2, 600),
     supabase
       .from("question_banks")
       .select("id, content, metadata")
@@ -76,8 +72,8 @@ export default async function MockExamPage() {
   ]);
 
   // Tone-stratified selection so the exam isn't skewed toward one tone (e.g. 3rd tone)
-  const eligibleC1Questions = c1Questions?.filter((question) => countHanSyllables(question.content) === 1) ?? [];
-  const eligibleC2Questions = c2Questions?.filter((question) => countHanSyllables(question.content) === 2) ?? [];
+  const eligibleC1Questions = c1Questions.filter((question) => countHanSyllables(question.content) === 1);
+  const eligibleC2Questions = c2Questions.filter((question) => countHanSyllables(question.content) === 2);
   const examCharacters: string[] = eligibleC1Questions.length >= 100
     ? sampleByTone(eligibleC1Questions, 100).map((q) => q.content)
     : shuffle(FALLBACK_CHARACTERS);
