@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 import { loadSelectedCharacter } from "@/lib/character-loader";
 import { buildPlayerMemory } from "@/lib/gemini/player-memory";
 import { shuffle, sampleByTone } from "@/lib/utils";
+import { fetchQuestionSample } from "@/lib/question-bank";
 
 const PracticeSession = dynamic(() => import("./practice-session").then(m => m.PracticeSession), {
   loading: () => (
@@ -34,14 +35,12 @@ export default async function Component1Page({
 
   const userId = user!.id;
 
-  // Fetch character and questions in parallel
-  const [character, { data: dbQuestions }] = await Promise.all([
+  // Fetch character and a server-side random question sample in parallel
+  // (sample_question_bank RPC — a plain .limit() without ORDER BY serves
+  // physical row order and starves newly inserted rows).
+  const [character, dbQuestions] = await Promise.all([
     loadSelectedCharacter(supabase, userId),
-    supabase
-      .from("question_banks")
-      .select("content, pinyin")
-      .eq("component", 1)
-      .limit(600),
+    fetchQuestionSample(supabase, 1, 600),
   ]);
 
   const playerMemory = await buildPlayerMemory(supabase, userId, character.id ?? "").catch(() => "");
@@ -71,7 +70,7 @@ export default async function Component1Page({
   // Otherwise draw a tone-balanced set so practice isn't skewed toward one tone.
   const questions: string[] = lpQuestions
     ? shuffle(lpQuestions)
-    : dbQuestions && dbQuestions.length > 0
+    : dbQuestions.length > 0
       ? sampleByTone(dbQuestions, 50).map((q) => q.content)
       : shuffle(DEFAULT_CHARACTERS);
 
