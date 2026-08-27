@@ -34,3 +34,35 @@ export async function fetchQuestionSample(
 
   return (data ?? []) as QuestionSampleRow[];
 }
+
+/**
+ * Whether a question_banks row with exactly this content exists for the
+ * component. Used to validate client-submitted values (e.g. C5 speaking
+ * topics) against the whole bank instead of a capped list fetch, which
+ * silently rejected rows past the cap. Errors fail closed (false).
+ *
+ * Content values are stored trimmed (and the C5 picker serves trimmed
+ * strings), so the exact-equality match is safe.
+ */
+export async function questionBankHasContent(
+  supabase: SupabaseClient,
+  component: number,
+  content: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("question_banks")
+    .select("id")
+    .eq("component", component)
+    .eq("content", content)
+    .limit(1);
+
+  if (error) {
+    console.error(
+      `[question-bank] content lookup (component=${component}) failed:`,
+      error,
+    );
+    return false;
+  }
+
+  return (data ?? []).length > 0;
+}

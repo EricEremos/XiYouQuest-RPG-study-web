@@ -1,12 +1,28 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { fetchQuestionSample } from "./question-bank";
+import { fetchQuestionSample, questionBankHasContent } from "./question-bank";
 
 function makeSupabase(result: { data: unknown; error: unknown }) {
   const select = vi.fn().mockResolvedValue(result);
   const rpc = vi.fn(() => ({ select }));
   return { supabase: { rpc } as unknown as SupabaseClient, rpc, select };
+}
+
+function makeTableSupabase(result: { data: unknown; error: unknown }) {
+  const limit = vi.fn().mockResolvedValue(result);
+  const eqContent = vi.fn(() => ({ limit }));
+  const eqComponent = vi.fn(() => ({ eq: eqContent }));
+  const select = vi.fn(() => ({ eq: eqComponent }));
+  const from = vi.fn(() => ({ select }));
+  return {
+    supabase: { from } as unknown as SupabaseClient,
+    from,
+    select,
+    eqComponent,
+    eqContent,
+    limit,
+  };
 }
 
 afterEach(() => {
@@ -50,5 +66,43 @@ describe("fetchQuestionSample", () => {
     const result = await fetchQuestionSample(supabase, 1, 50);
 
     expect(result).toEqual([]);
+  });
+});
+
+describe("questionBankHasContent", () => {
+  test("looks up the exact content row and reports a match", async () => {
+    const { supabase, from, eqComponent, eqContent, limit } = makeTableSupabase({
+      data: [{ id: "row-1" }],
+      error: null,
+    });
+
+    const result = await questionBankHasContent(supabase, 5, "我的假期");
+
+    expect(from).toHaveBeenCalledWith("question_banks");
+    expect(eqComponent).toHaveBeenCalledWith("component", 5);
+    expect(eqContent).toHaveBeenCalledWith("content", "我的假期");
+    expect(limit).toHaveBeenCalledWith(1);
+    expect(result).toBe(true);
+  });
+
+  test("reports no match when no row has that content", async () => {
+    const { supabase } = makeTableSupabase({ data: [], error: null });
+
+    const result = await questionBankHasContent(supabase, 5, "不存在的话题");
+
+    expect(result).toBe(false);
+  });
+
+  test("reports no match on query error, so validation fails closed", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { supabase } = makeTableSupabase({
+      data: null,
+      error: { message: "boom" },
+    });
+
+    const result = await questionBankHasContent(supabase, 5, "我的假期");
+
+    expect(result).toBe(false);
+    expect(errorSpy).toHaveBeenCalled();
   });
 });
