@@ -32,7 +32,19 @@ export async function fetchQuestionSample(
     return [];
   }
 
-  return (data ?? []) as QuestionSampleRow[];
+  // A few official words are stored as two rows with different readings
+  // (dual-reading entries, e.g. 肚子 dǔzi/dùzi). Collapse them so one session
+  // never shows the same visible word twice, merging the readings for display.
+  const byContent = new Map<string, QuestionSampleRow>();
+  for (const row of (data ?? []) as QuestionSampleRow[]) {
+    const seen = byContent.get(row.content);
+    if (!seen) {
+      byContent.set(row.content, row);
+    } else if (row.pinyin && seen.pinyin && !seen.pinyin.split("/").includes(row.pinyin)) {
+      byContent.set(row.content, { ...seen, pinyin: `${seen.pinyin}/${row.pinyin}` });
+    }
+  }
+  return [...byContent.values()];
 }
 
 /**
@@ -65,4 +77,48 @@ export async function questionBankHasContent(
   }
 
   return (data ?? []).length > 0;
+}
+
+/**
+ * Random sample of question IDs for a component via the same RPC, bounded so
+ * large banks (C2 is 15k+ rows) never hit PostgREST's silent max-rows cap the
+ * way an unranged `.select("id")` does. The RPC's ORDER BY random() also keeps
+ * late-inserted rows evenly represented.
+ */
+export async function fetchQuestionIdSample(
+  supabase: SupabaseClient,
+  component: number,
+  count: number,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .rpc("sample_question_bank", { p_component: component, p_n: count })
+    .select("id");
+
+  if (error) {
+    console.error(
+      `[question-bank] id sample (component=${component}, n=${count}) failed:`,
+      error,
+    );
+    return [];
+  }
+
+  return ((data ?? []) as { id: string }[]).map((row) => row.id);
+}
+
+/** Exact row count for a component (head request — no row transfer). */
+export async function fetchQuestionCount(
+  supabase: SupabaseClient,
+  component: number,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("question_banks")
+    .select("id", { count: "exact", head: true })
+    .eq("component", component);
+
+  if (error) {
+    console.error(`[question-bank] count (component=${component}) failed:`, error);
+    return 0;
+  }
+
+  return count ?? 0;
 }

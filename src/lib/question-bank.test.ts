@@ -69,6 +69,24 @@ describe("fetchQuestionSample", () => {
   });
 });
 
+describe("fetchQuestionSample dedup", () => {
+  test("collapses dual-reading duplicate-content rows, merging their readings", async () => {
+    const rows = [
+      { content: "肚子", pinyin: "du3 zi5" },
+      { content: "包子", pinyin: "bao1 zi5" },
+      { content: "肚子", pinyin: "du4 zi5" },
+    ];
+    const { supabase } = makeSupabase({ data: rows, error: null });
+
+    const result = await fetchQuestionSample(supabase, 2, 600);
+
+    expect(result).toHaveLength(2);
+    const duzi = result.find((row) => row.content === "肚子");
+    expect(duzi?.pinyin).toBe("du3 zi5/du4 zi5");
+  });
+
+});
+
 describe("questionBankHasContent", () => {
   test("looks up the exact content row and reports a match", async () => {
     const { supabase, from, eqComponent, eqContent, limit } = makeTableSupabase({

@@ -57,14 +57,23 @@ export default async function Component1Page({
     if (nodeData?.question_ids?.length) {
       const { data: qData } = await supabase
         .from("question_banks")
-        .select("content")
+        .select("content, pinyin")
         .in("id", nodeData.question_ids);
 
       if (qData?.length) {
         lpQuestions = qData.map((q: { content: string }) => q.content);
+        for (const q of qData as { content: string; pinyin: string | null }[]) {
+          if (q.pinyin) dbQuestions.push(q);
+        }
       }
     }
   }
+
+  // Word → DB pinyin (tone-number form) for the on-screen pinyin hint; the
+  // session falls back to the static map for words without a DB reading.
+  const pinyinByWord = Object.fromEntries(
+    dbQuestions.filter((q) => q.pinyin).map((q) => [q.content, q.pinyin]),
+  );
 
   // Learning-path questions are intentionally chosen, so keep them as-is (just shuffled).
   // Otherwise draw a tone-balanced set so practice isn't skewed toward one tone.
@@ -85,7 +94,7 @@ export default async function Component1Page({
         </p>
       </div>
 
-      <PracticeSession questions={questions} character={character} characterId={character.id} component={1} playerMemory={playerMemory} lpNodeId={lpNode} />
+      <PracticeSession questions={questions} pinyinByWord={pinyinByWord} character={character} characterId={character.id} component={1} playerMemory={playerMemory} lpNodeId={lpNode} />
     </div>
   );
 }

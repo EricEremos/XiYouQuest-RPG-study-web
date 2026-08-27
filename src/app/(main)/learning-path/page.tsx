@@ -1,6 +1,7 @@
 import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { loadSelectedCharacter } from "@/lib/character-loader";
-import { shuffle } from "@/lib/utils";
+import { shuffle, randomizeAnswerPositions } from "@/lib/utils";
+import { fetchQuestionSample } from "@/lib/question-bank";
 import type { QuizQuestion } from "@/types/practice";
 import type { LearningPlan, LearningNode, LearningCheckpoint } from "@/types/database";
 import LearningPathClient from "./learning-path-client";
@@ -42,8 +43,8 @@ export default async function LearningPathPage() {
   const [
     character,
     { data: activePlan },
-    { data: c1Questions },
-    { data: c2Questions },
+    c1Questions,
+    c2Questions,
     { data: c3Questions },
     { data: c4Passages },
   ] = await Promise.all([
@@ -56,16 +57,8 @@ export default async function LearningPathPage() {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
-      .from("question_banks")
-      .select("content")
-      .eq("component", 1)
-      .limit(100),
-    supabase
-      .from("question_banks")
-      .select("content")
-      .eq("component", 2)
-      .limit(100),
+    fetchQuestionSample(supabase, 1, 100),
+    fetchQuestionSample(supabase, 2, 100),
     supabase
       .from("question_banks")
       .select("id, content, metadata")
@@ -102,7 +95,8 @@ export default async function LearningPathPage() {
         explanation: row.metadata.explanation,
         acceptedAnswers: row.metadata.acceptedAnswers,
       }))
-      .map(withConfiguredAcceptedAnswers);
+      .map(withConfiguredAcceptedAnswers)
+      .map(randomizeAnswerPositions);
     const wc = shuffle(allParsed.filter(q => q.type === "word-choice")).slice(0, 3);
     const mw = shuffle(allParsed.filter(q => q.type === "measure-word")).slice(0, 3);
     const so = shuffle(allParsed.filter(q => q.type === "sentence-order")).slice(0, 2);
