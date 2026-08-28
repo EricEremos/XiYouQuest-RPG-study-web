@@ -75,6 +75,36 @@ This record documents content collection and provenance only; learner-facing res
 
 The remaining banks were verified against their in-repo sources and stamped: C6 (118 pronunciation-drill rows) all match `doc/ExampleQuestions/C6.txt` and carry `xiyouquest_practice` records, with 70 rows cross-referenced to their 2021 word-table entries; C7 (100 polyphone context items) all match `doc/ExampleQuestions/C7.txt` with every stored answer agreeing with the file key, recorded as `xiyouquest_practice` (the Journey-to-the-West-themed sentences are XiYouQuest-authored — school provenance is deliberately not claimed); C5 (147 topic rows) split into 3 rows matching the official 50-topic collection (recorded under `psc-speaking-topics-2024-01-01`) and 144 supplementary practice topics. Every content row across C1–C7 now carries either a source record or an explicit `not_in_official_table` flag (16 legacy rows). `xyq-preview` re-synced: 19,118 rows, per-row md5 identical.
 
+### C3 full-bank exam-format adjudication and official C5 topic completion (2026-08-28)
+
+All 104 production C3 rows were adjudicated against the exam's own scoring bases,
+led by the official 《普通话水平测试用普通话常见量词、名词搭配表》 (reproduction
+with provenance recorded in `docs/sources/psc-liangci-mingci-dapeibiao.md`;
+section structure 10/10/5 in 3 minutes verified against HKUST CLE's published
+rules). Every decision passed a three-lens adversarial verification (dictionary
+normativity / exam convention / omission hunting); only ≥2-lens survivors were
+applied. Applied to production: 27 rows gained `metadata.acceptedAnswers`
+(8 量词 dual-acceptances straight from the table's parenthetical cross-listings,
+13 dual-standard sentence items, 2 词语判断 items pairing two Putonghua words,
+plus the re-keyed row below and 3 structurally defective rows accepting all
+standard options); 1 school key re-keyed with a recorded
+`school_key_discrepancy` hold (他跳很好舞 → 他跳舞跳得很好 — ungrammatical school
+key, same precedent as the two 2026-08-27 holds); 1 practice-variant distractor
+repaired (他住上海 replaced by 他在住上海 to stop contradicting the school
+original). Dictionary-plausible pairings absent from the official table
+(项链＋串, 树＋株, 花＋枝, 路＋段, 毛巾＋块, 椅子＋张 and similar) were
+deliberately **not** accepted — the table is the scoring authority. Every
+change carries `accepted_answers_review.status = school_teacher_review_pending`;
+the decision sheet for the teacher is `docs/PSC_C3_TEACHER_REVIEW_PACKET.md`.
+In the same pass the C5 bank was completed to the full official 50-topic list
+(47 missing topics inserted under `psc-speaking-topics-2024-01-01` records,
+`official_topic_number` stamped; bank now 50 official + 144 practice topics),
+and practice C3 sessions were aligned to the official 10/10/5 composition
+(`QUIZ_SIZES`). 词语判断/语序 bank expansion is held pending the official
+《普通话与方言词语对照表》/《语法差异对照表》 appendices; a 30-item 量词
+expansion derived mechanically from the official table is staged behind its own
+adversarial distractor check.
+
 ## Asset-use traceability
 
 This snapshot introduces no new static asset. School-provided materials remain curriculum evidence only; they must not be repurposed as image, audio, passage, exercise, answer-key, or generated-scene input.
