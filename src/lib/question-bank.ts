@@ -47,6 +47,42 @@ export async function fetchQuestionSample(
   return [...byContent.values()];
 }
 
+/** Row shape consumers that build quiz items from `metadata` read. */
+export interface QuestionSampleRowWithMetadata extends QuestionSampleRow {
+  id: string;
+  metadata: unknown;
+}
+
+/**
+ * Same server-side uniform sample as {@link fetchQuestionSample}, but keeping
+ * `id` and `metadata` for the components whose items are built from metadata
+ * (C3/C6/C7). `sample_question_bank` returns SETOF question_banks, so the
+ * extra columns come from the same call.
+ *
+ * Use this instead of `.from("question_banks").limit(n)` wherever a bank can
+ * outgrow the cap: PostgREST without an ORDER BY serves physical row order, so
+ * everything past the cap is silently never shown.
+ */
+export async function fetchQuestionSampleWithMetadata(
+  supabase: SupabaseClient,
+  component: number,
+  count: number,
+): Promise<QuestionSampleRowWithMetadata[]> {
+  const { data, error } = await supabase
+    .rpc("sample_question_bank", { p_component: component, p_n: count })
+    .select("id, content, pinyin, metadata");
+
+  if (error) {
+    console.error(
+      `[question-bank] sample_question_bank(component=${component}, n=${count}) failed:`,
+      error,
+    );
+    return [];
+  }
+
+  return (data ?? []) as QuestionSampleRowWithMetadata[];
+}
+
 /**
  * Whether a question_banks row with exactly this content exists for the
  * component. Used to validate client-submitted values (e.g. C5 speaking

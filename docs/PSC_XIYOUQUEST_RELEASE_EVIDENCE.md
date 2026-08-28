@@ -105,6 +105,51 @@ and practice C3 sessions were aligned to the official 10/10/5 composition
 expansion derived mechanically from the official table is staged behind its own
 adversarial distractor check.
 
+### Verified-source-only bank rebuild (2026-08-28)
+
+The bank was rebuilt so that **every served row derives from a verified source**;
+authored content is no longer part of the learner-facing bank. Final production
+state: 19,734 rows with zero rows carrying `not_in_official_table` —
+C1 3,017 · C2 15,566 · C3 336 · C4 50 · C5 50 · C6 450 · C7 265.
+
+| Component | Was | Now | Basis |
+| --- | --- | --- | --- |
+| C6 | 118 authored drill words | 450 word-table entries (150 per contrast) | Words of the official 2021 词语表 carrying a 平翘舌 / 前后鼻音 / l–n contrast, each row stamped with its table and printed entry number |
+| C7 | 100 authored JTW sentences | 265 items over 130 characters | Only characters whose **every** official reading is illustrated by an official word-table word: the character, its readings, and both example words all come from the 2021 词语表 |
+| C3 量词 | 60 | 262 | 202 new items generated from 《量词、名词搭配表》 — key and accepted alternates copied from the table's cross-listings, distractors drawn from the 45 table quantifiers that pair with the noun nowhere in it. 17 generated items were dropped because 3+ of 5 options were officially correct (no discrimination) |
+| C5 | 50 official + 144 authored | 50 official | The official 50-topic list is the entire exam pool |
+| C1/C2 | 16 legacy rows outside the official tables | removed | — |
+| C3 variants | 15 rows labelled `xiyouquest_practice` | relabelled `school_derived_correction` | Answer taken from the school item; only the distractors were rewritten, so provenance is now stated honestly rather than implied |
+
+All 378 removed rows are preserved in
+[`docs/sources/archived-unverified-rows-2026-08-28.json`](sources/archived-unverified-rows-2026-08-28.json)
+(423 rows, a superset) — the rebuild is reversible.
+
+**Two defects found and fixed in the same pass.** (1) Nine C2 rows carried
+pinyin corrupted by apostrophe-boundary segmentation damage (`不安` stored as
+`bua4 n5`, likewise 图案/治安/彼岸/激昂/立案/提案/议案/预案); each was
+reconstructed from the official 表一/表二 monosyllable entries for its two
+characters, with the corrupted string's own preserved initial and tone as
+corroboration, and carries a `pinyin_repair` record. (2) The C6 and C7 pages
+read their banks through capped `.limit()` calls (200 and 100) that the rebuilt
+banks now exceed — the same physical-row-order truncation the 2026-08-27 RPC
+work fixed for C1/C2. Both now use a new `fetchQuestionSampleWithMetadata()`
+helper over the same `sample_question_bank` RPC, covered by two regression
+tests. The in-code fallback content for C6 and C7 was likewise replaced with
+word-table-sourced entries, so even the no-database path serves verified
+material.
+
+Verification: `tsc --noEmit` clean; `npx vitest run` 278 passed / 2 skipped;
+`npm run build` succeeded; each page's real query path was exercised against
+production and yields well-formed sessions (C3 10/10/5, C6 10 per contrast,
+C7 15 items, no malformed rows); production↔`xyq-preview` full-table md5 parity
+PASS at 19,734 rows.
+
+Not verified in a browser this pass: the running dev server fails to compile on
+a pre-existing dependency mismatch in `src/lib/auth-client.ts`
+(`genericOAuthClient` is absent from the resolved better-auth build), which is
+unrelated to this work and untouched by it.
+
 ## Asset-use traceability
 
 This snapshot introduces no new static asset. School-provided materials remain curriculum evidence only; they must not be repurposed as image, audio, passage, exercise, answer-key, or generated-scene input.

@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { fetchQuestionSample, questionBankHasContent } from "./question-bank";
+import {
+  fetchQuestionSample,
+  fetchQuestionSampleWithMetadata,
+  questionBankHasContent,
+} from "./question-bank";
 
 function makeSupabase(result: { data: unknown; error: unknown }) {
   const select = vi.fn().mockResolvedValue(result);
@@ -121,6 +125,34 @@ describe("questionBankHasContent", () => {
     const result = await questionBankHasContent(supabase, 5, "我的假期");
 
     expect(result).toBe(false);
+    expect(errorSpy).toHaveBeenCalled();
+  });
+});
+
+describe("fetchQuestionSampleWithMetadata", () => {
+  test("samples server-side and keeps id and metadata for metadata-built items", async () => {
+    const rows = [
+      { id: "a", content: "**背**包", pinyin: null, metadata: { type: "polyphonic" } },
+    ];
+    const { supabase, rpc, select } = makeSupabase({ data: rows, error: null });
+
+    const result = await fetchQuestionSampleWithMetadata(supabase, 7, 100);
+
+    expect(rpc).toHaveBeenCalledWith("sample_question_bank", {
+      p_component: 7,
+      p_n: 100,
+    });
+    expect(select).toHaveBeenCalledWith("id, content, pinyin, metadata");
+    expect(result).toEqual(rows);
+  });
+
+  test("resolves to an empty array on error so callers fall back", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { supabase } = makeSupabase({ data: null, error: { message: "boom" } });
+
+    const result = await fetchQuestionSampleWithMetadata(supabase, 6, 200);
+
+    expect(result).toEqual([]);
     expect(errorSpy).toHaveBeenCalled();
   });
 });
