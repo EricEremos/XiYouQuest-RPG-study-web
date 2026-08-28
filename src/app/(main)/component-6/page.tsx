@@ -55,6 +55,7 @@ export default async function Component6Page({
 
   // If launched from learning path, use the node's specific questions
   let lpQuestions: string[] | null = null;
+  let lpPinyin: Array<{ content: string; pinyin: string | null }> = [];
   if (lpNode) {
     const { data: nodeData } = await supabase
       .from("learning_nodes")
@@ -65,14 +66,24 @@ export default async function Component6Page({
     if (nodeData?.question_ids?.length) {
       const { data: qData } = await supabase
         .from("question_banks")
-        .select("content")
+        .select("content, pinyin")
         .in("id", nodeData.question_ids);
 
       if (qData?.length) {
         lpQuestions = qData.map((q: { content: string }) => q.content);
+        lpPinyin = qData as Array<{ content: string; pinyin: string | null }>;
       }
     }
   }
+
+  // Word → DB pinyin (tone-number form) for the on-screen pinyin hint. The drill
+  // words are official word-table entries, most of which are absent from the
+  // static bundled map, so the DB reading is the primary source here.
+  const pinyinByWord = Object.fromEntries(
+    [...dbQuestions, ...lpPinyin]
+      .filter((q) => q.pinyin)
+      .map((q) => [q.content, q.pinyin as string]),
+  );
 
   // Group by category, shuffle, and take subset
   const categoryWords: Record<string, string[]> = { zhcs: [], nng: [], ln: [] };
@@ -119,6 +130,7 @@ export default async function Component6Page({
 
       <PracticeSession
         questions={questions}
+        pinyinByWord={pinyinByWord}
         character={character}
         characterId={character.id}
         component={6}
