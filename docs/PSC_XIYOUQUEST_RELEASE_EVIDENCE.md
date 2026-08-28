@@ -145,10 +145,18 @@ production and yields well-formed sessions (C3 10/10/5, C6 10 per contrast,
 C7 15 items, no malformed rows); production↔`xyq-preview` full-table md5 parity
 PASS at 19,734 rows.
 
-Not verified in a browser this pass: the running dev server fails to compile on
-a pre-existing dependency mismatch in `src/lib/auth-client.ts`
-(`genericOAuthClient` is absent from the resolved better-auth build), which is
-unrelated to this work and untouched by it.
+Dev-server check: `npm run dev` compiles and serves this app cleanly (sign-in
+page renders, no compile or server errors). An earlier note in this record
+claimed a `genericOAuthClient` / better-auth compile failure here; that was a
+**misattribution** and is withdrawn. The failure came from a different project
+(`Meli/frontend`) whose dev server was occupying port 3000 — its own
+`src/lib/auth-client.ts` imported `genericOAuthClient` against better-auth
+1.7.2, where that export no longer exists. XiYouQuest's own dependency is
+better-auth 1.6.23, which does export it. Note for future browser QA: this app
+defaults to port 3000 because only prod, `cle-xyq-dev`, and `localhost:3000`
+are registered OIDC redirect URIs, so a signed-in check requires port 3000 to
+be free. Practice pages themselves remain behind HKUST SSO, so rendering them
+needs an interactive sign-in.
 
 ## Asset-use traceability
 
