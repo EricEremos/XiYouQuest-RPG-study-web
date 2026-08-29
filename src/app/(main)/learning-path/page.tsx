@@ -1,7 +1,7 @@
 import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { loadSelectedCharacter } from "@/lib/character-loader";
 import { shuffle, randomizeAnswerPositions } from "@/lib/utils";
-import { fetchQuestionSample } from "@/lib/question-bank";
+import { fetchQuestionSample, fetchQuestionSampleWithMetadata } from "@/lib/question-bank";
 import type { QuizQuestion } from "@/types/practice";
 import type { LearningPlan, LearningNode, LearningCheckpoint } from "@/types/database";
 import LearningPathClient from "./learning-path-client";
@@ -45,8 +45,8 @@ export default async function LearningPathPage() {
     { data: activePlan },
     c1Questions,
     c2Questions,
-    { data: c3Questions },
-    { data: c4Passages },
+    c3Questions,
+    c4Passages,
   ] = await Promise.all([
     loadSelectedCharacter(supabase, userId),
     supabase
@@ -59,16 +59,10 @@ export default async function LearningPathPage() {
       .maybeSingle(),
     fetchQuestionSample(supabase, 1, 100),
     fetchQuestionSample(supabase, 2, 100),
-    supabase
-      .from("question_banks")
-      .select("id, content, metadata")
-      .eq("component", 3)
-      .limit(500),
-    supabase
-      .from("question_banks")
-      .select("id, content, metadata")
-      .eq("component", 4)
-      .limit(50),
+    // Sampled server-side: a plain .limit() without ORDER BY serves physical row
+    // order, so anything past the cap is never shown once the bank grows.
+    fetchQuestionSampleWithMetadata(supabase, 3, 500),
+    fetchQuestionSampleWithMetadata(supabase, 4, 50),
   ]);
 
   // C1: shuffle and pick 10 characters (30% of mock exam's 100)
@@ -85,16 +79,25 @@ export default async function LearningPathPage() {
   let assessmentQuiz: QuizQuestion[] | undefined;
   if (c3Questions && c3Questions.length > 0) {
     const allParsed = c3Questions
-      .filter((row: { metadata: unknown }) => row.metadata && typeof row.metadata === "object")
-      .map((row: { id: string; content: string; metadata: { type: string; options: string[]; correctIndex: number; explanation: string; acceptedAnswers?: string[] } }) => ({
-        id: row.id,
-        type: row.metadata.type as QuizQuestion["type"],
-        prompt: row.content,
-        options: row.metadata.options,
-        correctIndex: row.metadata.correctIndex,
-        explanation: row.metadata.explanation,
-        acceptedAnswers: row.metadata.acceptedAnswers,
-      }))
+      .filter((row) => row.metadata && typeof row.metadata === "object")
+      .map((row) => {
+        const meta = row.metadata as {
+          type: string;
+          options: string[];
+          correctIndex: number;
+          explanation: string;
+          acceptedAnswers?: string[];
+        };
+        return {
+          id: row.id,
+          type: meta.type as QuizQuestion["type"],
+          prompt: row.content,
+          options: meta.options,
+          correctIndex: meta.correctIndex,
+          explanation: meta.explanation,
+          acceptedAnswers: meta.acceptedAnswers,
+        };
+      })
       .map(withConfiguredAcceptedAnswers)
       .map(randomizeAnswerPositions);
     const wc = shuffle(allParsed.filter(q => q.type === "word-choice")).slice(0, 3);
@@ -106,9 +109,10 @@ export default async function LearningPathPage() {
   // C4: Pick 1 random passage
   let assessmentPassage: { id: string; title: string; content: string } | undefined;
   if (c4Passages && c4Passages.length > 0) {
-    const picked = shuffle(c4Passages)[0] as { id: string; content: string; metadata: { title: string } };
+    const picked = shuffle(c4Passages)[0];
+    const meta = (picked.metadata ?? {}) as { title?: string };
     const scope = scopeOfficialReadingPassage(picked.content);
-    assessmentPassage = { id: picked.id, title: picked.metadata.title ?? "Untitled", content: scope.text };
+    assessmentPassage = { id: picked.id, title: meta.title ?? "Untitled", content: scope.text };
   }
 
   // C5: Pick 6 random topics
