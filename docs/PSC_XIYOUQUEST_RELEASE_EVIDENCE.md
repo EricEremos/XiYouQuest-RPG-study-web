@@ -342,6 +342,31 @@ Verified: zero structural defects (option/key/marker/explanation agreement),
 zero duplicate prompts, zero remaining ambiguous example words;
 production↔`xyq-preview` md5 parity at 19,911 rows.
 
+### Bank maximised against the sources we hold (2026-08-30)
+
+With the official appendices exhausted for C3, the remaining headroom was in the
+word table, which C6 and C7 draw from directly.
+
+- **C6: 450 → 896.** Each contrast set taken to ~300 from the official word
+  table, keeping the composition rules: 平翘舌 and 前后鼻音 words must carry both
+  members of the pair; 边音鼻音 keeps all 30 official words carrying both sounds
+  plus an even n-initial / l-initial split. Selection is spread across the
+  table's entry numbers rather than clustered at its front. Four words qualified
+  for two categories at once and were de-duplicated. Session depth goes from 15
+  to roughly 30 distinct sessions.
+- **C3 measure word: 262 → 274.** The official quantifier table's last 12
+  multi-character nouns, each a multi-quantifier entry, so each item shows two of
+  its officially cross-listed quantifiers (both accepted) against three the table
+  pairs with it nowhere. The official table's nouns are now fully covered apart
+  from single-character entries (书, 布, 牛, 驴) and 香, which is ambiguous
+  standing alone.
+
+Verified: C6 896 rows, zero duplicates, all Han-only, pinyin syllable count
+matches character count throughout, every row renders a pinyin hint, and each
+category still fills a 10-word session; C3 496 rows with zero measure-word items
+carrying an unaccepted official answer and zero duplicate prompts;
+production↔`xyq-preview` md5 parity at 20,369 rows.
+
 ## Asset-use traceability
 
 This snapshot introduces no new static asset. School-provided materials remain curriculum evidence only; they must not be repurposed as image, audio, passage, exercise, answer-key, or generated-scene input.
