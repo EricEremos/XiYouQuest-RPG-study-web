@@ -218,7 +218,18 @@ notation marks the standard option with `*` and dialect options with `方`, and 
 marks several groups with two correct answers (`a*b*`) — the official table itself
 sanctions multi-answer items. 143 items were generated from it, 11 of them
 officially multi-answer; groups with relational keys (`a≠b*`, `a＝b方`) were skipped
-rather than guessed. Sentence-order rows went from 39 to 182.
+rather than guessed.
+
+A post-insertion quality pass then removed 4 more. Every generated item was
+re-checked against the source: all option texts matched the table verbatim and
+every accepted-answer set matched the official `*` markings exactly, and no
+sentence is treated as correct in one item and wrong in another. But three items
+carried the source's *template* notation, where a parenthetical lists
+interchangeable verbs (`我说（比、打、跑）得过他。`) — readable in a printed table,
+not as an answer option — and one option contained the single doubled character
+in the whole 899-line transcription (`他们扫没没干净。`), evidently a web-transcription
+typo. Its intended form could not be confirmed against a print copy, so the item
+was dropped rather than repaired by guess. Sentence-order rows: 39 → 178.
 
 Word-choice grew only 35 → 44, deliberately. The companion
 《普通话与方言词语对照表》 (949 entries) could **not** be retrieved — every mainland
@@ -230,9 +241,9 @@ words.hk / Wiktionary were inserted. The remaining gap is recorded as a hold: th
 词语判断 sub-part has no authoritative source until that table is obtained.
 
 Verification: `tsc --noEmit` clean; 278 tests pass; production build succeeds;
-C3 exercised through its real RPC path (488 rows, 10/10/5 satisfiable, zero
+C3 exercised through its real RPC path (484 rows, 10/10/5 satisfiable, zero
 malformed rows, zero duplicate option sets, 119 rows carrying acceptedAnswers);
-production↔`xyq-preview` full-table md5 parity at 19,886 rows.
+production↔`xyq-preview` full-table md5 parity at 19,882 rows.
 
 **Edition caveat.** The recovered grammar table has 34 categories; the 2021 edition
 is reported as 35. The missing part could not be retrieved, so items derived from
