@@ -897,3 +897,141 @@ a、如果不是因为你碰它，盘子能打碎吗？
 b、不着你碰它，盘子能打了吗？
 （选对a*　b方）
 ```
+
+---
+
+## 5. Current-edition appendices — 2026-08-30
+
+Session goal: resolve whether the 2021-edition (effective 2024-01-01) grammar table
+really has 35 categories (vs. the 34 we hold, §2 above), get the name/examples of
+the 35th category if possible, and/or find the 949-entry vocabulary table.
+
+**Network reality confirmed again this session:** every mainland host attempted
+(`docin.com`, `jinchutou.com`, `max.book118.com`, `wenku.baidu.com`, `toutiao.com`,
+`*.edu.cn` teaching-affairs sites, `ywcbs.com` non-Wayback paths) either hard
+timed-out on direct `curl`, or — for `toutiao.com`/`scribd.com` — returned a
+JS/Cloudflare bot-challenge page instead of content. `r.jina.ai` again returned
+`401 AuthenticationRequiredError ... bad network reputation (AS30058)` on every
+URL tried. **New working proxy found this session: `translate.google.com/translate?sl=zh-CN&tl=en&u=<url>`**
+successfully fetched `max.book118.com` and one `wenku.baidu.com` page (both otherwise
+mainland-unreachable) — worth reusing in a future session, though it only forwards
+whatever the origin serves an anonymous/non-paying visitor (i.e. still hits paywalls).
+Plain `google.com` / `bing.com` scraping was **not usable**: Google redirected to a
+JS challenge page with no extractable results, and Bing (from this IP) returned an
+unrelated Japanese-market result set for a Chinese query — both dead ends distinct
+from the Wayback/DDG-html paths that did work.
+
+### 5.1 VERIFIED — the 2021 edition changed the grammar table from 34 to 35 categories, and this is corroborated independently of the HK source in §0.2
+
+This is the headline result of this session: an **official interpretive bulletin**,
+authored by the same body that publishes the 《纲要》 itself, states explicitly that
+the grammar-difference table's category count changed 34→35, and describes the
+*mechanism* (categories restructured, some example sentences revised/added/removed) —
+this is a materially stronger source than the bare "(含35類)" count on the HK exam-prep
+page already in §0.2, because it independently confirms the number **and** explains
+why it changed, from the standards body itself.
+
+**Provenance:** The bulletin is titled 新版《普通话水平测试实施纲要》解读
+("Interpretation of the New Edition of the *Implementation Outline*"), byline
+**国家语委普通话与文字应用培训测试中心** (National Language Commission's Putonghua
+and Written Language Application Training and Testing Center — the body that compiled
+and publishes the 《纲要》). I found it reproduced verbatim on **three independent
+university 语言文字工作网 (language-work office) pages**, all mainland-hosted and
+unreachable by direct `curl` from here, so all three were retrieved via Wayback:
+
+| # | Mirror | Origin URL | Retrieved via | Dateline on page |
+|---|---|---|---|---|
+| 1 | 东北石油大学 (nepu.edu.cn) | `https://ztw.nepu.edu.cn/yw/info/1158/2035.htm` | `http://web.archive.org/web/20260610185049id_/…` | posted 2024/06/18 on the page |
+| 2 | 陕西师范大学 (snnu.edu.cn) | `https://yywz.snnu.edu.cn/info/1167/2218.htm` | `http://web.archive.org/web/20260608022929id_/…` | "发布时间：2023年08月30日 15:34　作者：国家语委普通话与文字应用培训测试中心" |
+| 3 | 上海商学院 (sbs.edu.cn) | `https://www.sbs.edu.cn/yywz/ywxx/e3cd55687cb84f37a80aff649eb74339.htm` | `http://web.archive.org/web/20250901093521id_/…` | cites its own source as `https://shysc.shec.edu.cn/DocHtml/1/Article_20239121121.html` (上海市教师教育学院, 2023-09-27) |
+
+All three retrieved 2026-08-30. A fourth candidate mirror, `ysxy.nnvtu.edu.cn` (南宁职业技术大学), turned up in the same search but has **zero Wayback captures** — not used.
+
+**Fidelity check:** I diffed the three bodies by eye over the whole "三、新版纲要的主要内容及变化" section — they agree word-for-word except for cosmetic punctuation/spacing differences and mirror #1 lightly restructuring bullet formatting. Mirror #2 additionally carries an explicit byline and date that names the same issuing body as mirror #3's cited original. Three independently-hosted university offices reproducing the same institutional bulletin verbatim, one of them naming its date/author, is strong evidence this is a faithful copy of a genuine 国家语委 release (though I could not reach an origin `moe.gov.cn`/`gjdev.gov.cn`/language-commission copy directly — see network-reality note above).
+
+**Confidence: high.**
+
+**Verbatim quote (mirror #2, 陕西师范大学, chosen because it carries the explicit byline/date):**
+
+```
+"普通话水平测试用普通话与方言常见语法差异对照表"部分，根据语言应用和测试实践的发展变化，
+对语法差异类别、内容表述等做出修订，总类别由34个调整为35个；根据情况对部分例句作了修改、
+增补和删除。从搭配的规范度、常用性等方面对普通话水平测试用普通话常见量词名词搭配表进行梳理调整。
+```
+
+Translation (mine, for orientation only — not to be treated as an authoritative rendering):
+"The 'Putonghua-Dialect Common Grammar Difference Comparison Table' section was revised
+in line with the development of language use and testing practice, revising the grammar-
+difference categories and their content descriptions; **the total category count was
+adjusted from 34 to 35**; some example sentences were modified, added, or deleted as
+appropriate. The 'Putonghua Common Measure-word/Noun Pairing Table' was also reviewed
+and adjusted for pairing normativity and frequency of use."
+
+**What this resolves from §2.3:** the "open risk" flagged there — that the HK page's
+"(含35類)" figure might be imprecise, or that both our 34-category mirrors might be
+missing a final section — is now resolved in favor of possibility (1): **the 2021
+edition genuinely added one grammar category**, confirmed independently of the HK
+source. The 34-category table in §2 of this file should be treated as **the superseded
+2003/2004 edition**, accurate for that edition, but **short exactly one category**
+relative to the 2021/current edition now in force.
+
+**What this does NOT resolve:** the name of the 35th category, its example sentences,
+or which of the 34 existing categories (if any) were merged/renamed rather than one
+being purely added. The bulletin describes the *type* of change ("调整" — categories
+restructured, not simply appended) without itemizing it. **Do not infer a specific
+category name (e.g. "转折关系复句", "条件关系复句") from this bulletin — it names
+none.** I searched directly for four plausible candidates (转折/因果/条件/递进
+关系复句 — the natural remaining 复句 types, given 32–34 are 并列/取舍/假设) via
+DuckDuckGo and got **zero results** for all four; that absence is not evidence either
+way, just an unresolved gap.
+
+### 5.2 Same bulletin — incidental confirmation on the vocabulary side (adjacent table, not the 949-entry one)
+
+The same three mirrors also state the count for a **different, adjacent** appendix —
+《普通话水平测试用普通话词语表》(the *Putonghua* word list, "表一"+"表二"), **not**
+《…与方言词语对照表》(the *dialect-comparison* table we actually want, ~949 entries
+per §0.2). Recording this so it is not confused with the target table in future work:
+
+```
+《普通话水平测试用普通话词语表》仍由"表一""表二"和3个附表组成，主要遵照或参照2004年
+以来公（发）布的语言文字规范标准及出版的权威辞书等，调整了原词表的部分词形、读音、汉语
+拼音标注，增删了部分字词。修订后共收词语 18442条，其中"表一"8361条，"表二"10081条。
+3个附表为《普通话水平测试用普通话词语用字统计》《普通话水平测试用必读轻声词语表》
+《普通话水平测试用儿化词语表》。
+```
+
+The bulletin **confirms 《…与方言词语对照表》 exists as one of the 《纲要》's seven parts**
+("仍由《总论》《普通话语音分析》和《普通话水平测试用普通话词语表》《普通话水平测试用普通话
+与方言词语对照表》《普通话水平测试用普通话与常见语法差异对照表》《普通话水平测试用朗读作品》
+《普通话水平测试用话题》等七部分构成") but gives **no entry count and no content** for it,
+and says only that the grammar/measure-word tables (not this one) had content changes —
+it does not state whether the 949-entry dialect-vocabulary table changed at all between
+editions. **Confidence: high** (same three-mirror sourcing as §5.1) for what it says;
+**silent, not negative**, on whether the vocabulary table itself was revised.
+
+### 5.3 Dead ends worked this session (angle-by-angle)
+
+| Angle | What was tried | Result |
+|---|---|---|
+| **(1) HK training bodies** | `site:hkeaa.edu.hk`, `site:polyu.edu.hk`, `site:cuhk.edu.hk`, `site:hkbu.edu.hk`, `site:cityu.edu.hk` combined with 普通話水平測試/語法差異對照表, via DuckDuckGo html endpoint | **Zero results for every query.** DDG's index has effectively no coverage of these institutional domains for this topic. mandarin.edu.hk / cle.hkust.edu.hk (already in §0.2) remain the only working HK sources and were not re-scraped for new content this session. |
+| **(2) Taiwan/overseas booksellers** | `search.books.com.tw` (博客來) — redirected to homepage, no results extracted. `sanmin.com.tw` (三民書局) — search page loaded (HTTP 200) but the results area contained only site chrome/navigation, no product listing: the title itself only appears once, in the search-box echo. | **Not carried by either store searched.** (The 解读 bulletin in §5.1 confirms a 繁体字版 was distributed "国（境）内外" from 2023-08, so an overseas retail listing may exist elsewhere — not found here.) |
+| **(3) Book-preview surfaces** | Google Books API (`googleapis.com/books/v1/volumes`) → `429 quota exceeded` (shared/anonymous quota, not query-specific). `books.google.com.hk` web search → redirected into the same JS-challenge Google results page as plain `google.com`, no results extracted. `max.book118.com` doc `5321141032004010` (titled with a **2021-09-16** timestamp, i.e. plausibly the just-finalized 2021 edition) — reached via the `translate.google.com` proxy, but the free preview cuts off after the 说明 preamble (identical boilerplate to the 2004-edition text already in §2.5) and never reaches category content, so **it does not resolve which edition's text it actually is**. `wenku.baidu.com/view/cbe1f3932…` — also reached via the same proxy, preview cuts off at the same point (end of 说明), before any numbered category. A second `wenku.baidu.com` doc (`c15e65651a…`, titled "…修订…") hit a 百度安全验证 (Baidu security checkpoint) even through the proxy. |
+| **(4) `ywcbs.com` Wayback sweep** | Re-ran the CDX query for `ywcbs.com/app/pthspcs*` (both `matchType=domain` and plain prefix) — **only `files/basic-html/index.html` is captured, one snapshot, confirmed again.** Separately found the publisher's own new-book listing page (`ywcbs.com/wssd/xssj/202309/t20230911_1137.html`, ISBN 9787518712335, ¥89.00, ed. 国家语委培训测试中心) via Wayback (`20250708164754`) — its "在线阅读" (read online) button links to the exact same `http://www.ywcbs.com/app/pthspcs/` flipbook already exhausted, so this is not a new access path, just confirmation that the flipbook the earlier session found *is* the 2021-edition book's official reader. |
+| **(5) Academic papers / theses** | DuckDuckGo-html searches surfaced the 解读 bulletin (used in §5.1/5.2) plus several document-sharing mirrors (`docin.com/p-4308371016.html`, `jinchutou.com/shtml/16c45dd…`, both titled "…修订…") — **all mainland-hosted, all connection-timed-out on direct curl, and none has a Wayback capture** (`archive.org/wayback/available` returned `archived_snapshots: {}` for each). `scribd.com` hosts two relevant PDFs (`/document/784683557/` = the 《纲要》2021 itself; `/document/1061338079/` = 《…与方言词语对照表》) and both load (HTTP 200) but serve a Cloudflare **"Client Challenge"** page instead of content on direct `curl`, and the `translate.google.com` proxy does not help with Cloudflare-gated sites (it needs the origin to actually serve HTML). `toutiao.com` (今日头条) article `7550297552080454183` loads but its body is JS-rendered and the static HTML has no article text (bot-challenge JS, not real content). No CNKI/万方/semanticscholar abstract surfaced in these searches that discusses the grammar-table content specifically (only this 解读 bulletin, which is a summary bulletin, not a paper). |
+
+### 5.4 Net effect on the dataset decision
+
+- Section §2's 34-category table should continue to be treated as the **superseded**
+  (2003/2004) edition — now with **independent, high-confidence confirmation** (not
+  just the single HK exam-prep page) that the current (2021, in force since 2024-01-01)
+  edition has 35 categories, one more than we hold.
+- The **name, definition, and example sentences of the 35th category remain unknown**
+  after this session's search. No dataset item should be authored *as* the 35th
+  category's content — that would be fabrication. The existing archive-stamped caveat
+  from the prior commit (`docs(evidence): confirm the grammar-table edition gap and
+  stamp the affected rows`) remains the correct posture: mark affected rows as sourced
+  from the superseded edition, do not invent a 35th-category row.
+- The 949-entry 《…与方言词语对照表》 remains **entirely unfound** — this session found
+  no new content for it, only reconfirmation that a `scribd.com` copy exists but is
+  Cloudflare-gated, and that unrelated document-sharing mirrors of it are all
+  mainland-hosted and unreachable with no Wayback fallback.

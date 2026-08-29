@@ -245,29 +245,38 @@ C3 exercised through its real RPC path (484 rows, 10/10/5 satisfiable, zero
 malformed rows, zero duplicate option sets, 119 rows carrying acceptedAnswers);
 production↔`xyq-preview` full-table md5 parity at 19,882 rows.
 
-**Edition caveat — confirmed, and stamped on every affected row.** The recovered
-grammar table has 34 categories. Multiple independent Chinese university and
-official-notice sources confirm that the edition in force since **2024-01-01**
-(《普通话水平测试实施纲要（2021年版）》, 语文出版社) revises that table to **35
-categories** and additionally "modified, added and deleted" example sentences,
-while the 量词、名词搭配表 had some nouns and quantifiers adjusted. The recovered
-table is therefore the superseded edition.
+**Edition caveat — traced to the issuing body, and stamped on every affected row.**
+The recovered grammar table has 34 categories. The official interpretive bulletin
+新版《普通话水平测试实施纲要》解读, bylined 国家语委普通话与文字应用培训测试中心 — the
+body that compiles and publishes the 纲要 — states the change directly:
 
-Two consequences, handled rather than hidden:
+> "普通话水平测试用普通话与方言常见语法差异对照表"部分…总类别由34个调整为35个；根据情况对
+> 部分例句作了修改、增补和删除。从搭配的规范度、常用性等方面对普通话水平测试用普通话常见量词
+> 名词搭配表进行梳理调整。
 
-- All 139 items generated from it now carry
-  `source_version: psc-shishigangyao-appendix-pre2024` and an `edition_caveat`
-  block naming the discrepancy and its sources, so no row implies it came from
-  the in-force printing. The dialect contrast each item teaches is unaffected —
-  these are genuine Putonghua/dialect distinctions — but an item may not match
-  the current printed table verbatim.
-- The 量词 table used here has exactly 45 rows, which matches the count the HK
-  sources attribute to the current edition, so the measure-word decisions are
-  believed current. "Some nouns and quantifiers adjusted" means this should be
-  re-checked against a current print copy when one is available.
+Recovered from three independently-hosted university language-office mirrors
+(东北石油大学, 陕西师范大学 — which carries the byline and 2023-08-30 date, and
+上海商学院), all mainland-unreachable directly and fetched through Wayback, and read
+against each other word for word. The full provenance sits in
+`docs/sources/official-grammar-contrast-table.md` §5.
 
-Obtaining the in-force 35-category table is now a known gap alongside the
-vocabulary table, and blocked the same way.
+Three consequences, handled rather than hidden:
+
+- The 139 grammar items carry `source_version: psc-shishigangyao-appendix-pre2024`
+  and an `edition_caveat` block. The dialect contrast each teaches is unaffected;
+  verbatim agreement with the current printing is not claimed.
+- **The same bulletin says the 量词、名词搭配表 was also "梳理调整" for normativity
+  and frequency.** An earlier note here inferred that our copy was current because
+  its 45-quantifier count matches what HK sources give for the current edition —
+  that inference is too weak, since the count can hold while pairings change. All
+  232 measure-word items are now stamped with that uncertainty too.
+- The name and examples of the added 35th category remain unknown. It was not
+  guessed at.
+
+Obtaining the in-force appendices is a known gap. Every mainland host times out
+from this network; a Google-Translate proxy was found to reach some of them but
+only serves what an anonymous visitor sees, so paywalled document mirrors stay
+closed.
 
 **Retrieval closed — do not repeat this search.** A second, direct attempt to obtain
 《普通话水平测试用普通话与方言词语对照表》 exhausted the remaining paths:
