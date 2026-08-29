@@ -289,6 +289,25 @@ Closing it needs a copy from the school (print or scan) or a China-routed fetch;
 until then word-choice items stay at the 44 externally-attested rows and must not
 be expanded by authoring.
 
+### C6 l/n drill rebuilt as a real contrast set (2026-08-30)
+
+The rebuilt C6 bank was checked category by category for whether its words
+actually carry the contrast they claim. 平翘舌 and 前后鼻音 were sound — 150 of
+150 words in each carry both members of their pair. **边音鼻音 (l/n) was not**:
+of its 150 words, 108 were l-only (来临 lái lín, 劳力 láo lì, 力量 lì liàng), only
+13 were n-only, and 29 carried both. A Cantonese speaker drilling the n→l merger
+was therefore mostly reading the sound they already produce.
+
+Rebuilt from the official word table with an explicit composition: all 30
+two-syllable entries carrying both sounds, then an even 60/60 split of
+n-initial and l-initial words, drawn spread across the table's entry numbers
+rather than clustered at its start. Each row records its `contrast` class, so
+the mix is auditable rather than incidental. C6 stays at 450 rows.
+
+Verified: no duplicates, every word Han-only, pinyin syllable count matches
+character count on all 450, every row renders a pinyin hint (0 falling back to
+an em dash), production↔`xyq-preview` md5 parity at 19,882 rows.
+
 ## Asset-use traceability
 
 This snapshot introduces no new static asset. School-provided materials remain curriculum evidence only; they must not be repurposed as image, audio, passage, exercise, answer-key, or generated-scene input.
