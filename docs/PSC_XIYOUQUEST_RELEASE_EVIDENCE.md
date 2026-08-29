@@ -250,6 +250,26 @@ is reported as 35. The missing part could not be retrieved, so items derived fro
 it may be one category short. This does not affect the correctness of any item
 generated, only the coverage.
 
+**Retrieval closed — do not repeat this search.** A second, direct attempt to obtain
+《普通话水平测试用普通话与方言词语对照表》 exhausted the remaining paths:
+
+- `pthxx.cn` — the host that yielded the grammar table — was enumerated completely
+  through the Wayback CDX index (524 captures). Its appendix directory
+  `/zc/xxzl/2019-08-04/` holds exactly: 1110 必读轻声词语表 · 1113–1116 语法差异对照表
+  (四/三/二/一) · 1117 最容易读错的地名 · 1118 最容易读错的姓氏 · 1119 容易写错的字 ·
+  1120 测试中容易读错字词汇总 · 1121 汉语拼音方案 · 1536 汉字部首表. **The vocabulary
+  comparison table is not among them**, and the site's own navigation offers only
+  词语表一/二, 轻声, 儿化 — the different appendices already ingested.
+- `1113.html` (语法差异对照表（四）) has **no Wayback capture at all** ("has not archived
+  that URL"), so the 34-vs-35 category question cannot be settled from the archive.
+- `ywcbs.com` (语文出版社, publisher of the 实施纲要 itself) has zero captures for its
+  flipbook path and the host TCP-times-out, as does every other mainland host tried.
+
+The 词语判断 sub-part therefore has no authoritative source available from here.
+Closing it needs a copy from the school (print or scan) or a China-routed fetch;
+until then word-choice items stay at the 44 externally-attested rows and must not
+be expanded by authoring.
+
 ## Asset-use traceability
 
 This snapshot introduces no new static asset. School-provided materials remain curriculum evidence only; they must not be repurposed as image, audio, passage, exercise, answer-key, or generated-scene input.
