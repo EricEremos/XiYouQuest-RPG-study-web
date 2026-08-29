@@ -184,6 +184,61 @@ four rows above. Until then the deployed app degrades exactly as tabulated.
 Deployment is not performed from here — it needs the `xyq` Vercel access
 recorded in the release holds.
 
+### Campaign question repair and C3 expansion from the official grammar table (2026-08-29)
+
+**The campaign carried the same defect the teacher first reported.** `src/lib/quest/stage-questions.ts`
+holds its own hardcoded question set, so the C3 adjudication never reached it. An
+audit of all 215 quest MCQs against the same bases found three defect classes:
+
+1. **24 items with more than one correct answer** — measure-word items checked
+   against the official 量词、名词搭配表 (一（ ）墙 accepts 面 and 道; 一（ ）耳朵
+   只 and 对; 一（ ）猪 头 and 口), and sentence items aligned with the C3 bank so
+   the campaign and practice can no longer disagree about the same item.
+2. **19 items whose distractors are themselves standard Putonghua.** The stem asks
+   which option *is* standard Putonghua, so any official-table entry among the
+   options is a correct answer. 开心/快乐/高兴/欢喜 and 想念/想/思念/惦记 had **no
+   wrong option at all**. Detection rule: a distractor present in the official 2021
+   词语表 disqualifies the item. (The converse does not hold — absence from the
+   table does not prove non-standard, since the table is a syllabus list, not a
+   dictionary; several distractors had to be rejected on 现汉 grounds instead.)
+3. **Items with no Cantonese contrast.** For this app's Cantonese-speaking users,
+   开心 干净 舒服 客厅 学校 老师 馒头 着急 are the same words in Cantonese, so the
+   item taught nothing even once repaired. Five were rebased onto concepts that do
+   differ (上学/返学, 生气/嬲, 空调/冷气机, 冰箱/雪柜, 电梯/升降机) and three with no
+   clean contrast were deleted. The 12 duplicated items were replaced with fresh
+   single-answer measure-word items from the official table rather than dropped.
+
+Final: 211 MCQs, zero items with an unaccepted correct answer, zero duplicates.
+
+**C3 bank expanded from 336 to 488 rows.** A research pass recovered the official
+《普通话水平测试用普通话与方言常见语法差异对照表》 (34 类, 208 answer-keyed groups),
+cross-verified character-for-character across two independent mirrors and stored
+at `docs/sources/official-grammar-contrast-table.md` with full provenance. Its own
+notation marks the standard option with `*` and dialect options with `方`, and it
+marks several groups with two correct answers (`a*b*`) — the official table itself
+sanctions multi-answer items. 143 items were generated from it, 11 of them
+officially multi-answer; groups with relational keys (`a≠b*`, `a＝b方`) were skipped
+rather than guessed. Sentence-order rows went from 39 to 182.
+
+Word-choice grew only 35 → 44, deliberately. The companion
+《普通话与方言词语对照表》 (949 entries) could **not** be retrieved — every mainland
+host was unreachable from this network — so items were hand-drafted instead and
+sent for external attestation. That check refuted most of them: of 69 proposed
+Cantonese distractors, 26 were fabrications, 8 were the same word twice, and 11
+had the wrong meaning. Only the 9 items whose distractors are attested in 粵典
+words.hk / Wiktionary were inserted. The remaining gap is recorded as a hold: the
+词语判断 sub-part has no authoritative source until that table is obtained.
+
+Verification: `tsc --noEmit` clean; 278 tests pass; production build succeeds;
+C3 exercised through its real RPC path (488 rows, 10/10/5 satisfiable, zero
+malformed rows, zero duplicate option sets, 119 rows carrying acceptedAnswers);
+production↔`xyq-preview` full-table md5 parity at 19,886 rows.
+
+**Edition caveat.** The recovered grammar table has 34 categories; the 2021 edition
+is reported as 35. The missing part could not be retrieved, so items derived from
+it may be one category short. This does not affect the correctness of any item
+generated, only the coverage.
+
 ## Asset-use traceability
 
 This snapshot introduces no new static asset. School-provided materials remain curriculum evidence only; they must not be repurposed as image, audio, passage, exercise, answer-key, or generated-scene input.
