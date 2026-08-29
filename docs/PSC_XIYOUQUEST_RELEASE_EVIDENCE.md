@@ -367,6 +367,40 @@ category still fills a 10-word session; C3 496 rows with zero measure-word items
 carrying an unaccepted official answer and zero duplicate prompts;
 production↔`xyq-preview` md5 parity at 20,369 rows.
 
+### The vocabulary comparison table: search closed as a confirmed negative (2026-08-30)
+
+《普通话水平测试用普通话与方言词语对照表》 (949 entries, p.253 of the official guide)
+is the sole authoritative basis for the 词语判断 sub-part, and it is why C3
+word-choice stands at 44 items while measure-word and sentence-order run to 274
+and 178. Two search passes have now closed, and the negative is a checked one
+rather than an abandoned attempt:
+
+- `pthxx.cn/zc/xxzl/` — the folder that yielded the grammar table — was
+  **completely enumerated** via CDX: 11 URLs, every one fetched and read. It holds
+  the neutral-tone table, the grammar table's three parts, and assorted reading
+  aids. The vocabulary table is not among them.
+- The blogger who mirrored the grammar table was identified (`c007525`, uid
+  1630402205) and their post catalogue walked across four categories, roughly 200
+  posts, including chasing the prev/next chain out from the grammar-table posts
+  themselves. No match.
+- `mandarin.edu.hk`'s CMS post index was **fully enumerated** (49 posts, ids 1–60).
+  HKUST's own PSC page cites all the appendix tables by name and count but
+  reproduces none of their bodies.
+- `doc.quark.cn` and `ywcbs.com`, the two strongest prior leads, return HTTP 523
+  **even to archive.org's own crawler**, so they are down or geofenced at origin
+  rather than merely unreachable from here.
+
+Paths not yet tried, and the only ones left: Cloudflare-gated document mirrors
+(scribd, wenku.baidu, docin) and the CNKI / 万方 academic databases, all of which
+need either a different network route or paid access. A photo or scan of pp.253ff
+from a print copy would settle it immediately — the grammar table was parsed
+straight out of its printed notation, and the same pipeline is ready for this one.
+
+Until then, word-choice stays at 44 by choice. The alternative was authoring
+dialect distractors, and when that was attempted the external attestation pass
+refuted 26 of 69 proposed Cantonese words as fabrications. Shipping invented
+vocabulary to learners is worse than a small sub-bank.
+
 ## Asset-use traceability
 
 This snapshot introduces no new static asset. School-provided materials remain curriculum evidence only; they must not be repurposed as image, audio, passage, exercise, answer-key, or generated-scene input.

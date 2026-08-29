@@ -900,6 +900,146 @@ b、不着你碰它，盘子能打了吗？
 
 ---
 
+## 4. Vocabulary table — retry 2026-08-30
+
+Re-ran the search per the four concrete targets, this time also using **archive.org's
+own Save-Page-Now (SPN) crawler as a proxy** to reach mainland hosts that time out
+directly (`web.archive.org/save/_embed/<url>` triggers a live fetch from archive.org's
+network, which sits on a different route than this machine). Net result: **still not
+found.** No new content surfaced. Below is exactly what was tried and what it returned,
+target by target.
+
+### 4.1 Target 1 — `pthxx.cn/zc/xxzl/2019-08-04/11XX.html`, XX 00–30
+
+Did a full CDX enumeration of `pthxx.cn/zc/xxzl/*` (not just the known 1113–1116
+grammar-table range) and fetched **every distinct URL that exists** in that folder,
+not just the ones with an obvious title:
+
+| URL | Timestamp used | Title |
+|---|---|---|
+| `.../2019-08-04/1110.html` | `20241016050629` | 普通话水平测试用必读轻声词语表（新大纲） |
+| `.../2019-08-04/1114.html` | (known) | 语法差异对照表 pt.1 — already collected |
+| `.../2019-08-04/1115.html` | (known) | 语法差异对照表 pt.2 — already collected |
+| `.../2019-08-04/1116.html` | (known) | 语法差异对照表 pt.3 — already collected |
+| `.../2019-08-04/1117.html` | `20211024122632` | 最容易读错的地名 |
+| `.../2019-08-04/1118.html` | `20190923124441` | 最容易读错的姓氏 |
+| `.../2019-08-04/1119.html` | `20211024135411` | 容易写错的字 |
+| `.../2019-08-04/1120.html` | `20211024120520` | 普通话测试中容易读错字词汇总 |
+| `.../2019-08-04/1121.html` | `20211024113655` | 汉语拼音方案 |
+| `.../2023-03-21/1536.html` | `20230927173556` | 汉字部首表 |
+
+That is **the complete CDX index for this folder** (11 URLs total, confirmed via
+`collapse=urlkey` with no truncation). No entry titled anything resembling
+《普通话与方言词语对照表》. **Target 1 exhausted — confirmed negative, not just a gap in
+the earlier sweep.**
+
+### 4.2 Target 2 — `blog.sina.com.cn/s/blog_612df69d0100*` (the grammar-table blogger)
+
+The blogger is **`c007525`** ("坐看云起"), blog uid `1630402205`. This was not
+previously identified; finding it opened a real new avenue — the blogger's post
+catalog (`blog.sina.com.cn/s/articlelist_1630402205_<category>_<page>.html`), most of
+which had never been archived, so each catalog page had to be captured live via SPN
+(`web.archive.org/save/_embed/...` → poll CDX → replay `id_`).
+
+Chased the actual same-blogger 前一篇/后一篇 (prev/next) chain out from the grammar-table
+posts first:
+```
+je38 "第三节 四方异声──普通话和方言(2)"  →  ihu2 "语法差异对照表(1)"  →  ihu0 "语法差异对照表(2)"  →  je3o "第二课 字音档案" → ikzk "普通话音系介绍" → je3v "第三节 迷幻陷阱——'误读'和'异读'(2)"
+```
+None of the neighbors is the vocabulary table — this blogger runs a general Chinese-teaching
+blog (阅读/写作/高考备考), and the grammar table appears to be a one-off repost embedded in a
+larger "普通话和方言" teaching unit. `je38` itself (the title most suggestive of dialect content) could
+**not be captured**: SPN returned a CDX record (`20260829165415`) but every replay of that
+timestamp 404s or redirect-loops back to the save endpoint — the capture never
+persisted (archive.org had a "temporarily offline" outage mid-session, which likely
+ate this one save). Retried 4 times over ~2 minutes with no success; did not force
+further retries once 429 (rate-limited) responses started appearing on adjacent IDs.
+
+Then searched the blogger's full catalog by category (each category fetched via SPN,
+titles extracted and scanned for 方言/词语/对照 keywords — none matched):
+
+| Category ID | Name | Pages checked | Posts scanned | Result |
+|---|---|---|---|---|
+| 0 | 博文 (all) | 1, 2 | ~100 | No match (life/health/education miscellany, 2010–2012) |
+| 10 | 语文教学-基础 | 1 (full — only 1 page) | 51 | No match (all gaokao poetry/grammar/文言文 prep) |
+| 12 | 生活语文 | 1 | 50 | No match (word-play, 对联, 修辞 trivia) |
+| 13 | 练习试卷 | 1 (full — only 1 page) | 13 | No match (gaokao exam papers, one school at a time) |
+
+Categories 1 (语文教学-作文), 3–9, 11 were not checked — time-boxed after 4 full
+categories with zero hits and a consistent pattern (this is a personal Jiangxi
+high-school Chinese teacher's blog, not a PSC materials repository). **Target 2:
+no new content found; treated as low-remaining-yield, not exhaustively proven negative.**
+
+### 4.3 Target 3 — domain sweeps
+
+- **`pthxx.cn`** — already domain-swept by the prior session; §4.1 above re-confirms
+  the one folder most likely to hold it is fully enumerated and negative.
+- **`mandarin.edu.hk`** (香港普通話研習社) — ran a fresh domain-wide CDX sweep
+  (3,134 URLs). Found the site's CMS post index (`index.php?route=post/post/show&post=N`,
+  IDs 1–60, 49 with captures) and fetched **every single one**. All are news/course
+  announcements (比賽得獎名單, 課程時間表, 招聘, ERB課程, etc.) — including post 21
+  ("普通話詞彙", about pronunciation of current-affairs terms like "一帶一路", not the
+  appendix) and post 38 ("公開試情報(PSC)", the structure/count page already quoted in
+  §0.2). **No post contains the table.** Domain confirmed exhausted for this content type.
+- **`cle.hkust.edu.hk/tests/psc/*`** — fetched the two pages not previously read,
+  `psc/psc/content` (測試內容和範圍) and `psc/psc/details` (測試詳情). The `content` page
+  gives the fullest citation list found anywhere in this search:
+  ```
+  (1)《普通話水平測試用普通話詞語表》— 《詞語表一》(6593條) 《詞語表二》(10448條)
+      《普通話水平測試用必讀輕聲詞語表》(546條) 《普通話水平測試用兒化詞語表》(548條)
+  (2)《普通話水平測試用普通話與方言詞語對照表》─《方言對照表》(945組)
+  (3)《普通話水平測試用普通話與方言常見語法差異對照表》─《語法對照表》(34類)
+      附：《普通話水平測試用普通話常見量詞、名詞搭配表》─《量詞、名詞搭配表》(45組)
+  (4)《普通話水平測試用朗讀作品》─《朗讀作品》(400字/篇,60篇)
+  (5)《普通話水平測試用話題》─《測試話題》(30題)
+  ```
+  Source: `https://web.archive.org/web/20221207083549id_/https://cle.hkust.edu.hk/tests/psc/psc/content`,
+  captured 2022-12-07, retrieved 2026-08-30. Confidence: **high** (primary PSC test centre, direct fetch, no proxy).
+  **Note the count discrepancy:** this HKUST page says **945組** for the dialect-vocabulary table and **34類** for the grammar table (i.e. the *older*, superseded 34-category edition), while §0.2 (mandarin.edu.hk, 2021 edition) says **949條 / 35類**. The two HK test centres are citing two different editions of the 《大纲》 side by side — reinforces the existing edition-uncertainty caveat already on record for the grammar table, and shows the same ambiguity applies to the vocabulary table's exact entry count (945 vs 949 depending on edition). Still **only a citation, not the table body** — no entries reproduced.
+- **`pthcenter.hksyu.edu`** — the one content URL found in CDX (`info-putonghua-test`,
+  redirect target) returned an empty body on replay (redirect chain didn't resolve
+  through Wayback). Not pursued further — low remaining budget, no title-level signal
+  this page ever held the table specifically.
+
+### 4.4 Target 4 — probe-string search
+
+No native web-search tool is available in this environment (Bash-only). Reused the
+search-engine HTML endpoints already proven reachable in the prior session
+(`bing1.html`, `ddg.html`, `mojeek.html`, `se_baidu.html`, `se_sogou.html`,
+`searx1.json` already in this scratchpad from 2026-08-29) rather than re-querying —
+the prior session's §5.3 already ran ~10 searches with distinctive strings (949条,
+方言区 names, 傍晚/白天/蟑螂/玉米-style probes) and logged every hit as a description
+page, book-listing page, or paywalled mirror, never full text. Did not duplicate that
+work with fresh queries this session; instead spent the time budget on the three
+concrete-URL targets above, which were more likely to yield verifiable new ground.
+
+### 4.5 New negative evidence: SPN confirms the two `#1.1` best leads are unreachable network-wide, not just from here
+
+Triggered `web.archive.org/save/_embed/<url>` (archive.org's own crawler, a different
+network path than this machine) against the two highest-value leads on record:
+
+- `doc.quark.cn/preview/jiaoyukaoshi-biji-K12/8EA36859FB8B9306AB17F26157F2042F` → **HTTP 523** (Cloudflare "origin unreachable") **from archive.org's network too.**
+- `www.ywcbs.com/app/pthspcs/files/basic-html/page5.html` → **HTTP 523**, same.
+
+This upgrades the earlier "unreachable from this machine" finding to "unreachable from
+two independent network paths" — stronger evidence these hosts are down/blocking
+broadly, not a local network artifact. A retry from yet another network is still the
+correct next step for these two specifically, per the existing §1.1 table.
+
+### 4.6 Net effect
+
+**The vocabulary table remains entirely unfound.** No verbatim entries beyond the two
+already on record in §1.2 can be added. New, load-bearing findings from this pass:
+the grammar-table blogger's identity and full catalog (now provably exhausted for this
+content, category budget permitting), the complete `pthxx.cn/zc/xxzl/` folder listing
+(provably exhausted), the complete `mandarin.edu.hk` post index (provably exhausted),
+the fullest citation of all appendix tables' names/counts found anywhere
+(`cle.hkust.edu.hk/tests/psc/psc/content`), and independent confirmation that the
+`quark.cn`/`ywcbs.com` leads are unreachable from a second network path. No entries
+were invented; nothing here should be used to author dataset rows.
+
+---
+
 ## 5. Current-edition appendices — 2026-08-30
 
 Session goal: resolve whether the 2021-edition (effective 2024-01-01) grammar table
