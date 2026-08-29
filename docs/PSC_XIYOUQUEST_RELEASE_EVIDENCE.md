@@ -308,6 +308,31 @@ Verified: no duplicates, every word Han-only, pinyin syllable count matches
 character count on all 450, every row renders a pinyin hint (0 falling back to
 an em dash), production↔`xyq-preview` md5 parity at 19,882 rows.
 
+### C7 expanded, and an ambiguity class caught in already-shipped rows (2026-08-30)
+
+The first C7 pass only accepted characters where **every** official reading had
+an official example word, which silently excluded the most valuable polyphones —
+差 (5 readings), 行, 和, 恶, 种, 称, 参, 薄, 炮, 膀 — because one rare reading had
+no word. Relaxing the rule to "at least two readings illustrated" and indexing the
+appendix rows as well as the word table yielded 18 more characters.
+
+Building them surfaced a defect class the first pass had not tested for: **an
+example word can itself carry two official readings at the target position.**
+公差 is both gōngchā and gōngchāi in the official table, so an item asking for
+the reading of 差 in 公差 has two correct answers — the very defect first
+reported. A mechanical check over all 53 such (word, position) pairs in the
+official table found 3 in the new batch and, more importantly, **6 already
+live**: 登场 (chǎng/cháng), 杆子 (gān/gǎn) ×2, 供养 (gōng/gòng) ×2, 受累
+(léi/lèi). All 7 prompts were removed.
+
+C7 is now 294 rows over 146 characters. One row is a deliberate exception:
+`**济济**` marks the whole word because the target character occurs twice with
+the same reading, recorded in its `display_note`.
+
+Verified: zero structural defects (option/key/marker/explanation agreement),
+zero duplicate prompts, zero remaining ambiguous example words;
+production↔`xyq-preview` md5 parity at 19,911 rows.
+
 ## Asset-use traceability
 
 This snapshot introduces no new static asset. School-provided materials remain curriculum evidence only; they must not be repurposed as image, audio, passage, exercise, answer-key, or generated-scene input.
