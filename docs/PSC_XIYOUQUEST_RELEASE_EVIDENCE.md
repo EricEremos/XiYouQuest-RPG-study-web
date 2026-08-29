@@ -158,6 +158,32 @@ are registered OIDC redirect URIs, so a signed-in check requires port 3000 to
 be free. Practice pages themselves remain behind HKUST SSO, so rendering them
 needs an interactive sign-in.
 
+### Signed-in production check, and a live code/data mismatch (2026-08-29)
+
+Verified on the deployed app (`cle-xyq.hkust.edu.hk`) with a signed-in account.
+The rebuilt bank **is** live — C6 serves word-table entries (充塞/渣滓/政策/思潮/
+身材), C7 serves the new item shape (`花**岗**岩` with options gāng/gǎng,
+correctly keyed, the `**…**` marker rendering as a highlighted character), and
+C3 serves the school-supplied items.
+
+**But the production build predates this work, so the database was rebuilt
+while the code that reads it was not deployed.** Observed consequences:
+
+| Surface | Deployed behaviour | After deploying the current branch |
+| --- | --- | --- |
+| C6 pinyin hint | `—` for every word (confirmed on all five words of group 1) | the row's official reading |
+| C6 pool | first 200 rows of 450 by physical order; the `ln` contrast sits past the cap | all 450, sampled |
+| C7 pool | first 100 rows of 265 | all 265, sampled |
+| C3 session | 15 questions (5/5/5) | 25 (10/10/5, the official structure) |
+
+The C6 pinyin gap is a **regression introduced by the rebuild**: the previous
+118 drill words were all present in the bundled static pinyin map, and the
+word-table words that replaced them are not. The code fix landed in 64eca7e and
+the read fixes in c7f7377/66afecc, so deploying the current branch closes all
+four rows above. Until then the deployed app degrades exactly as tabulated.
+Deployment is not performed from here — it needs the `xyq` Vercel access
+recorded in the release holds.
+
 ## Asset-use traceability
 
 This snapshot introduces no new static asset. School-provided materials remain curriculum evidence only; they must not be repurposed as image, audio, passage, exercise, answer-key, or generated-scene input.
