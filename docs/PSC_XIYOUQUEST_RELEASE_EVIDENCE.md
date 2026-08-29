@@ -245,10 +245,29 @@ C3 exercised through its real RPC path (484 rows, 10/10/5 satisfiable, zero
 malformed rows, zero duplicate option sets, 119 rows carrying acceptedAnswers);
 production↔`xyq-preview` full-table md5 parity at 19,882 rows.
 
-**Edition caveat.** The recovered grammar table has 34 categories; the 2021 edition
-is reported as 35. The missing part could not be retrieved, so items derived from
-it may be one category short. This does not affect the correctness of any item
-generated, only the coverage.
+**Edition caveat — confirmed, and stamped on every affected row.** The recovered
+grammar table has 34 categories. Multiple independent Chinese university and
+official-notice sources confirm that the edition in force since **2024-01-01**
+(《普通话水平测试实施纲要（2021年版）》, 语文出版社) revises that table to **35
+categories** and additionally "modified, added and deleted" example sentences,
+while the 量词、名词搭配表 had some nouns and quantifiers adjusted. The recovered
+table is therefore the superseded edition.
+
+Two consequences, handled rather than hidden:
+
+- All 139 items generated from it now carry
+  `source_version: psc-shishigangyao-appendix-pre2024` and an `edition_caveat`
+  block naming the discrepancy and its sources, so no row implies it came from
+  the in-force printing. The dialect contrast each item teaches is unaffected —
+  these are genuine Putonghua/dialect distinctions — but an item may not match
+  the current printed table verbatim.
+- The 量词 table used here has exactly 45 rows, which matches the count the HK
+  sources attribute to the current edition, so the measure-word decisions are
+  believed current. "Some nouns and quantifiers adjusted" means this should be
+  re-checked against a current print copy when one is available.
+
+Obtaining the in-force 35-category table is now a known gap alongside the
+vocabulary table, and blocked the same way.
 
 **Retrieval closed — do not repeat this search.** A second, direct attempt to obtain
 《普通话水平测试用普通话与方言词语对照表》 exhausted the remaining paths:
